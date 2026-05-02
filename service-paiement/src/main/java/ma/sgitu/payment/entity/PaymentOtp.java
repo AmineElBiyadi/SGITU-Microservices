@@ -8,16 +8,33 @@ import java.time.LocalDateTime;
 @Table(name = "payment_otps")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PaymentOtp {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "user_id", nullable = false)
     private Long userId;
-    private Long paymentAccountId;
-    private String otpHash; // Code haché (Sécurité)
 
-    private String status; // PENDING, VERIFIED, EXPIRED, FAILED
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_account_id", nullable = false)
+    private PaymentAccount paymentAccount;
+
+    @Column(name = "otp_hash", nullable = false)
+    private String otpHash;
+
+    @Column(name = "status", nullable = false)
+    private String status = "PENDING";
+
+    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
-    private Integer attempts; // Nombre de tentatives (max 3 par exemple)
-    private LocalDateTime createdAt;
+
+    @Column(name = "attempts", nullable = false)
+    private Integer attempts = 0;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
 }

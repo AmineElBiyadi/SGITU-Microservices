@@ -109,8 +109,8 @@ public class PaymentService {
             return;
         }
 
-        // 2. Vérifier Solde et Statut
-        if (account.getStatus() != ma.sgitu.payment.enums.AccountStatus.ACTIVE) {
+        // 2. Vérifier Statut — ✅ String comparé avec String
+        if (!"ACTIVE".equals(account.getStatus())) {
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.ACCOUNT_NOT_ACTIVE);
         } else if (account.getBalance().compareTo(payment.getAmount()) < 0) {
@@ -128,4 +128,4 @@ public class PaymentService {
             payment.setStatus(PaymentStatus.SUCCESS);
         }
     }
-}
+    }
