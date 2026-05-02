@@ -21,12 +21,8 @@ public class Report {
 
     @Id
     private String id;
-    private String title;
-    private LocalDate periodStart;
-    private LocalDate periodEnd;
     private LocalDateTime generatedAt;
-    private String generatedBy;
-    private List<String> snapshotIds;
-    private Map<String, Object> summary;
-    private String status;
+    private String period;
+    private List<SnapshotType> requestedTypes;
+    private List<StatSnapshot> snapshots;
 }

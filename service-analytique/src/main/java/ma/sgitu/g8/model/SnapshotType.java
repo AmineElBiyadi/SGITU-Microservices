@@ -1,10 +1,12 @@
 package ma.sgitu.g8.model;
 
 public enum SnapshotType {
-    FREQUENCY,
+    TRIPS,
     REVENUE,
-    SUBSCRIPTION,
-    INCIDENT,
-    VEHICLE,
+    INCIDENTS,
+    VEHICLES,
+    USERS,
+    SUBSCRIPTIONS,
+    DASHBOARD,
     PREDICTION
 }
