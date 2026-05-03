@@ -9,4 +9,6 @@ public enum SnapshotType {
     SUBSCRIPTIONS,
     DASHBOARD,
     PREDICTION
+
+
 }
