@@ -7,4 +7,6 @@ public enum SnapshotType {
     INCIDENT,
     VEHICLE,
     PREDICTION
+
+
 }
