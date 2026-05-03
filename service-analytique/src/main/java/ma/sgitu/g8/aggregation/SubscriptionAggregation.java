@@ -134,7 +134,7 @@ public class SubscriptionAggregation {
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         snapshotRepository.save(StatSnapshot.builder()
-                .snapshotType(SnapshotType.SUBSCRIPTION)
+                .snapshotType(SnapshotType.SUBSCRIPTIONS)
                 .statId(statId)
                 .granularity(granularity)
                 .period(period)

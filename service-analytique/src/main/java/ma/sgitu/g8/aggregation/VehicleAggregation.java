@@ -139,7 +139,7 @@ public class VehicleAggregation {
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         snapshotRepository.save(StatSnapshot.builder()
-                .snapshotType(SnapshotType.VEHICLE)
+                .snapshotType(SnapshotType.VEHICLES)
                 .statId(statId)
                 .granularity(granularity)
                 .period(period)

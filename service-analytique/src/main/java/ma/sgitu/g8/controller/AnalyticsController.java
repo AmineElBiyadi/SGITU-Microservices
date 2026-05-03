@@ -68,7 +68,7 @@ public class AnalyticsController {
     @GetMapping("/dashboard")
     @Operation(summary = "Get dashboard summary statistics")
     public ResponseEntity<?> getDashboard(@RequestParam(required = false) String period) {
-        return getSnapshotResponse(SnapshotType.DASHBOARD, period);
+        return ResponseEntity.ok(analyticsService.getAllSnapshots());
     }
 
     @PostMapping("/reports/generate")

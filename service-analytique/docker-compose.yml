@@ -13,11 +13,33 @@ services:
     build: .
     container_name: g8-analytics-service
     ports:
-      - "8080:8080"
+      - "8088:8088"
     environment:
       MONGO_URI: mongodb://mongodb:27017/g8_analytics
+      ML_SERVICE_URL: http://ml-service:5000
     depends_on:
       - mongodb
+      - ml-service
+  
+  ml-service:
+    build: ./ml-service
+    container_name: g8-ml-service
+    ports:
+      - "5000:5000"
+
+  mongo-express:
+    image: mongo-express
+    container_name: g8-mongo-express
+    restart: always
+    ports:
+      - "9099:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH: false # Disables login page for local dev
+    depends_on:
+      - mongodb
+
 
 volumes:
   g8-mongo-data:

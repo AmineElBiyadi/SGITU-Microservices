@@ -27,6 +27,10 @@ public class AnalyticsService {
         return snapshotRepository.findBySnapshotTypeAndPeriod(type, period);
     }
     
+    public List<StatSnapshot> getAllSnapshots() {
+        return snapshotRepository.findAll();
+    }
+
     public List<StatSnapshot> getSnapshotsByType(SnapshotType type) {
         return snapshotRepository.findBySnapshotType(type);
     }

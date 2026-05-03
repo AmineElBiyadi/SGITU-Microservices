@@ -7,6 +7,7 @@ import ma.sgitu.g8.aggregation.SubscriptionAggregation;
 import ma.sgitu.g8.aggregation.TicketAggregation;
 import ma.sgitu.g8.aggregation.VehicleAggregation;
 import ma.sgitu.g8.alert.ThresholdAlertService;
+import ma.sgitu.g8.ml.MlPredictionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,9 @@ public class ScheduledAnalyticsJob {
     @Autowired
     private ThresholdAlertService thresholdAlertService;
 
+    @Autowired
+    private MlPredictionService mlPredictionService;
+
     @Scheduled(fixedRate = 60000)
     public void runAnalytics() {
         log.info("ScheduledAnalyticsJob started");
@@ -42,6 +46,8 @@ public class ScheduledAnalyticsJob {
         revenueAggregation.compute();
         subscriptionAggregation.compute();
         thresholdAlertService.detect();
+        mlPredictionService.computePeakHoursPrediction();
+        mlPredictionService.computeIncidentPrediction();
         log.info("ScheduledAnalyticsJob finished");
     }
 }

@@ -127,7 +127,7 @@ public class IncidentAggregation {
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         snapshotRepository.save(StatSnapshot.builder()
-                .snapshotType(SnapshotType.INCIDENT)
+                .snapshotType(SnapshotType.INCIDENTS)
                 .statId(statId)
                 .granularity(granularity)
                 .period(period)
