@@ -5,3 +5,4 @@ public enum IdentityMethodType {
     FINGERPRINT,
     FACE_ID
 }
+
