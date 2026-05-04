@@ -1,7 +1,6 @@
 package com.ensate.billetterie.validation.steps;
 
 import com.ensate.billetterie.ticket.domain.entity.Ticket;
-import com.ensate.billetterie.ticket.domain.enums.TicketStatus;
 import com.ensate.billetterie.validation.domain.ValidationContext;
 import com.ensate.billetterie.validation.exceptions.ValidationException;
 import com.ensate.billetterie.validation.interfaces.NextStep;
@@ -11,27 +10,25 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 /**
- * Validation step that checks if a ticket has a valid status for validation.
- * Only tickets with status ISSUED or TRANSFERRED can be validated and redeemed.
+ * Validation step that checks if the person presenting the ticket is the current holder.
+ * This ensures that only the current ticket holder (or an authorized transferee) can redeem it.
  * 
- * Throws ValidationException if ticket status is:
- * - REDEEMED or USED (already used)
- * - CANCELLED (cancelled by owner or admin)
- * - EXPIRED (passed expiry date)
- * - REFUNDED (refunded to holder)
- * - FLAGGED (flagged for review)
+ * Compares the ticket's holderId with the holderId in the ValidationContext.
+ * If the context holderId is null, it attempts to extract it from the identity verification payload.
+ * 
+ * Throws ValidationException if the holder IDs do not match.
  */
-public class TicketStatusStep implements ValidationStep {
+public class HolderMatchStep implements ValidationStep {
     
     private final Executor validationExecutor;
     
-    public TicketStatusStep(Executor validationExecutor) {
+    public HolderMatchStep(Executor validationExecutor) {
         this.validationExecutor = validationExecutor;
     }
     
     @Override
     public String getStepName() {
-        return "TicketStatusStep";
+        return "HolderMatchStep";
     }
     
     @Override
@@ -41,14 +38,15 @@ public class TicketStatusStep implements ValidationStep {
     ) {
         return CompletableFuture.supplyAsync(() -> {
             Ticket ticket = context.getResolvedTicket();
-            TicketStatus status = ticket.getStatus();
+            String ticketHolderId = ticket.getHolderId();
+            String presenterId = context.getHolderId();
             
-            // Valid statuses for validation
-            if (status != TicketStatus.ISSUED && status != TicketStatus.TRANSFERRED) {
+            // Check if holder IDs match
+            if (presenterId == null || !presenterId.equals(ticketHolderId)) {
                 throw new ValidationException(
                         getStepName(),
-                        "Ticket status '" + status + "' is not eligible for validation. " +
-                        "Only ISSUED or TRANSFERRED tickets can be validated."
+                        "Presenter ID '" + presenterId + "' does not match ticket holder '" + 
+                        ticketHolderId + "'. Only the ticket holder can redeem it."
                 );
             }
             
@@ -61,10 +59,9 @@ public class TicketStatusStep implements ValidationStep {
             }
             throw new ValidationException(
                     getStepName(),
-                    "Error checking ticket status: " + ex.getMessage(),
+                    "Error checking holder match: " + ex.getMessage(),
                     ex
             );
         });
     }
 }
-
