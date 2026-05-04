@@ -12,7 +12,7 @@ import com.sgitu.servicegestionincidents.service.NotificationService;
 import com.sgitu.servicegestionincidents.util.ReferenceGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -26,7 +26,7 @@ public class SuiviVehiculeConsumer {
     private final NotificationService notificationService;
     private final ReferenceGenerator referenceGenerator;
 
-    @RabbitListener(queues = MessagingConstants.SUIVI_VEHICULE_QUEUE)
+    @KafkaListener(topics = MessagingConstants.SUIVI_VEHICULE_TOPIC, groupId = MessagingConstants.GROUP_ID)
     public void recevoirIncidentVehicule(IncidentDetecteEvent event) {
         log.info("Incident détecté par IoT - Type: {}, Véhicule: {}", event.getType(), event.getVehiculeId());
 

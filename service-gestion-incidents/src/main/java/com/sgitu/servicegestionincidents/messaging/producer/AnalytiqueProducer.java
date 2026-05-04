@@ -4,7 +4,7 @@ import com.sgitu.servicegestionincidents.messaging.constant.MessagingConstants;
 import com.sgitu.servicegestionincidents.messaging.event.IncidentAnalytiqueEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,15 +12,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AnalytiqueProducer {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void envoyerDonneesAnalytique(IncidentAnalytiqueEvent event) {
         log.info("Publication données analytique pour incident {}", event.getReference());
-        rabbitTemplate.convertAndSend(
-                MessagingConstants.INCIDENT_EXCHANGE,
-                MessagingConstants.ANALYTIQUE_OUT_ROUTING_KEY,
-                event
-        );
+        kafkaTemplate.send(MessagingConstants.ANALYTIQUE_OUT_TOPIC, event);
         log.info("Données analytique publiées avec succès");
     }
 }

@@ -12,7 +12,7 @@ import com.sgitu.servicegestionincidents.service.NotificationService;
 import com.sgitu.servicegestionincidents.util.ReferenceGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -26,7 +26,7 @@ public class AnalytiqueConsumer {
     private final NotificationService notificationService;
     private final ReferenceGenerator referenceGenerator;
 
-    @RabbitListener(queues = MessagingConstants.ANALYTIQUE_IN_QUEUE)
+    @KafkaListener(topics = MessagingConstants.ANALYTIQUE_IN_TOPIC, groupId = MessagingConstants.GROUP_ID)
     public void recevoirIncidentAnalytique(IncidentDetecteEvent event) {
         log.info("Incident détecté par analytique - Type: {}, Ligne: {}", event.getType(), event.getLigneTransport());
 
