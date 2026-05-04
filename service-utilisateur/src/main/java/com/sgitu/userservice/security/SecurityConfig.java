@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/roles").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/deactivate").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/users/*/activate").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/users/*").hasRole("ADMIN")
 
                 // Tout le reste — authentifié
