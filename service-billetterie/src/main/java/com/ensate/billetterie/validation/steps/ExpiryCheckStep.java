@@ -1,37 +1,32 @@
 package com.ensate.billetterie.validation.steps;
 
 import com.ensate.billetterie.ticket.domain.entity.Ticket;
-import com.ensate.billetterie.ticket.domain.enums.TicketStatus;
 import com.ensate.billetterie.validation.domain.ValidationContext;
 import com.ensate.billetterie.validation.exceptions.ValidationException;
 import com.ensate.billetterie.validation.interfaces.NextStep;
 import com.ensate.billetterie.validation.interfaces.ValidationStep;
 
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 /**
- * Validation step that checks if a ticket has a valid status for validation.
- * Only tickets with status ISSUED or TRANSFERRED can be validated and redeemed.
+ * Validation step that checks if a ticket has expired.
+ * A ticket expires when the current time surpasses its expiresAt timestamp.
  * 
- * Throws ValidationException if ticket status is:
- * - REDEEMED or USED (already used)
- * - CANCELLED (cancelled by owner or admin)
- * - EXPIRED (passed expiry date)
- * - REFUNDED (refunded to holder)
- * - FLAGGED (flagged for review)
+ * Throws ValidationException if the ticket has expired (expiresAt < now).
  */
-public class TicketStatusStep implements ValidationStep {
+public class ExpiryCheckStep implements ValidationStep {
     
     private final Executor validationExecutor;
     
-    public TicketStatusStep(Executor validationExecutor) {
+    public ExpiryCheckStep(Executor validationExecutor) {
         this.validationExecutor = validationExecutor;
     }
     
     @Override
     public String getStepName() {
-        return "TicketStatusStep";
+        return "ExpiryCheckStep";
     }
     
     @Override
@@ -41,14 +36,14 @@ public class TicketStatusStep implements ValidationStep {
     ) {
         return CompletableFuture.supplyAsync(() -> {
             Ticket ticket = context.getResolvedTicket();
-            TicketStatus status = ticket.getStatus();
+            Instant expiresAt = ticket.getExpiresAt();
+            Instant now = Instant.now();
             
-            // Valid statuses for validation
-            if (status != TicketStatus.ISSUED && status != TicketStatus.TRANSFERRED) {
+            // Check if ticket has expired
+            if (expiresAt != null && now.isAfter(expiresAt)) {
                 throw new ValidationException(
                         getStepName(),
-                        "Ticket status '" + status + "' is not eligible for validation. " +
-                        "Only ISSUED or TRANSFERRED tickets can be validated."
+                        "Ticket has expired. Expiry date: " + expiresAt + ", Current time: " + now
                 );
             }
             
@@ -61,10 +56,9 @@ public class TicketStatusStep implements ValidationStep {
             }
             throw new ValidationException(
                     getStepName(),
-                    "Error checking ticket status: " + ex.getMessage(),
+                    "Error checking ticket expiry: " + ex.getMessage(),
                     ex
             );
         });
     }
 }
-

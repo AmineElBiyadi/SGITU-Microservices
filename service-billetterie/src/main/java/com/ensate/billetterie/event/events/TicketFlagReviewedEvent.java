@@ -11,21 +11,24 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TicketIssuedEvent implements BaseEvent {
+public class TicketFlagReviewedEvent implements BaseEvent {
     @Builder.Default
-    private String eventType = "TICKET_ISSUED";
+    private String eventType = "TICKET_FLAG_REVIEWED";
     private String ticketId;
     private String userId;
     private String tripId;
-    private String tokenType;
-    private String tokenValue;
-    private String classe;
-    private String type;
-    private Instant issuedAt;
-    private Instant expiresAt;
+    private String adminId;
+    private Decision decision;
+    private TicketFlaggedEvent.RaisonFlag raisonFlag;
+    private String commentaire;
+    private Instant reviewedAt;
+
+    public enum Decision {
+        FRAUDE_CONFIRMEE, FAUX_POSITIF
+    }
 
     @Override
     public Instant getTimestamp() {
-        return issuedAt;
+        return reviewedAt;
     }
 }

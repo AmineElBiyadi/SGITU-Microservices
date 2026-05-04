@@ -11,21 +11,18 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TicketIssuedEvent implements BaseEvent {
+public class TicketRefundedEvent implements BaseEvent {
     @Builder.Default
-    private String eventType = "TICKET_ISSUED";
+    private String eventType = "TICKET_REFUNDED";
     private String ticketId;
     private String userId;
-    private String tripId;
-    private String tokenType;
-    private String tokenValue;
-    private String classe;
-    private String type;
-    private Instant issuedAt;
-    private Instant expiresAt;
+    private Double montant;
+    private String devise;
+    private TicketCancelledEvent.Declencheur declencheur;
+    private Instant refundedAt;
 
     @Override
     public Instant getTimestamp() {
-        return issuedAt;
+        return refundedAt;
     }
 }
