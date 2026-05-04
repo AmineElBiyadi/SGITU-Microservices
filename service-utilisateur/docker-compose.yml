@@ -14,6 +14,8 @@ services:
       SERVER_PORT: 8083
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       INTERNAL_KEY: ${INTERNAL_SECRET_KEY:-SGITU_INTERNAL_SECRET_KEY_CHANGE_ME}
+      # G8 — Analyse & données: ask them for their container name and port
+      G8_BASE_URL: ${G8_BASE_URL:-}
     depends_on:
       users-db:
         condition: service_healthy

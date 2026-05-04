@@ -99,6 +99,15 @@ public class UserController {
         return ResponseEntity.ok(userService.deactivateUser(id));
     }
 
+    // ── PUT /users/{id}/activate — Réactiver un compte (Admin) ──
+
+    @Operation(summary = "Réactiver un compte utilisateur", description = "Remet un compte inactif en état actif (Admin uniquement).")
+    @PutMapping("/{id}/activate")
+    public ResponseEntity<UserResponseDTO> activateUser(
+            @Parameter(description = "ID de l'utilisateur à réactiver") @PathVariable Long id) {
+        return ResponseEntity.ok(userService.activateUser(id));
+    }
+
     // ── DELETE /users/{id} — Supprimer un compte (Admin) ──
 
     @Operation(summary = "Supprimer définitivement un utilisateur", description = "Supprime l'utilisateur et son profil de la base de données (Admin uniquement).")

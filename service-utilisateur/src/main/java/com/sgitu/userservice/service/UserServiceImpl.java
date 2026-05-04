@@ -20,6 +20,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserEventPublisher eventPublisher;
 
     @Override
     public UserResponseDTO createUser(UserRequestDTO request) {
@@ -49,6 +50,8 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         User saved = userRepository.save(user);
+        // Notify consumers: new user is active
+        eventPublisher.publish(saved.getId(), "active");
         return toResponseDTO(saved);
     }
 
@@ -131,7 +134,21 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
         user.setActive(false);
-        return toResponseDTO(userRepository.save(user));
+        UserResponseDTO result = toResponseDTO(userRepository.save(user));
+        // Notify consumers: user is now inactive
+        eventPublisher.publish(id, "inactive");
+        return result;
+    }
+
+    @Override
+    public UserResponseDTO activateUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+        user.setActive(true);
+        UserResponseDTO result = toResponseDTO(userRepository.save(user));
+        // Notify consumers: user is active again
+        eventPublisher.publish(id, "active");
+        return result;
     }
 
     @Override
