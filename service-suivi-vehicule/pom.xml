@@ -99,6 +99,19 @@
 		</dependency>
 
 		<!-- ======================== -->
+		<!--        CACHE             -->
+		<!-- ======================== -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<!-- Caffeine : cache local haute perf avec TTL -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
+		<!-- ======================== -->
 		<!--    SWAGGER / OpenAPI     -->
 		<!-- ======================== -->
 		<dependency>

@@ -29,4 +29,12 @@ public class Arret {
 
     @Column(nullable = false)
     private Boolean present;
+
+    // Coordonnées GPS de l'arrêt (nécessaires pour le calcul de proximité)
+    private Double latitude;
+
+    private Double longitude;
+
+    // Nom lisible de l'arrêt (ex: "Arrêt Liberté", "Terminus Nord")
+    private String nom;
 }
