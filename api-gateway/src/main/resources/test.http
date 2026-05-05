@@ -1,0 +1,31 @@
+### Register
+### Register
+POST http://localhost:8080/auth/register
+Content-Type: application/json
+
+{
+  "email": "wissal2@sgitu.ma",
+  "password": "123456",
+  "role": "ROLE_USER"
+}
+
+### Login
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "wissal@sgitu.ma",
+  "password": "123456"
+}
+### Test route protégée
+GET http://localhost:8080/api/test
+Authorization: Bearer eyJhbGci...
+### Test route protégée avec token
+GET http://localhost:8080/api/test
+Authorization: Bearer eyJhbGci...colle_ton_token_ici
+### Test route protégée avec token
+GET http://localhost:8080/api/test
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIi...ton_token_complet_ici
+### Test route protégée avec vrai token
+GET http://localhost:8080/api/test
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ3aXNzYWxAc2dpdHUubWEiLCJpYXQiOjE3NzgwMTI5ODMsImV4cCI6MTc3ODAxNjU4M30.Frm4OG2jWMMqx21BYdDU7NZboh0zpZ5Z-IRmjaFRBI4
