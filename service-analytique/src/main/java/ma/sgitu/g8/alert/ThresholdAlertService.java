@@ -8,8 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -36,18 +39,23 @@ public class ThresholdAlertService {
         snapshotRepository.findFirstByStatIdOrderByComputedAtDesc("VEH_PUNCTUALITY")
                 .filter(snapshot -> value(snapshot) < 80.0)
                 .ifPresent(snapshot -> sendAlert(Map.of(
-                        "source", "G8_ANALYTICS",
+                        "notificationId", UUID.randomUUID().toString(),
+                        "sourceService", "G8_ANALYTICS",
                         "eventType", "PUNCTUALITY_ALERT",
-                        "severity", "WARNING",
-                        "notificationType", "EMAIL, PUSH",
-                        "targetAudience", "OPERATORS",
-                        "subject", "[SGITU] Taux de ponctualité critique",
-                        "body", "Le taux de ponctualité est tombé à " + value(snapshot) + "% (seuil : 80%)",
+                        "channel", "EMAIL",
+                        "priority", "HIGH",
+                        "recipient", Map.of(
+                                "userId", "op-01",
+                                "email", "operateur@sgitu.ma"
+                        ),
                         "metadata", Map.of(
-                                "statId", "VEH_02",
+                                "severity", "WARNING",
+                                "targetAudience", "OPERATORS",
                                 "value", value(snapshot),
                                 "threshold", 80,
-                                "period", "today"
+                                "lineId", "GLOBAL",
+                                "period", YearMonth.now().toString(),
+                                "statId", "VEH_02"
                         )
                 )));
     }
@@ -56,18 +64,22 @@ public class ThresholdAlertService {
         snapshotRepository.findFirstByStatIdOrderByComputedAtDesc("INC_TOTAL")
                 .filter(snapshot -> value(snapshot) > 10)
                 .ifPresent(snapshot -> sendAlert(Map.of(
-                        "source", "G8_ANALYTICS",
+                        "notificationId", UUID.randomUUID().toString(),
+                        "sourceService", "G8_ANALYTICS",
                         "eventType", "HIGH_INCIDENT_VOLUME",
-                        "severity", "WARNING",
-                        "notificationType", "EMAIL, SMS",
-                        "targetAudience", "SUPERVISORS",
-                        "subject", "[SGITU] Nombre d'incidents élevé",
-                        "body", "Incidents aujourd'hui : " + value(snapshot) + " (seuil : 10)",
+                        "channel", "EMAIL",
+                        "priority", "HIGH",
+                        "recipient", Map.of(
+                                "userId", "sup-01",
+                                "email", "superviseur@sgitu.ma"
+                        ),
                         "metadata", Map.of(
-                                "statId", "INC_01",
+                                "severity", "WARNING",
+                                "targetAudience", "SUPERVISORS",
                                 "value", value(snapshot),
                                 "threshold", 10,
-                                "period", "today"
+                                "date", LocalDate.now().toString(),
+                                "statId", "INC_01"
                         )
                 )));
     }
@@ -76,18 +88,22 @@ public class ThresholdAlertService {
         snapshotRepository.findFirstByStatIdOrderByComputedAtDesc("SUB_CHURN")
                 .filter(snapshot -> value(snapshot) > 15)
                 .ifPresent(snapshot -> sendAlert(Map.of(
-                        "source", "G8_ANALYTICS",
+                        "notificationId", UUID.randomUUID().toString(),
+                        "sourceService", "G8_ANALYTICS",
                         "eventType", "HIGH_CHURN_RATE",
-                        "severity", "WARNING",
-                        "notificationType", "EMAIL",
-                        "targetAudience", "MANAGEMENT",
-                        "subject", "[SGITU] Taux d'attrition élevé",
-                        "body", "Taux de churn : " + value(snapshot) + "% (seuil : 15%)",
+                        "channel", "EMAIL",
+                        "priority", "HIGH",
+                        "recipient", Map.of(
+                                "userId", "mgmt-01",
+                                "email", "direction@sgitu.ma"
+                        ),
                         "metadata", Map.of(
-                                "statId", "SUB_04",
+                                "severity", "WARNING",
+                                "targetAudience", "MANAGEMENT",
                                 "value", value(snapshot),
                                 "threshold", 15,
-                                "period", "this_month"
+                                "month", YearMonth.now().toString(),
+                                "statId", "SUB_04"
                         )
                 )));
     }
@@ -102,20 +118,25 @@ public class ThresholdAlertService {
                             .orElse(0);
                     double threshold = average * 0.70;
                     double todayValue = value(todaySnapshot);
+
                     if (average > 0 && todayValue < threshold) {
                         sendAlert(Map.of(
-                                "source", "G8_ANALYTICS",
+                                "notificationId", UUID.randomUUID().toString(),
+                                "sourceService", "G8_ANALYTICS",
                                 "eventType", "LOW_DAILY_REVENUE",
-                                "severity", "WARNING",
-                                "notificationType", "EMAIL",
-                                "targetAudience", "MANAGEMENT",
-                                "subject", "[SGITU] Revenu journalier bas",
-                                "body", "Revenu du jour inférieur à 70% de la moyenne",
+                                "channel", "EMAIL",
+                                "priority", "HIGH",
+                                "recipient", Map.of(
+                                        "userId", "mgmt-01",
+                                        "email", "direction@sgitu.ma"
+                                ),
                                 "metadata", Map.of(
-                                        "statId", "REV_01",
+                                        "severity", "WARNING",
+                                        "targetAudience", "MANAGEMENT",
                                         "value", todayValue,
                                         "threshold", threshold,
-                                        "period", "today"
+                                        "date", LocalDate.now().toString(),
+                                        "statId", "REV_01"
                                 )
                         ));
                     }
@@ -126,18 +147,23 @@ public class ThresholdAlertService {
         snapshotRepository.findFirstByStatIdOrderByComputedAtDesc("INC_REPEAT_ZONES")
                 .filter(snapshot -> value(snapshot) > 0)
                 .ifPresent(snapshot -> sendAlert(Map.of(
-                        "source", "G8_ANALYTICS",
+                        "notificationId", UUID.randomUUID().toString(),
+                        "sourceService", "G8_ANALYTICS",
                         "eventType", "INCIDENT_ZONE_RISK",
-                        "severity", "CRITICAL",
-                        "notificationType", "EMAIL, SMS, PUSH",
-                        "targetAudience", "OPERATORS, SUPERVISORS",
-                        "subject", "[SGITU] Zone à risque détectée",
-                        "body", value(snapshot) + " zone(s) avec incidents répétés détectée(s)",
+                        "channel", "EMAIL",
+                        "priority", "HIGH",
+                        "recipient", Map.of(
+                                "userId", "op-01",
+                                "email", "operateur@sgitu.ma"
+                        ),
                         "metadata", Map.of(
-                                "statId", "INC_05",
+                                "severity", "CRITICAL",
+                                "targetAudience", "OPERATORS",
                                 "value", value(snapshot),
                                 "threshold", 3,
-                                "period", "this_month"
+                                "zoneId", "GLOBAL",
+                                "period", YearMonth.now().toString(),
+                                "statId", "INC_05"
                         )
                 )));
     }

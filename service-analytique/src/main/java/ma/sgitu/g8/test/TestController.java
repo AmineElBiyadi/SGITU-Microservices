@@ -32,6 +32,10 @@ public class TestController {
 
     @GetMapping("/snapshots")
     public ResponseEntity<List<StatSnapshot>> snapshots() {
-        return ResponseEntity.ok(snapshotRepository.findAll());
+        return ResponseEntity.ok(
+                snapshotRepository.findAll(
+                        org.springframework.data.domain.PageRequest.of(0, 100)
+                ).getContent()
+        );
     }
 }
