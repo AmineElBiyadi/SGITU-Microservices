@@ -12,5 +12,5 @@ import java.util.Optional;
 public interface StatSnapshotRepository extends MongoRepository<StatSnapshot, String> {
     List<StatSnapshot> findBySnapshotType(SnapshotType type);
     List<StatSnapshot> findByPeriod(String period);
-    Optional<StatSnapshot> findBySnapshotTypeAndPeriod(SnapshotType type, String period);
+    Optional<StatSnapshot> findFirstBySnapshotTypeAndPeriodOrderByComputedAtDesc(SnapshotType type, String period);
 }

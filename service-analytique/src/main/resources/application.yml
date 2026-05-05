@@ -12,3 +12,10 @@ spring:
 logging:
   level:
     ma.sgitu.g8: DEBUG
+
+g5:
+  notification:
+    url: ${G5_NOTIFICATION_URL:http://localhost:8085/api/notifications/send}
+ml:
+  service:
+    url: ${ML_SERVICE_URL:http://localhost:5000}

@@ -24,18 +24,22 @@ public class AnalyticsService {
     }
 
     public Optional<StatSnapshot> getSnapshotByTypeAndPeriod(SnapshotType type, String period) {
-        return snapshotRepository.findBySnapshotTypeAndPeriod(type, period);
+        return snapshotRepository.findFirstBySnapshotTypeAndPeriodOrderByComputedAtDesc(type, period);
     }
     
+    public List<StatSnapshot> getAllSnapshots() {
+        return snapshotRepository.findAll();
+    }
+
     public List<StatSnapshot> getSnapshotsByType(SnapshotType type) {
         return snapshotRepository.findBySnapshotType(type);
     }
 
     public Report generateReport(String period, List<SnapshotType> types) {
+        // Collect ALL current snapshots for each requested type (all granularities)
         List<StatSnapshot> snapshots = types.stream()
-                .map(type -> snapshotRepository.findBySnapshotTypeAndPeriod(type, period))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
+                .flatMap(type -> snapshotRepository.findBySnapshotType(type).stream())
+                .filter(s -> !s.isPrediction())
                 .collect(Collectors.toList());
 
         Report report = Report.builder()
