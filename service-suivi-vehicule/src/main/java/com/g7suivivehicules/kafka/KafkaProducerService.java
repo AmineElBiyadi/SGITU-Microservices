@@ -110,7 +110,8 @@ public class KafkaProducerService {
                 .description(alert.getMessage())
                 .latitude(alert.getLatitude())
                 .longitude(alert.getLongitude())
-                .vehiculeId(alert.getVehiculeId().toString()) // Remarque : String utilisé ici au lieu de Long pour passer l'UUID
+                .vehiculeId(alert.getVehiculeId().toString()) // Remarque : String utilisé ici au lieu de Long pour
+                                                              // passer l'UUID
                 .dateDetection(alert.getTimestampDebut().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .build();
 

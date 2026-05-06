@@ -25,7 +25,7 @@ public class G4IntegrationService {
      * Calcule la déviation en mètres par rapport au tracé théorique de la ligne.
      * En production, cette méthode appellera GET /api/v1/lignes/{id}/trajet
      */
-    public double verifierDeviationItineraire(UUID ligneId, Double latitudeCourante, Double longitudeCourante) {
+    public double verifierDeviationItineraire(String ligneId, Double latitudeCourante, Double longitudeCourante) {
         // En production : Récupérer List<PointGPS> trajet = restTemplate.getForEntity(...)
         // Pour l'exemple, on imagine un point théorique (celui de G4)
         double latTheorique = latitudeCourante + 0.002; // Simule un décalage
@@ -41,7 +41,7 @@ public class G4IntegrationService {
      * Calcule le retard en minutes par rapport à l'horaire prévu à un arrêt.
      * En production, cette méthode appellera GET /api/v1/lignes/{id}/horaires
      */
-    public int verifierRetardHoraire(UUID ligneId, UUID arretId, LocalDateTime heurePassageReelle) {
+    public int verifierRetardHoraire(String ligneId, UUID arretId, LocalDateTime heurePassageReelle) {
         // En production : Récupérer l'horaire prévu pour cet arrêt via G4
         LocalDateTime heurePrevue = heurePassageReelle.minusMinutes(10); // Simule un retard de 10 min
 
