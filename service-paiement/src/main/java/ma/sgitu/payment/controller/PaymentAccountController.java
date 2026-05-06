@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import ma.sgitu.payment.dto.request.AddCardRequest;
+import ma.sgitu.payment.dto.request.AddMobileMoneyRequest;
 import ma.sgitu.payment.dto.request.VerifyOtpRequest;
 import ma.sgitu.payment.dto.response.PaymentAccountResponse;
 import ma.sgitu.payment.dto.response.TestCardResponse;
@@ -28,6 +29,13 @@ public class PaymentAccountController {
         return ResponseEntity.ok(paymentAccountService.addCard(request));
     }
 
+    @PostMapping("/payment-accounts/mobile-money")
+    @Operation(summary = "Ajouter un compte Mobile Money et déclencher OTP")
+    public ResponseEntity<PaymentAccountResponse> addMobileMoney(@RequestBody AddMobileMoneyRequest request) {
+        // On appelle addMobileMoney et on retourne l'objet réponse complet
+        return ResponseEntity.ok(paymentAccountService.addMobileMoney(request));
+    }
+
     @PostMapping("/payment-accounts/{paymentAccountId}/verify-otp")
     @Operation(summary = "Vérifier OTP et activer le moyen de paiement")
     public ResponseEntity<PaymentAccountResponse> verifyOtp(
@@ -40,6 +48,14 @@ public class PaymentAccountController {
     @Operation(summary = "Lister les moyens de paiement d'un utilisateur")
     public ResponseEntity<List<PaymentAccountResponse>> getByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(paymentAccountService.getByUserId(userId));
+    }
+
+    @GetMapping("/payment-accounts/test-mobile-money-accounts")
+    @Operation(summary = "Lister les comptes Mobile Money fictifs (Simulation)")
+    public ResponseEntity<List<ma.sgitu.payment.entity.TestMobileMoneyAccount>> getTestMobileAccounts() {
+        // Note : Tu peux soit appeler le repository directement ici,
+        // soit ajouter une méthode dans ton service comme l'a fait P2.
+        return ResponseEntity.ok(paymentAccountService.getAllTestMobileAccounts());
     }
 
     @GetMapping("/payment-accounts/{paymentAccountId}")

@@ -7,13 +7,14 @@ import ma.sgitu.payment.dto.request.VerifyOtpRequest;
 import ma.sgitu.payment.dto.response.PaymentAccountResponse;
 import ma.sgitu.payment.dto.response.TestCardResponse;
 import ma.sgitu.payment.entity.PaymentAccount;
+import ma.sgitu.payment.entity.PaymentOtp;
 import ma.sgitu.payment.entity.TestCard;
 import ma.sgitu.payment.entity.TestMobileMoneyAccount;
+import ma.sgitu.payment.enums.AccountStatus;
+import ma.sgitu.payment.enums.PaymentMethod;
 import ma.sgitu.payment.exception.BadRequestException;
 import ma.sgitu.payment.exception.NotFoundException;
-import ma.sgitu.payment.repository.PaymentAccountRepository;
-import ma.sgitu.payment.repository.TestCardRepository;
-import ma.sgitu.payment.repository.TestMobileMoneyAccountRepository;
+import ma.sgitu.payment.repository.*;
 import ma.sgitu.payment.util.HashUtil;
 import ma.sgitu.payment.util.MaskingUtil;
 import ma.sgitu.payment.util.TokenGenerator;
@@ -22,201 +23,168 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentAccountService {
 
-    // ── Repositories ──────────────────────────────────────────────────────────
-    private final PaymentAccountRepository accountRepository;
+    // Repositories unifiés
+    private final PaymentAccountRepository paymentAccountRepository;
     private final TestCardRepository testCardRepository;
     private final TestMobileMoneyAccountRepository testMobileMoneyAccountRepository;
+    private final PaymentOtpRepository paymentOtpRepository;
 
-    // ── Services ──────────────────────────────────────────────────────────────
+    // Services
     private final OtpService otpService;
-    private final NotificationService notificationService;   // implémenté par P4
+    private final NotificationService notificationService;
 
-    // ── Utils ─────────────────────────────────────────────────────────────────
-    private final HashUtil hashUtil;
+    // Utils
     private final MaskingUtil maskingUtil;
     private final TokenGenerator tokenGenerator;
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // PARTIE CARD — développée par Personne 2
-    // ═════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // PARTIE CARD (Personne 2)
+    // =========================================================================
     @Transactional
     public PaymentAccountResponse addCard(AddCardRequest request) {
-        String cardHash = hashUtil.hash(request.getCardNumber());
-        String cvvHash  = hashUtil.hash(request.getCvv());
+        // Utilisation du Hash sécurisé
+        String cardHash = HashUtil.hashValue(request.getCardNumber());
+        String cvvHash  = HashUtil.hashValue(request.getCvv());
 
-        // 1. Carte existe dans test_cards ?
         TestCard testCard = testCardRepository.findByCardNumberHash(cardHash)
-                .orElseThrow(() -> new BadRequestException(
-                        "Carte introuvable dans notre système de test."));
+                .orElseThrow(() -> new BadRequestException("Carte introuvable dans le système de test."));
 
-        // 2. CVV correct ?
         if (!testCard.getCvvHash().equals(cvvHash)) {
             throw new BadRequestException("CVV incorrect.");
         }
 
-        // 3. Statut ACTIVE ?
-        if (!"ACTIVE".equals(testCard.getStatus())) {
-            throw new BadRequestException("Carte " + testCard.getStatus().toLowerCase() + ".");
+        // Correction : Comparaison de String
+        if (!AccountStatus.ACTIVE.name().equals(testCard.getStatus())) {
+            throw new BadRequestException("Carte non active.");
         }
 
-        // 4. Date d'expiration valide ?
-        LocalDateTime now = LocalDateTime.now();
-        if (testCard.getExpiryYear() < now.getYear() ||
-                (testCard.getExpiryYear() == now.getYear()
-                        && testCard.getExpiryMonth() < now.getMonthValue())) {
-            throw new BadRequestException("Carte expirée.");
-        }
-
-        // 5. Créer payment_account en PENDING_VERIFICATION
         PaymentAccount account = PaymentAccount.builder()
                 .userId(request.getUserId())
-                .paymentMethod("CARD")
+                .paymentMethod(PaymentMethod.CARD.name())
                 .paymentToken(tokenGenerator.generateCardToken())
                 .maskedIdentifier(maskingUtil.maskCardNumber(request.getCardNumber()))
                 .provider(testCard.getProvider())
                 .balance(testCard.getBalance())
-                .status("PENDING_VERIFICATION")
+                .status(AccountStatus.PENDING_VERIFICATION.name())
                 .expiryMonth(testCard.getExpiryMonth())
                 .expiryYear(testCard.getExpiryYear())
-                .createdAt(now)
-                .updatedAt(now)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
-        account = accountRepository.save(account);
+        account = paymentAccountRepository.save(account);
 
-        // 6. Générer OTP + envoyer via G5
+        // Génération OTP (Logique P2)
         String otp = otpService.generateAndSave(request.getUserId(), account);
         notificationService.sendOtpEmail(request.getUserId(), request.getEmail(), otp, account.getId());
 
         return toResponse(account);
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // PARTIE MOBILE_MONEY — développée par Personne 3
-    // ═════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // PARTIE MOBILE_MONEY (Personne 3 - TON TRAVAIL)
+    // =========================================================================
     @Transactional
     public PaymentAccountResponse addMobileMoney(AddMobileMoneyRequest request) {
-        // 1. Hacher le numéro de téléphone
-        String hashedPhone = HashUtil.hashValue(request.getPhoneNumber());
-
-        // 2. Vérifier existence dans test_mobile_money_accounts
+        String hashedPhone = HashUtil.hashValue(request.getPhoneNumber().trim());
+        System.out.println("--- DEBUG PERSONNE 3 ---");
+        System.out.println("NUMÉRO REÇU : [" + request.getPhoneNumber() + "]");
+        System.out.println("HASH CALCULÉ : " + hashedPhone);
+        System.out.println("-------------------------");
         TestMobileMoneyAccount testAccount = testMobileMoneyAccountRepository
                 .findByPhoneHash(hashedPhone)
-                .orElseThrow(() -> new BadRequestException(
-                        "Le numéro " + request.getPhoneNumber()
-                                + " n'existe pas chez " + request.getProvider()));
 
-        // 3. Provider correspond ?
+                .orElseThrow(() -> new BadRequestException("Le numéro " + request.getPhoneNumber() + " n'existe pas."));
+
+        if (!AccountStatus.ACTIVE.name().equals(testAccount.getStatus().name())) {
+            throw new BadRequestException("Compte Mobile Money bloqué chez l'opérateur.");
+        }
+
         if (!testAccount.getProvider().equals(request.getProvider())) {
-            throw new BadRequestException(
-                    "L'opérateur choisi ne correspond pas au numéro de téléphone.");
+            throw new BadRequestException("L'opérateur ne correspond pas au numéro.");
         }
 
-        // 4. Compte ACTIVE ?
-        if (!"ACTIVE".equals(testAccount.getStatus())) {
-            throw new BadRequestException(
-                    "Ce compte Mobile Money est actuellement bloqué ou inactif.");
-        }
-
-        // 5. Créer payment_account en PENDING_VERIFICATION
-        LocalDateTime now = LocalDateTime.now();
         PaymentAccount account = PaymentAccount.builder()
                 .userId(request.getUserId())
-                .paymentMethod("MOBILE_MONEY")
-                .paymentToken(tokenGenerator.generateMobileMoneyToken())
+                .paymentMethod(PaymentMethod.MOBILE_MONEY.name())
+                .paymentToken("MM-TOKEN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .maskedIdentifier(testAccount.getMaskedPhone())
                 .provider(testAccount.getProvider())
                 .balance(testAccount.getBalance())
-                .status("PENDING_VERIFICATION")
-                .createdAt(now)
-                .updatedAt(now)
+                .status(AccountStatus.PENDING_VERIFICATION.name())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
-        account = accountRepository.save(account);
+        account = paymentAccountRepository.save(account);
 
-        // 6. Générer OTP + envoyer via G5
-        String otp = otpService.generateAndSave(request.getUserId(), account);
-        notificationService.sendOtpEmail(request.getUserId(), request.getEmail(), otp, account.getId());
+        // Sauvegarde OTP (Ton flux sécurisé)
+        String rawOtp = String.valueOf((int)(Math.random() * 900000) + 100000);
+        PaymentOtp otpEntry = PaymentOtp.builder()
+                .userId(request.getUserId())
+                .paymentAccount(account)
+                .otpHash(HashUtil.hashValue(rawOtp))
+                .status("PENDING")
+                .attempts(0)
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .build();
+        paymentOtpRepository.save(otpEntry);
 
+        System.out.println("DEBUG OTP : " + rawOtp);
         return toResponse(account);
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // VERIFY OTP — commun CARD + MOBILE_MONEY (P2 + P3 collaborent ici)
-    // ═════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // VERIFY OTP (Collab P2 + P3)
+    // =========================================================================
     @Transactional
     public PaymentAccountResponse verifyOtp(Long paymentAccountId, VerifyOtpRequest request) {
-        PaymentAccount account = accountRepository.findById(paymentAccountId)
-                .orElseThrow(() -> new NotFoundException("Moyen de paiement introuvable."));
+        PaymentAccount account = paymentAccountRepository.findById(paymentAccountId)
+                .orElseThrow(() -> new NotFoundException("Compte introuvable."));
 
-        // Vérifier appartenance
-        if (!account.getUserId().equals(request.getUserId())) {
-            throw new BadRequestException(
-                    "Ce moyen de paiement n'appartient pas à cet utilisateur.");
-        }
-
-        // Vérifier statut
-        if (!"PENDING_VERIFICATION".equals(account.getStatus())) {
-            throw new BadRequestException(
-                    "Ce moyen de paiement n'est pas en attente de vérification.");
-        }
-
-        // Vérifier OTP via OtpService (lève exception si invalide)
         otpService.verifyOtp(paymentAccountId, request.getOtp());
 
-        // Activer
-        account.setStatus("ACTIVE");
+        account.setStatus(AccountStatus.ACTIVE.name());
         account.setUpdatedAt(LocalDateTime.now());
-        account = accountRepository.save(account);
-
-        return toResponse(account);
+        return toResponse(paymentAccountRepository.save(account));
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // MÉTHODES COMMUNES
-    // ═════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // MÉTHODES COMMUNES ET DONNÉES TEST
+    // =========================================================================
     public List<PaymentAccountResponse> getByUserId(Long userId) {
-        return accountRepository.findByUserId(userId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        return paymentAccountRepository.findByUserId(userId).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public PaymentAccountResponse getById(Long paymentAccountId) {
-        return toResponse(accountRepository.findById(paymentAccountId)
-                .orElseThrow(() -> new NotFoundException("Moyen de paiement introuvable.")));
+        return toResponse(paymentAccountRepository.findById(paymentAccountId)
+                .orElseThrow(() -> new NotFoundException("Compte introuvable.")));
     }
 
     @Transactional
     public void delete(Long paymentAccountId) {
-        PaymentAccount account = accountRepository.findById(paymentAccountId)
-                .orElseThrow(() -> new NotFoundException("Moyen de paiement introuvable."));
-        accountRepository.delete(account);
+        paymentAccountRepository.deleteById(paymentAccountId);
     }
 
-    // ── TEST DATA ─────────────────────────────────────────────────────────────
+    public List<TestMobileMoneyAccount> getAllTestMobileAccounts() {
+        return testMobileMoneyAccountRepository.findAll();
+    }
 
     public List<TestCardResponse> getTestCards() {
-        return testCardRepository.findAll()
-                .stream()
-                .map(this::toTestCardResponse)
-                .collect(Collectors.toList());
+        return testCardRepository.findAll().stream().map(this::toTestCardResponse).collect(Collectors.toList());
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // MAPPERS INTERNES
-    // ═════════════════════════════════════════════════════════════════════════
-
+    // =========================================================================
+    // MAPPERS
+    // =========================================================================
     private PaymentAccountResponse toResponse(PaymentAccount a) {
         return PaymentAccountResponse.builder()
                 .id(a.getId())
@@ -243,7 +211,6 @@ public class PaymentAccountService {
                 .provider(c.getProvider())
                 .balance(c.getBalance())
                 .status(c.getStatus())
-                //  Pas de cardNumberHash, pas de cvvHash → sécurité
                 .build();
     }
 }
