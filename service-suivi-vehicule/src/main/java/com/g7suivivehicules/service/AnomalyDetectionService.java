@@ -5,8 +5,10 @@ import com.g7suivivehicules.entity.Alert.TypeAlert;
 import com.g7suivivehicules.entity.Arret;
 import com.g7suivivehicules.entity.PositionGPS;
 import com.g7suivivehicules.entity.Telemetrie;
+import com.g7suivivehicules.entity.Vehicule;
 import com.g7suivivehicules.repository.ArretRepository;
 import com.g7suivivehicules.repository.PositionGPSRepository;
+import com.g7suivivehicules.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +33,11 @@ import java.util.UUID;
  *   4. Freinage brusque
  *   5. Immobilisation anormale (avec vérification arrêt prévu)
  *   6. Si aucune anomalie → résolution automatique des alertes ouvertes
+ *
+ * TODO (Intégration G4) :
+ *   - Appeler l'API de G4 (GET /api/v1/lignes/{id}/trajet et horaires) via un client HTTP
+ *   - Ajouter la logique mathématique de comparaison entre GPS actuel et tracé G4 (=> DEVIATION)
+ *   - Ajouter la logique mathématique de comparaison entre heure actuelle et horaire G4 (=> RETARD)
  */
 @Slf4j
 @Service
@@ -41,6 +48,8 @@ public class AnomalyDetectionService {
     private final SeuilConfigService seuilConfigService;
     private final ArretRepository arretRepository;
     private final PositionGPSRepository positionGPSRepository;
+    private final G4IntegrationService g4IntegrationService;
+    private final VehiculeRepository vehiculeRepository;
 
     // ========== POINT D'ENTRÉE PRINCIPAL ==========
 
@@ -146,6 +155,46 @@ public class AnomalyDetectionService {
             );
         } else {
             alertService.resoudreAutomatiquement(vehiculeId, TypeAlert.IMMOBILISATION);
+        }
+
+        // ── 6. Déviation d'itinéraire (Intégration G4) ────────────────────────
+        Vehicule vehicule = vehiculeRepository.findById(vehiculeId).orElse(null);
+        if (vehicule != null && vehicule.getLigneId() != null) {
+            UUID currentLigneId = vehicule.getLigneId();
+            
+            double deviationMetres = g4IntegrationService.verifierDeviationItineraire(currentLigneId, latitude, longitude);
+            double seuilDeviation = 100.0; // 100 mètres max de tolérance
+            if (deviationMetres > seuilDeviation) {
+                anomalieDetectee = true;
+                alertService.creerOuMettreAJour(
+                        vehiculeId,
+                        TypeAlert.DEVIATION_ITINERAIRE,
+                        latitude, longitude,
+                        deviationMetres, seuilDeviation,
+                        Severite.MOYENNE,
+                        String.format("Déviation d'itinéraire détectée : %.1f mètres du tracé officiel", deviationMetres)
+                );
+            } else {
+                alertService.resoudreAutomatiquement(vehiculeId, TypeAlert.DEVIATION_ITINERAIRE);
+            }
+
+            // ── 7. Retard (Intégration G4) ────────────────────────────────────────
+            // Se calcule idéalement uniquement quand le véhicule arrive à un arrêt.
+            int retardMinutes = g4IntegrationService.verifierRetardHoraire(currentLigneId, UUID.randomUUID(), position.getTimestamp());
+            double seuilRetard = 5.0; // 5 minutes de tolérance
+            if (retardMinutes > seuilRetard) {
+                anomalieDetectee = true;
+                alertService.creerOuMettreAJour(
+                        vehiculeId,
+                        TypeAlert.RETARD_HORAIRE,
+                        latitude, longitude,
+                        (double) retardMinutes, seuilRetard,
+                        Severite.MOYENNE,
+                        String.format("Retard significatif : %d minutes par rapport à l'horaire prévu", retardMinutes)
+                );
+            } else {
+                alertService.resoudreAutomatiquement(vehiculeId, TypeAlert.RETARD_HORAIRE);
+            }
         }
 
         if (!anomalieDetectee) {

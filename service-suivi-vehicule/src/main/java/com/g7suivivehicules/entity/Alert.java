@@ -86,7 +86,9 @@ public class Alert {
         VITESSE_EXCESSIVE,     // vitesse > seuil configuré
         TEMPERATURE_CRITIQUE,  // température moteur > seuil
         CARBURANT_CRITIQUE,    // carburant < seuil
-        FREINAGE_BRUSQUE       // décélération anormale détectée
+        FREINAGE_BRUSQUE,      // décélération anormale détectée
+        DEVIATION_ITINERAIRE,  // écart trop important par rapport au tracé G4
+        RETARD_HORAIRE         // retard significatif par rapport à l'horaire G4
     }
 
     public enum StatutAlert {

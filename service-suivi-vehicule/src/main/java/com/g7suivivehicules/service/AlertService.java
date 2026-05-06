@@ -4,6 +4,7 @@ import com.g7suivivehicules.entity.Alert;
 import com.g7suivivehicules.entity.Alert.StatutAlert;
 import com.g7suivivehicules.entity.Alert.TypeAlert;
 import com.g7suivivehicules.entity.Alert.Severite;
+import com.g7suivivehicules.kafka.KafkaProducerService;
 import com.g7suivivehicules.repository.AlertRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class AlertService {
 
     private final AlertRepository alertRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     // ========== CRÉATION / MISE À JOUR ==========
 
@@ -83,10 +85,8 @@ public class AlertService {
         log.warn("[AlertService] Nouvelle alerte créée — vehiculeId={} type={} severite={}",
                 vehiculeId, typeAlert, severite);
 
-        // TODO : brancher KafkaProducerService.publierAlerte(sauvegardee) si severite
-        // HAUTE/CRITIQUE
-        // TODO : brancher G9IntegrationService.signalerIncident(sauvegardee) si
-        // severite HAUTE/CRITIQUE
+        // Publication asynchrone sur Kafka (gère l'envoi G4 et G9 en interne)
+        kafkaProducerService.publierAlerte(sauvegardee);
 
         return sauvegardee;
     }

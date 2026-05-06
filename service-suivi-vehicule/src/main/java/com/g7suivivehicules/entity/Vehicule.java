@@ -23,7 +23,7 @@ public class Vehicule {
     private TypeVehicule type; // BUS ou TRAM
 
     @Column(nullable = false)
-    private String ligne;
+    private UUID ligneId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
