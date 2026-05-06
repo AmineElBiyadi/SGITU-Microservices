@@ -36,10 +36,14 @@ public class SuiviVehiculeConsumer {
                     .longitude(event.getLongitude())
                     .build();
 
+            String finalDescription = event.getDescription() != null ? event.getDescription() : "";
+            if (event.getVehiculeId() != null) finalDescription += "\nVéhicule: " + event.getVehiculeId();
+            if (event.getLigneTransport() != null) finalDescription += "\nLigne: " + event.getLigneTransport();
+
             Incident incident = Incident.builder()
                     .reference(referenceGenerator.generate())
                     .type(TypeIncident.valueOf(event.getType()))
-                    .description(event.getDescription())
+                    .description(finalDescription)
                     .dateSignalement(LocalDateTime.now())
                     .dateIncident(event.getDateDetection())
                     .statut(StatutIncident.NOUVEAU)
@@ -51,7 +55,7 @@ public class SuiviVehiculeConsumer {
             Incident saved = incidentRepository.save(incident);
             log.info("Incident créé automatiquement: {}", saved.getReference());
 
-            notificationService.notifierActeurs(saved);
+            notificationService.envoyerAlerteIoT(saved);
 
         } catch (Exception e) {
             log.error("Erreur lors du traitement de l'événement IoT: {}", e.getMessage(), e);

@@ -15,5 +15,4 @@ public final class MessagingConstants {
 
     // Incoming
     public static final String SUIVI_VEHICULE_TOPIC = "suivi-vehicule.incident.topic";
-    public static final String ANALYTIQUE_IN_TOPIC = "analytique.incident.topic";
 }

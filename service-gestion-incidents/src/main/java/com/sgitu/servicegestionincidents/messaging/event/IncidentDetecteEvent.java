@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 @Builder
 public class IncidentDetecteEvent implements Serializable {
 
-    private String source;          // "SUIVI_VEHICULE" ou "ANALYTIQUE"
     private String type;            // PANNE_VEHICULE, RETARD, ACCIDENT, etc.
     private String gravite;         // FAIBLE, MOYEN, ELEVE, CRITIQUE
     private String description;
