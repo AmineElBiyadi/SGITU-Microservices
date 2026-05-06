@@ -1,11 +1,20 @@
 package ma.sgitu.payment.dto.response;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+/**
+ * DTO de réponse pour moyens de paiement enregistrés
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class PaymentAccountResponse {
 
     private Long id;

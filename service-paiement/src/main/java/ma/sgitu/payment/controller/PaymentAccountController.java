@@ -1,79 +1,63 @@
 package ma.sgitu.payment.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import ma.sgitu.payment.dto.request.AddCardRequest;
 import ma.sgitu.payment.dto.request.AddMobileMoneyRequest;
-import ma.sgitu.payment.dto.request.VerifyOtpRequest;
 import ma.sgitu.payment.dto.response.PaymentAccountResponse;
-import ma.sgitu.payment.dto.response.TestCardResponse;
 import ma.sgitu.payment.service.PaymentAccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
+@RequestMapping("/payment-accounts")
 @RequiredArgsConstructor
-@Tag(name = "Moyens de paiement", description = "Gestion des cartes et Mobile Money")
 public class PaymentAccountController {
 
     private final PaymentAccountService paymentAccountService;
 
-    @PostMapping("/payment-accounts/card")
-    @Operation(summary = "Ajouter une carte et déclencher OTP email")
+    // ✅ Ajouter carte
+    @PostMapping("/card")
     public ResponseEntity<PaymentAccountResponse> addCard(
             @Valid @RequestBody AddCardRequest request) {
-        return ResponseEntity.ok(paymentAccountService.addCard(request));
+
+        PaymentAccountResponse response = paymentAccountService.addCard(request);
+        return ResponseEntity.status(201).body(response);
     }
 
-    @PostMapping("/payment-accounts/mobile-money")
-    @Operation(summary = "Ajouter un compte Mobile Money et déclencher OTP")
-    public ResponseEntity<PaymentAccountResponse> addMobileMoney(@RequestBody AddMobileMoneyRequest request) {
-        // On appelle addMobileMoney et on retourne l'objet réponse complet
-        return ResponseEntity.ok(paymentAccountService.addMobileMoney(request));
+    // ✅ Ajouter Mobile Money
+    @PostMapping("/mobile-money")
+    public ResponseEntity<PaymentAccountResponse> addMobileMoney(
+            @Valid @RequestBody AddMobileMoneyRequest request) {
+
+        PaymentAccountResponse response = paymentAccountService.addMobileMoney(request);
+        return ResponseEntity.status(201).body(response);
     }
 
-    @PostMapping("/payment-accounts/{paymentAccountId}/verify-otp")
-    @Operation(summary = "Vérifier OTP et activer le moyen de paiement")
-    public ResponseEntity<PaymentAccountResponse> verifyOtp(
-            @PathVariable Long paymentAccountId,
-            @Valid @RequestBody VerifyOtpRequest request) {
-        return ResponseEntity.ok(paymentAccountService.verifyOtp(paymentAccountId, request));
-    }
+    // ✅ Lister par user
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<PaymentAccountResponse>> getByUserId(
+            @PathVariable Long userId) {
 
-    @GetMapping("/payment-accounts/user/{userId}")
-    @Operation(summary = "Lister les moyens de paiement d'un utilisateur")
-    public ResponseEntity<List<PaymentAccountResponse>> getByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(paymentAccountService.getByUserId(userId));
     }
 
-    @GetMapping("/payment-accounts/test-mobile-money-accounts")
-    @Operation(summary = "Lister les comptes Mobile Money fictifs (Simulation)")
-    public ResponseEntity<List<ma.sgitu.payment.entity.TestMobileMoneyAccount>> getTestMobileAccounts() {
-        // Note : Tu peux soit appeler le repository directement ici,
-        // soit ajouter une méthode dans ton service comme l'a fait P2.
-        return ResponseEntity.ok(paymentAccountService.getAllTestMobileAccounts());
+    // ✅ Détail (CORRIGÉ pour éviter conflit avec /card)
+    @GetMapping("/id/{id}")
+    public ResponseEntity<PaymentAccountResponse> getById(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(paymentAccountService.getById(id));
     }
 
-    @GetMapping("/payment-accounts/{paymentAccountId}")
-    @Operation(summary = "Consulter un moyen de paiement précis")
-    public ResponseEntity<PaymentAccountResponse> getById(@PathVariable Long paymentAccountId) {
-        return ResponseEntity.ok(paymentAccountService.getById(paymentAccountId));
-    }
+    // ✅ Supprimer
+    @DeleteMapping("/id/{id}")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id) {
 
-    @DeleteMapping("/payment-accounts/{paymentAccountId}")
-    @Operation(summary = "Supprimer un moyen de paiement")
-    public ResponseEntity<Void> delete(@PathVariable Long paymentAccountId) {
-        paymentAccountService.delete(paymentAccountId);
+        paymentAccountService.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/test-cards")
-    @Operation(summary = "Lister les cartes fictives (sans données sensibles)")
-    public ResponseEntity<List<TestCardResponse>> getTestCards() {
-        return ResponseEntity.ok(paymentAccountService.getTestCards());
     }
 }

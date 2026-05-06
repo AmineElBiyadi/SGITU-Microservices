@@ -1,10 +1,20 @@
 package ma.sgitu.payment.dto.response;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+/**
+ * DTO de réponse pour cartes de test
+ * Ne contient AUCUNE donnée sensible
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class TestCardResponse {
 
     private Long id;
@@ -15,5 +25,4 @@ public class TestCardResponse {
     private String provider;
     private BigDecimal balance;
     private String status;
-    // Pas de cardNumberHash, pas de cvvHash → sécurité
 }

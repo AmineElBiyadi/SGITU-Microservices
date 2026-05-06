@@ -1,31 +1,39 @@
 package ma.sgitu.payment.util;
 
-import org.springframework.stereotype.Component;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-@Component
+/**
+ * Utilitaire pour hasher les données sensibles
+ * Utilise BCrypt pour sécurité maximale
+ */
 public class HashUtil {
 
-    // Méthode instance (injection Spring — ton style P2)
-    public String hash(String input) {
-        return hashValue(input);
-    }
+    private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public boolean matches(String raw, String hashed) {
-        return hashValue(raw).equals(hashed);
-    }
-
-    // Méthode statique (style P3 — pour compatibilité)
-    public static String hashValue(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encoded = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(encoded);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Erreur de hachage SHA-256", e);
+    /**
+     * Hash une chaîne de caractères avec BCrypt
+     *
+     * @param input Donnée à hasher (carte, CVV, téléphone, OTP)
+     * @return String hashée
+     */
+    public static String hash(String input) {
+        if (input == null || input.isEmpty()) {
+            throw new IllegalArgumentException("Input ne peut pas être vide");
         }
+        return encoder.encode(input);
+    }
+
+    /**
+     * Vérifie si une donnée correspond au hash
+     *
+     * @param input Donnée en clair
+     * @param hash Hash à comparer
+     * @return boolean
+     */
+    public static boolean verify(String input, String hash) {
+        if (input == null || hash == null) {
+            return false;
+        }
+        return encoder.matches(input, hash);
     }
 }

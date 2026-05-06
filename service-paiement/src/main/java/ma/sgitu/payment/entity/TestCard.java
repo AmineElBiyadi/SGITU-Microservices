@@ -2,12 +2,23 @@ package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ma.sgitu.payment.enums.AccountStatus;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Entity TestCard - Carte fictive pour simulation bancaire
+ * Table : test_cards
+ */
 @Entity
 @Table(name = "test_cards")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class TestCard {
 
     @Id
@@ -23,7 +34,7 @@ public class TestCard {
     @Column(name = "last4", nullable = false, length = 4)
     private String last4;
 
-    @Column(name = "card_holder_name", nullable = false)
+    @Column(name = "card_holder_name", nullable = false, length = 100)
     private String cardHolderName;
 
     @Column(name = "expiry_month", nullable = false)
@@ -32,15 +43,17 @@ public class TestCard {
     @Column(name = "expiry_year", nullable = false)
     private Integer expiryYear;
 
-    @Column(name = "provider", nullable = false)
+    @Column(name = "provider", nullable = false, length = 50)
     private String provider;
 
     @Column(name = "balance", nullable = false, precision = 10, scale = 2)
-    private BigDecimal balance = BigDecimal.ZERO;
+    private BigDecimal balance;
 
-    @Column(name = "status", nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private AccountStatus status;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 }

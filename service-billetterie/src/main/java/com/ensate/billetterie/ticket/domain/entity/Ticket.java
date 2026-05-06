@@ -89,6 +89,10 @@ public class Ticket {
     @Field("cancelled_at")
     private Instant cancelledAt;
 
+    @Field("deleted_at")
+    private Instant deletedAt;
+
+
     @Field("transferred_at")
     private Instant transferredAt;
 
