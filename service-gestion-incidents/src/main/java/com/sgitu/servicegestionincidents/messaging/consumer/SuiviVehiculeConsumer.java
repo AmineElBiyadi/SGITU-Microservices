@@ -12,7 +12,7 @@ import com.sgitu.servicegestionincidents.service.NotificationService;
 import com.sgitu.servicegestionincidents.util.ReferenceGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -26,7 +26,7 @@ public class SuiviVehiculeConsumer {
     private final NotificationService notificationService;
     private final ReferenceGenerator referenceGenerator;
 
-    @RabbitListener(queues = MessagingConstants.SUIVI_VEHICULE_QUEUE)
+    @KafkaListener(topics = MessagingConstants.SUIVI_VEHICULE_TOPIC, groupId = MessagingConstants.GROUP_ID)
     public void recevoirIncidentVehicule(IncidentDetecteEvent event) {
         log.info("Incident détecté par IoT - Type: {}, Véhicule: {}", event.getType(), event.getVehiculeId());
 
@@ -36,10 +36,14 @@ public class SuiviVehiculeConsumer {
                     .longitude(event.getLongitude())
                     .build();
 
+            String finalDescription = event.getDescription() != null ? event.getDescription() : "";
+            if (event.getVehiculeId() != null) finalDescription += "\nVéhicule: " + event.getVehiculeId();
+            if (event.getLigneTransport() != null) finalDescription += "\nLigne: " + event.getLigneTransport();
+
             Incident incident = Incident.builder()
                     .reference(referenceGenerator.generate())
                     .type(TypeIncident.valueOf(event.getType()))
-                    .description(event.getDescription())
+                    .description(finalDescription)
                     .dateSignalement(LocalDateTime.now())
                     .dateIncident(event.getDateDetection())
                     .statut(StatutIncident.NOUVEAU)
@@ -51,7 +55,7 @@ public class SuiviVehiculeConsumer {
             Incident saved = incidentRepository.save(incident);
             log.info("Incident créé automatiquement: {}", saved.getReference());
 
-            notificationService.notifierActeurs(saved);
+            notificationService.envoyerAlerteIoT(saved);
 
         } catch (Exception e) {
             log.error("Erreur lors du traitement de l'événement IoT: {}", e.getMessage(), e);

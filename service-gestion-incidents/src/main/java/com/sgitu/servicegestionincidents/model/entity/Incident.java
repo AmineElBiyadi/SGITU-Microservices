@@ -40,6 +40,8 @@ public class Incident {
     @Column(nullable = false)
     private LocalDateTime dateIncident;
 
+    private LocalDateTime dateLimiteResolution;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutIncident statut;
