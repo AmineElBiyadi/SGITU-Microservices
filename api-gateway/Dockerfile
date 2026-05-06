@@ -22,5 +22,13 @@ COPY --from=build /app/target/*.jar app.jar
 # Port exposé
 EXPOSE 8080
 
-# Lancer l'application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Créer un utilisateur non-root
+RUN addgroup -S sgitu && adduser -S g10 -G sgitu
+USER g10
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+# Lancer l'application avec le profil docker
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar", "--spring.profiles.active=docker"]

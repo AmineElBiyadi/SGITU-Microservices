@@ -53,7 +53,11 @@ public class SecurityConfig {
                                 "/auth/verify-email",
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
-                                "/actuator/**"
+                                "/actuator/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/webjars/**"
                         ).permitAll()
                         .pathMatchers(
                                 "/api/users/*/roles",
