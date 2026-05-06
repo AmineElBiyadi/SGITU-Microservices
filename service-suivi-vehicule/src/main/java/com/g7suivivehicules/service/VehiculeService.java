@@ -30,7 +30,7 @@ public class VehiculeService {
                 .immatriculation(request.getImmatriculation())
                 .type(request.getType())
                 .ligne(request.getLigne())
-                .statut(Vehicule.StatutVehicule.EN_SERVICE) // Statut par defaut
+                .statut(Vehicule.StatutVehicule.DISPONIBLE) // Initialement disponible
                 .conducteurId(request.getConducteurId())
                 .build();
 
