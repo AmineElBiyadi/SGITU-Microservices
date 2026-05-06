@@ -15,26 +15,27 @@ public interface AlertRepository extends JpaRepository<Alert, UUID> {
 
     // ========== REQUête DE DéDUPLICATION (la plus importante) ==========
     // Vérifie si une alerte OUVERTE existe déjà pour ce vehiculeId + typeAlert
-    @Query("SELECT a FROM Alert a WHERE a.vehiculeId = :vehiculeId " +
-           "AND a.typeAlert = :typeAlert " +
-           "AND a.statut = com.g7suivivehicules.entity.Alert.StatutAlert.OUVERTE")
-    Optional<Alert> findActiveByVehiculeIdAndTypeAlert(
-            @Param("vehiculeId") UUID vehiculeId,
-            @Param("typeAlert") Alert.TypeAlert typeAlert);
+    Optional<Alert> findByVehiculeIdAndTypeAlertAndStatut(UUID vehiculeId, Alert.TypeAlert typeAlert, Alert.StatutAlert statut);
+
+    default Optional<Alert> findActiveByVehiculeIdAndTypeAlert(UUID vehiculeId, Alert.TypeAlert typeAlert) {
+        return findByVehiculeIdAndTypeAlertAndStatut(vehiculeId, typeAlert, Alert.StatutAlert.OUVERTE);
+    }
 
     // ========== ALERTES PAR VÉHICULE ==========
     List<Alert> findByVehiculeIdOrderByTimestampDebutDesc(UUID vehiculeId);
 
-    @Query("SELECT a FROM Alert a WHERE a.vehiculeId = :vehiculeId " +
-           "AND a.statut = com.g7suivivehicules.entity.Alert.StatutAlert.OUVERTE " +
-           "ORDER BY a.timestampDebut DESC")
-    List<Alert> findActiveByVehiculeId(@Param("vehiculeId") UUID vehiculeId);
+    List<Alert> findByVehiculeIdAndStatutOrderByTimestampDebutDesc(UUID vehiculeId, Alert.StatutAlert statut);
+
+    default List<Alert> findActiveByVehiculeId(UUID vehiculeId) {
+        return findByVehiculeIdAndStatutOrderByTimestampDebutDesc(vehiculeId, Alert.StatutAlert.OUVERTE);
+    }
 
     // ========== TOUTES LES ALERTES ACTIVES (= OUVERTE uniquement) ==========
-    @Query("SELECT a FROM Alert a " +
-           "WHERE a.statut = com.g7suivivehicules.entity.Alert.StatutAlert.OUVERTE " +
-           "ORDER BY a.timestampDebut DESC")
-    List<Alert> findAllActive();
+    List<Alert> findByStatutOrderByTimestampDebutDesc(Alert.StatutAlert statut);
+
+    default List<Alert> findAllActive() {
+        return findByStatutOrderByTimestampDebutDesc(Alert.StatutAlert.OUVERTE);
+    }
 
     // ========== FILTRES OPTIONNELS (pour GET /api/v1/alerts) ==========
     @Query("SELECT a FROM Alert a WHERE " +
