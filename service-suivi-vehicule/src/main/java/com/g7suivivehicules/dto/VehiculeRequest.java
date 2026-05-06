@@ -18,7 +18,6 @@ public class VehiculeRequest {
     @NotNull(message = "type obligatoire")
     private Vehicule.TypeVehicule type; // BUS ou TRAM
 
-    @NotBlank(message = "ligne obligatoire")
     private String ligne;
 
     private UUID conducteurId;
