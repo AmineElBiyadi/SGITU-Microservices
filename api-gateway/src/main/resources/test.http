@@ -2,6 +2,57 @@
 GET http://localhost:8080/actuator/health
 
 
+### Login admin initial
+### Compte cree automatiquement au demarrage si absent:
+### email = admin@sgitu.ma / password = Admin123456
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@sgitu.ma",
+  "password": "Admin123456"
+}
+
+
+### Admin G10 - lister les comptes auth
+GET http://localhost:8080/admin/users
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-admin-list
+
+
+### Admin G10 - changer role d'un compte auth
+PUT http://localhost:8080/admin/users/1/role
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-admin-role
+
+{
+  "role": "ROLE_OPERATOR"
+}
+
+
+### Admin G10 - activer/desactiver un compte auth
+PUT http://localhost:8080/admin/users/1/status
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-admin-status
+
+{
+  "enabled": false
+}
+
+
+### Admin G10 - marquer email verifie/non verifie
+PUT http://localhost:8080/admin/users/1/email-verification
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-admin-email
+
+{
+  "emailVerified": true
+}
+
+
 ### Register ROLE_USER
 ### Apres cette requete, copier le token/lien affiche dans les logs:
 ### DEV email verification link for user1@sgitu.ma: http://localhost:8080/auth/verify-email?token=...
@@ -80,7 +131,13 @@ Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-404
 
 
-### 403 - ROLE_USER interdit sur route admin
+### 403 - ROLE_USER interdit sur endpoint admin G10
+GET http://localhost:8080/admin/users
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-403-admin-g10
+
+
+### 403 - ROLE_USER interdit sur route admin G3 routee par G10
 PUT http://localhost:8080/api/users/1/roles
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 Content-Type: application/json
@@ -91,16 +148,46 @@ X-Correlation-Id: test-403
 }
 
 
-### Routage G1 Billetterie
-GET http://localhost:8080/api/tickets/test
+### Routage G1 Billetterie - details ticket
+GET http://localhost:8080/api/v1/tickets/1
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g1
+
+
+### Routage G1 Billetterie - admin dashboard
+GET http://localhost:8080/api/v1/admin/dashboard
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g1-admin
 
 
 ### Routage G2 Abonnements
 GET http://localhost:8080/api/abonnements/1
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g2
+
+
+### Routage G2 Abonnements - souscrire
+POST http://localhost:8080/api/abonnements/souscrire?userId=1&planId=1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g2-souscrire
+
+
+### Routage G2 Plans
+GET http://localhost:8080/api/plans
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g2-plans
+
+
+### Routage G2 Admin - suspendre abonnement
+POST http://localhost:8080/api/abonnements/admin/1/suspendre?motif=test
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g2-admin
+
+
+### Routage G2 Callback paiement
+POST http://localhost:8080/api/abonnements/paiement/confirmation?transactionId=tx-test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g2-payment-callback
 
 
 ### Routage G3 Utilisateurs
@@ -110,15 +197,45 @@ X-Correlation-Id: test-g3
 
 
 ### Routage G4 Coordination
-GET http://localhost:8080/api/coordination/test
+GET http://localhost:8080/api/g4/health
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g4
 
 
+### Routage G4 Coordination - lignes
+GET http://localhost:8080/api/g4/lignes
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g4-lignes
+
+
+### Routage G4 Coordination - events metier
+GET http://localhost:8080/api/g4/events
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g4-events
+
+
+### Routage G4 Coordination - operator status
+GET http://localhost:8080/api/v1/operator/status
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g4-operator-status
+
+
 ### Routage G5 Notifications
-GET http://localhost:8080/api/notifications/test
+GET http://localhost:8080/api/notifications/1
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g5
+
+
+### Routage G5 Notifications - liste filtree
+GET http://localhost:8080/api/notifications?userId=1&status=SENT&sourceService=G10&page=0&size=10
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g5-list
+
+
+### Routage G5 Notifications - retry
+POST http://localhost:8080/api/notifications/1/retry
+Authorization: Bearer COLLER_ADMIN_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g5-retry
 
 
 ### Routage G6 Paiement
@@ -127,16 +244,89 @@ Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g6
 
 
+### Routage G6 Paiement - remboursements
+GET http://localhost:8080/api/refunds/1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g6-refunds
+
+
+### Routage G6 Paiement - moyens de paiement
+GET http://localhost:8080/api/payment-accounts/1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g6-payment-accounts
+
+
+### Routage G6 Paiement - donnees de test cartes
+GET http://localhost:8080/api/test-cards
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g6-test-cards
+
+
+### Routage G6 Paiement - health G6
+GET http://localhost:8080/api/health
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g6-health
+
+
 ### Routage G7 Suivi Vehicules
-GET http://localhost:8080/api/vehicles/test
+GET http://localhost:8080/api/suivi-vehicules/health
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
 X-Correlation-Id: test-g7
 
 
-### Routage G8 Analytics
-GET http://localhost:8080/api/analytics/test
+### Routage G8 Ingestion - tickets
+POST http://localhost:8080/api/v1/ingestion/tickets
 Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
-X-Correlation-Id: test-g8
+Content-Type: application/json
+X-Correlation-Id: test-g8-ingestion-tickets
+
+{
+  "ticketId": 1,
+  "userId": 1,
+  "eventType": "TICKET_CREATED",
+  "amount": 6.0
+}
+
+
+### Routage G8 Analytics - dashboard
+GET http://localhost:8080/api/v1/analytics/dashboard
+Authorization: Bearer COLLER_ADMIN_OU_AGENT_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g8-dashboard
+
+
+### Routage G8 Analytics - rapport
+POST http://localhost:8080/api/v1/analytics/reports/generate
+Authorization: Bearer COLLER_ADMIN_OU_AGENT_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-g8-report
+
+{
+  "type": "DASHBOARD",
+  "format": "PDF"
+}
+
+
+### Routage G8 ML - prediction peak hours
+POST http://localhost:8080/predict/peak-hours
+Authorization: Bearer COLLER_ADMIN_OU_AGENT_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-g8-predict-peak-hours
+
+{
+  "horizonHours": 24
+}
+
+
+### Routage G8 ML - prediction incidents
+POST http://localhost:8080/predict/incidents
+Authorization: Bearer COLLER_ADMIN_OU_AGENT_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-g8-predict-incidents
+
+{
+  "zoneId": "zone-centre",
+  "horizonHours": 24
+}
 
 
 ### Routage G9 Incidents

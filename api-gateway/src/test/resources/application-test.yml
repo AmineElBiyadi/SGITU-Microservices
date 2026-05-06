@@ -1,0 +1,48 @@
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:gateway_test_db;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  cloud:
+    gateway:
+      enabled: true
+
+jwt:
+  secret: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
+  expiration: 3600000
+  refresh-expiration: 604800000
+
+g10:
+  public-base-url: http://localhost:8080
+  email:
+    verification-expiration-minutes: 1440
+    password-reset-expiration-minutes: 15
+    log-tokens: false
+  notifications:
+    enabled: false
+    email-url: http://localhost:8085/api/notifications/send
+  admin:
+    bootstrap:
+      enabled: true
+    email: admin@sgitu.ma
+    password: Admin123456
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.web: INFO

@@ -1,0 +1,80 @@
+# =============================================================================
+#  SGITU - Groupe 10 uniquement
+#  Lance l'API Gateway, sa base MySQL et phpMyAdmin.
+#  A executer depuis le dossier api-gateway avec : docker compose up -d --build
+# =============================================================================
+
+networks:
+  sgitu-g10-network:
+    driver: bridge
+
+volumes:
+  gateway-db-g10-data:
+
+services:
+  gateway-db:
+    image: mysql:8.0
+    container_name: sgitu-g10-gateway-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: gateway_db
+    ports:
+      - "3360:3306"
+    volumes:
+      - gateway-db-g10-data:/var/lib/mysql
+    networks:
+      - sgitu-g10-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: sgitu-g10-phpmyadmin
+    environment:
+      PMA_HOST: gateway-db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8090:80"
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+    networks:
+      - sgitu-g10-network
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sgitu-g10-api-gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://gateway-db:3306/gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      JWT_SECRET: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
+      JWT_EXPIRATION: 3600000
+      JWT_REFRESH_EXPIRATION: 604800000
+      G10_PUBLIC_BASE_URL: http://localhost:8080
+      G10_NOTIFICATIONS_ENABLED: "false"
+      G10_NOTIFICATIONS_EMAIL_URL: http://notification-service:8085/api/notifications/send
+      G10_NOTIFICATIONS_BEARER_TOKEN: ""
+      G10_EMAIL_LOG_TOKENS: "true"
+      G10_ADMIN_BOOTSTRAP_ENABLED: "true"
+      G10_ADMIN_EMAIL: admin@sgitu.ma
+      G10_ADMIN_PASSWORD: Admin123456
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+    networks:
+      - sgitu-g10-network
+    restart: unless-stopped

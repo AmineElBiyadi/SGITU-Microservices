@@ -54,11 +54,7 @@ public class AuthService {
         user.setEnabled(false);
         user.setEmailVerified(false);
 
-        if (request.getRole() != null && !request.getRole().isBlank()) {
-            user.setRole(User.RoleType.valueOf(request.getRole()));
-        } else {
-            user.setRole(User.RoleType.ROLE_USER);
-        }
+        user.setRole(resolvePublicRegistrationRole(request.getRole()));
 
         userRepository.save(user);
         createEmailVerificationToken(user);
@@ -176,7 +172,7 @@ public class AuthService {
         token.setExpiresAt(LocalDateTime.now().plusMinutes(emailVerificationExpirationMinutes));
 
         emailVerificationTokenRepository.save(token);
-        notificationClient.sendVerificationEmail(user.getEmail(), rawToken);
+        notificationClient.sendVerificationEmail(user.getId(), user.getEmail(), rawToken);
     }
 
     private void createPasswordResetToken(User user) {
@@ -190,6 +186,22 @@ public class AuthService {
         token.setExpiresAt(LocalDateTime.now().plusMinutes(passwordResetExpirationMinutes));
 
         passwordResetTokenRepository.save(token);
-        notificationClient.sendPasswordResetEmail(user.getEmail(), rawToken);
+        notificationClient.sendPasswordResetEmail(user.getId(), user.getEmail(), rawToken);
+    }
+
+    private User.RoleType resolvePublicRegistrationRole(String role) {
+        if (role == null || role.isBlank()) {
+            return User.RoleType.ROLE_USER;
+        }
+
+        try {
+            User.RoleType roleType = User.RoleType.valueOf(role);
+            if (roleType == User.RoleType.ROLE_ADMIN) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ROLE_ADMIN reserve aux endpoints admin");
+            }
+            return roleType;
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role invalide");
+        }
     }
 }

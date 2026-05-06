@@ -59,14 +59,19 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/webjars/**"
                         ).permitAll()
+                        .pathMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(
                                 "/api/users/*/roles",
                                 "/api/users/*/deactivate",
-                                "/api/abonnements/admin/**"
+                                "/api/abonnements/admin",
+                                "/api/abonnements/admin/**",
+                                "/api/v1/admin/**",
+                                "/api/v1/ticket-types",
+                                "/api/v1/ticket-types/**"
                         ).hasAuthority("ROLE_ADMIN")
                         .pathMatchers(
-                                "/api/analytics/**",
-                                "/api/reports/**"
+                                "/api/v1/analytics/**",
+                                "/predict/**"
                         ).hasAnyAuthority("ROLE_ADMIN", "ROLE_AGENT")
                         .pathMatchers("/api/**").authenticated()
                         .anyExchange().authenticated()

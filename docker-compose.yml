@@ -86,7 +86,26 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  #  G10 — API Gateway & Sécurité (port 8080)
+  #  PHPMYADMIN - Interface web de developpement pour la base G10
+  # ---------------------------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: sgitu-phpmyadmin
+    environment:
+      PMA_HOST: gateway-db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8090:80"
+    depends_on:
+      gateway-db:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  #  G10 - API Gateway & Securite (port 8080)
   # ---------------------------------------------------------------------------
   api-gateway:
     build:
@@ -104,6 +123,10 @@ services:
       JWT_REFRESH_EXPIRATION: 604800000
       G10_PUBLIC_BASE_URL: http://localhost:8080
       G10_NOTIFICATIONS_EMAIL_URL: http://notification-service:8085/api/notifications/send
+      G10_NOTIFICATIONS_BEARER_TOKEN: ""
+      G10_ADMIN_BOOTSTRAP_ENABLED: "true"
+      G10_ADMIN_EMAIL: admin@sgitu.ma
+      G10_ADMIN_PASSWORD: Admin123456
     depends_on:
       gateway-db:
         condition: service_healthy
