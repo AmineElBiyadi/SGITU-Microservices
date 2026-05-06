@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class VehiculeService {
 
     private final VehiculeRepository vehiculeRepository;
-    private final KafkaProducer kafkaProducer;
+    // private final KafkaProducer kafkaProducer; // Temporairement désactivé pour test sans Kafka
 
     @Transactional
     public VehiculeResponse createVehicule(VehiculeRequest request) {
@@ -36,11 +36,12 @@ public class VehiculeService {
 
         Vehicule saved = vehiculeRepository.save(vehicule);
         
-        // Notification Kafka
-        kafkaProducer.envoyerEvenementVehicule("vehicle.registered", saved);
+        // Notification Kafka (Désactivée pour test local)
+        // kafkaProducer.envoyerEvenementVehicule("vehicle.registered", saved);
 
         return mapToResponse(saved);
     }
+
 
 
     public List<VehiculeResponse> getAllVehicules() {
