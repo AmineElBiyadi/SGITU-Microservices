@@ -21,4 +21,10 @@ public class KafkaProducer {
         log.info("Envoi position au topic {}: {}", positionTopic, position);
         kafkaTemplate.send(positionTopic, position.getVehiculeId().toString(), position);
     }
+
+    public void envoyerEvenementVehicule(String topic, Object vehicule) {
+        log.info("Envoi evenement vehicule au topic {}: {}", topic, vehicule);
+        kafkaTemplate.send(topic, vehicule);
+    }
 }
+
