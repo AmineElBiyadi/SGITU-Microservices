@@ -1,0 +1,110 @@
+# =============================================================
+# SGITU — Docker Compose G6 Paiement
+# MySQL + payment-service + phpMyAdmin
+# =============================================================
+
+version: '3.9'
+
+networks:
+  sgitu-network:
+    driver: bridge
+
+volumes:
+  mysql_payment_data:
+
+services:
+
+  # ───────────────────────────────────────────────────────────
+  #  BASE DE DONNÉES MySQL
+  # ───────────────────────────────────────────────────────────
+  mysql-payment:
+    image: mysql:8.0
+    container_name: sgitu-mysql-payment
+    hostname: mysql-payment
+    networks:
+      - sgitu-network
+    ports:
+      - "3316:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: sgitu
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
+    volumes:
+      - mysql_payment_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ───────────────────────────────────────────────────────────
+  #  PHPMYADMIN
+  # ───────────────────────────────────────────────────────────
+  phpmyadmin-payment:
+    image: phpmyadmin:latest
+    container_name: sgitu-phpmyadmin-payment
+    networks:
+      - sgitu-network
+    ports:
+      - "8896:80"
+    environment:
+      PMA_HOST: mysql-payment
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    depends_on:
+      mysql-payment:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ───────────────────────────────────────────────────────────
+  #  MICROSERVICE G6 PAIEMENT
+  # ───────────────────────────────────────────────────────────
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sgitu/payment-service:1.0.0
+    container_name: payment-service
+    hostname: payment-service
+    networks:
+      - sgitu-network
+    ports:
+      - "8086:8086"
+    environment:
+      # Base de données
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-payment:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: sgitu
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
+
+      # Hibernate
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_SQL_INIT_MODE: always
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      JWT_EXPIRATION: 86400000
+
+      # G5 Notifications
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8085}
+
+      # Profil
+      SPRING_PROFILES_ACTIVE: docker
+
+      # Port
+      SERVER_PORT: 8086
+
+    restart: on-failure
+    depends_on:
+      mysql-payment:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s

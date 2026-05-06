@@ -2,39 +2,39 @@ package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ma.sgitu.payment.enums.OtpStatus;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "payment_otps")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class PaymentOtp {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_account_id", nullable = false)
-    private PaymentAccount paymentAccount;
+    private Long paymentAccountId;
 
-    @Column(name = "otp_hash", nullable = false)
     private String otpHash;
 
-    @Column(name = "status", nullable = false)
-    private String status = "PENDING";
+    @Enumerated(EnumType.STRING)
+    private OtpStatus status;
 
-    @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
-    @Column(name = "attempts", nullable = false)
-    private Integer attempts = 0;
+    private Integer attempts;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 
-    @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 }

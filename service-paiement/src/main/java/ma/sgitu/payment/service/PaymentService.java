@@ -5,9 +5,6 @@ import ma.sgitu.payment.dto.request.PaymentRequest;
 import ma.sgitu.payment.dto.response.PaymentDetailsResponse;
 import ma.sgitu.payment.dto.response.PaymentResponse;
 import ma.sgitu.payment.entity.Payment;
-import ma.sgitu.payment.entity.PaymentAccount;
-import ma.sgitu.payment.enums.FailureReason;
-import ma.sgitu.payment.enums.PaymentMethod;
 import ma.sgitu.payment.enums.PaymentStatus;
 import ma.sgitu.payment.repository.PaymentAccountRepository;
 import ma.sgitu.payment.repository.PaymentRepository;
@@ -25,10 +22,10 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentAccountRepository paymentAccountRepository;
     private final TestMobileMoneyAccountRepository testMobileMoneyAccountRepository;
-
     @Transactional
     public PaymentResponse processPayment(PaymentRequest request) {
 
+        // Créer transaction PENDING
         Payment payment = Payment.builder()
                 .userId(request.getUserId())
                 .sourceType(request.getSourceType())
@@ -40,23 +37,19 @@ public class PaymentService {
                 .transactionToken("PAY-" + System.currentTimeMillis())
                 .build();
 
-        // ✅ CARD et MOBILE_MONEY gérés
-        if (request.getPaymentMethod() == PaymentMethod.CARD) {
-            handleCardPayment(payment);
-        } else if (request.getPaymentMethod() == PaymentMethod.MOBILE_MONEY) {
+        if (request.getPaymentMethod() == ma.sgitu.payment.enums.PaymentMethod.MOBILE_MONEY) {
             handleMobileMoneyPayment(payment);
         }
 
         payment = paymentRepository.save(payment);
+        String msg = payment.getStatus() == PaymentStatus.SUCCESS ? "Paiement réussi" : "Paiement en attente ou échoué";
 
         return PaymentResponse.builder()
                 .paymentId(payment.getId())
                 .transactionToken(payment.getTransactionToken())
                 .status(payment.getStatus().name())
                 .failureReason(payment.getFailureReason() != null ? payment.getFailureReason().name() : null)
-                .message(payment.getStatus() == PaymentStatus.SUCCESS
-                        ? "Paiement validé avec succès"
-                        : "Le paiement a échoué")
+                .message(payment.getStatus() == PaymentStatus.SUCCESS ? "Paiement réussi" : "Le paiement a échoué")
                 .build();
     }
 
@@ -87,83 +80,6 @@ public class PaymentService {
         return toDetailsResponse(payment);
     }
 
-    // ═══════════════════════════════════════════
-    // CARD — ajouté par Personne 2
-    // ═══════════════════════════════════════════
-    private void handleCardPayment(Payment payment) {
-        // 1. Chercher le payment_account par token
-        PaymentAccount account = paymentAccountRepository
-                .findByPaymentToken(payment.getSavedPaymentToken())
-                .orElse(null);
-
-        if (account == null) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.INVALID_TOKEN);
-            return;
-        }
-
-        // 2. Vérifier que le token appartient au bon userId
-        if (!account.getUserId().equals(payment.getUserId())) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.INVALID_TOKEN);
-            return;
-        }
-
-        // 3. Vérifier statut ACTIVE
-        if (!"ACTIVE".equals(account.getStatus())) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.ACCOUNT_NOT_ACTIVE);
-            return;
-        }
-
-        // 4. Vérifier solde suffisant
-        if (account.getBalance().compareTo(payment.getAmount()) < 0) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.INSUFFICIENT_BALANCE);
-            return;
-        }
-
-        // 5. Débiter et SUCCESS
-        account.setBalance(account.getBalance().subtract(payment.getAmount()));
-        paymentAccountRepository.save(account);
-        payment.setStatus(PaymentStatus.SUCCESS);
-    }
-
-    // ═══════════════════════════════════════════
-    // MOBILE_MONEY — développé par Personne 3
-    // ═══════════════════════════════════════════
-    private void handleMobileMoneyPayment(Payment payment) {
-        PaymentAccount account = paymentAccountRepository
-                .findByPaymentToken(payment.getSavedPaymentToken())
-                .orElse(null);
-
-        if (account == null) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.INVALID_TOKEN);
-            return;
-        }
-
-        if (!"ACTIVE".equals(account.getStatus())) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.ACCOUNT_NOT_ACTIVE);
-        } else if (account.getBalance().compareTo(payment.getAmount()) < 0) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(FailureReason.INSUFFICIENT_BALANCE);
-        } else {
-            account.setBalance(account.getBalance().subtract(payment.getAmount()));
-            paymentAccountRepository.save(account);
-            testMobileMoneyAccountRepository.findByMaskedPhone(account.getMaskedIdentifier())
-                    .ifPresent(testAccount -> {
-                        testAccount.setBalance(testAccount.getBalance().subtract(payment.getAmount()));
-                        testMobileMoneyAccountRepository.save(testAccount);
-                    });
-            payment.setStatus(PaymentStatus.SUCCESS);
-        }
-    }
-
-    // ═══════════════════════════════════════════
-    // MAPPER INTERNE
-    // ═══════════════════════════════════════════
     private PaymentDetailsResponse toDetailsResponse(Payment payment) {
         return PaymentDetailsResponse.builder()
                 .id(payment.getId())
@@ -179,5 +95,37 @@ public class PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    private void handleMobileMoneyPayment(Payment payment) {
+        // 1. Chercher le compte
+        ma.sgitu.payment.entity.PaymentAccount account = paymentAccountRepository
+                .findByPaymentToken(payment.getSavedPaymentToken())
+                .orElse(null);
+
+        if (account == null) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.INVALID_TOKEN);
+            return;
+        }
+
+        // 2. Vérifier Solde et Statut
+        if (account.getStatus() != ma.sgitu.payment.enums.AccountStatus.ACTIVE) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.ACCOUNT_NOT_ACTIVE);
+        } else if (account.getBalance().compareTo(payment.getAmount()) < 0) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.INSUFFICIENT_BALANCE);
+        } else {
+            // 3. Débit et Succès
+            account.setBalance(account.getBalance().subtract(payment.getAmount()));
+            paymentAccountRepository.save(account);
+            testMobileMoneyAccountRepository.findByMaskedPhone(account.getMaskedIdentifier())
+                    .ifPresent(testAccount -> {
+                        testAccount.setBalance(testAccount.getBalance().subtract(payment.getAmount()));
+                        testMobileMoneyAccountRepository.save(testAccount);
+                    });
+            payment.setStatus(PaymentStatus.SUCCESS);
+        }
     }
 }

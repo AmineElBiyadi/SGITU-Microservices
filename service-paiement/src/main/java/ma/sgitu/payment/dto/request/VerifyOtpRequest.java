@@ -2,14 +2,25 @@ package ma.sgitu.payment.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+/**
+ * DTO pour vérifier un code OTP
+ */
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class VerifyOtpRequest {
 
-    @NotNull
-    private Long userId;
+    @NotNull(message = "paymentAccountId obligatoire")
+    @Positive(message = "paymentAccountId doit être positif")
+    private Long paymentAccountId;
 
-    @NotBlank
-    private String otp;
+    @NotBlank(message = "Code OTP obligatoire")
+    private String otpCode;
 }
