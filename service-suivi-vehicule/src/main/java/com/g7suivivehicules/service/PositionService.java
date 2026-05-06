@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class PositionService {
 
     private final PositionGPSRepository positionRepository;
-    private final KafkaProducer kafkaProducer;
+    // private final KafkaProducer kafkaProducer; // Désactivé pour test local
 
     // ================================
     // Enregistrer une position GPS
