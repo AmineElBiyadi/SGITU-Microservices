@@ -6,7 +6,8 @@
 # =============================================================================
 
 networks:
-  sgitu-g10-network:
+  sgitu-network:
+    name: sgitu-network
     driver: bridge
 
 services:
@@ -21,11 +22,11 @@ services:
       - ./logs:/app/logs
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
-      JWT_EXPIRATION: 3600000
-      JWT_REFRESH_EXPIRATION: 604800000
+      JWT_SECRET: ${JWT_SECRET:-G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
     networks:
-      - sgitu-g10-network
+      - sgitu-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]

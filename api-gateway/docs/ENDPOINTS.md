@@ -31,13 +31,15 @@ Claims minimaux :
 ```json
 {
   "sub": "user@sgitu.ma",
-  "role": "ROLE_USER",
+  "roles": ["ROLE_USER"],
   "userId": 10,
   "iat": 1715000000,
   "exp": 1715003600,
   "jti": "uuid"
 }
 ```
+
+G10 accepte aussi l'ancien format `"role": "ROLE_USER"` pour rester compatible pendant l'integration.
 
 `userId` peut aussi s'appeler `id`. Si l'id est absent, G10 transmet seulement email, roles et correlation id.
 
@@ -70,9 +72,9 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | POST | `/auth/forgot-password` | G3 |
 | POST | `/auth/reset-password` | G3 |
 | GET | `/auth/verify-email?token=...` | G3 |
-| GET | `/admin/users` | G3, protege par G10 avec `ROLE_ADMIN` |
-| PUT | `/admin/users/{id}/role` | G3, protege par G10 avec `ROLE_ADMIN` |
-| PUT | `/admin/users/{id}/status` | G3, protege par G10 avec `ROLE_ADMIN` |
+| GET | `/api/users` | G3, JWT requis |
+| PUT | `/api/users/{id}/roles` | G3, protege par G10 avec `ROLE_ADMIN` |
+| PUT | `/api/users/{id}/deactivate` | G3, protege par G10 avec `ROLE_ADMIN` |
 
 ## 6. Routes microservices
 
@@ -80,7 +82,7 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | --- | --- | --- | --- | --- |
 | G1 Billetterie | `/api/v1/tickets/**`, `/api/v1/admin/**`, `/api/v1/ticket-types/**` | `service-billetterie` | 8081 | JWT, admin pour `/api/v1/admin/**` et ticket-types |
 | G2 Abonnements | `/api/abonnements/**`, `/api/plans/**` | `service-abonnement` | 8082 | JWT, admin pour `/api/abonnements/admin/**` |
-| G3 Utilisateurs/Auth | `/auth/**`, `/admin/users/**`, `/api/users/**`, `/api/profiles/**` | `user-service` | 8083 | Public pour auth publique, admin pour `/admin/**`, JWT pour `/api/**` |
+| G3 Utilisateurs/Auth | `/auth/**`, `/api/users/**`, `/api/profiles/**` | `user-service` | 8083 | Public pour auth publique, admin pour modification roles/desactivation, JWT pour `/api/**` |
 | G4 Coordination | `/api/g4/**`, `/api/v1/operator/status` | `coordination-service` | 8084 | JWT |
 | G5 Notifications | `/api/notifications/**` | `notification-service` | 8085 | JWT, retry admin selon endpoint |
 | G6 Paiement | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**`, `/api/test-cards`, `/api/health` | `payment-service` | 8086 | JWT |
@@ -93,7 +95,7 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | Code | Code applicatif | Cas |
 | --- | --- | --- |
 | 401 | `UNAUTHORIZED` | JWT absent sur une route protegee |
-| 401 | `INVALID_TOKEN` | JWT invalide, expire ou sans claim role |
+| 401 | `INVALID_TOKEN` | JWT invalide, expire ou sans claim role/roles |
 | 403 | `FORBIDDEN` | Role insuffisant |
 | 404 | `ROUTE_NOT_FOUND` | Aucune route Gateway ne correspond |
 | 503 | `SERVICE_UNAVAILABLE` | Service cible indisponible |

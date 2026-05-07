@@ -34,17 +34,17 @@ spring:
           filters:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
 
-        - id: g3-auth-users
+        - id: g3-auth
           uri: http://user-service:8083
           predicates:
-            - Path=/auth/**,/admin/users/**
+            - Path=/auth/**
+          filters:
+            - RewritePath=/(?<segment>.*), /api/$\{segment}
 
         - id: g3-utilisateurs
           uri: http://user-service:8083
           predicates:
-            - Path=/api/users/**,/api/profiles/**
-          filters:
-            - RewritePath=/api/(?<segment>.*), /$\{segment}
+            - Path=/api/users,/api/users/**,/api/profiles,/api/profiles/**
 
         - id: g4-coordination
           uri: http://coordination-service:8084
@@ -81,9 +81,9 @@ spring:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
 
 jwt:
-  secret: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
-  expiration: 3600000
-  refresh-expiration: 604800000
+  secret: ${JWT_SECRET:G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS}
+  expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 springdoc:
   api-docs:

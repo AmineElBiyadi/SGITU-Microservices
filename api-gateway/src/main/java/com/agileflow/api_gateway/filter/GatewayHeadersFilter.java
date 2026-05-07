@@ -38,7 +38,7 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE;
+        return Ordered.LOWEST_PRECEDENCE - 10;
     }
 
     private ServerWebExchange enrichExchange(ServerWebExchange exchange,

@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,7 +52,11 @@ class ApiGatewayApplicationTests {
 
         webTestClient.get()
                 .uri("/api/unknown/test")
-                .headers(headers -> headers.setBearerAuth(jwt("admin.g3@sgitu.ma", "ROLE_ADMIN", "1")))
+                .headers(headers -> headers.setBearerAuth(jwtWithRolesClaim(
+                        "admin.g3@sgitu.ma",
+                        List.of("ROLE_ADMIN"),
+                        "1"
+                )))
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody()
@@ -62,7 +67,7 @@ class ApiGatewayApplicationTests {
     @Test
     void adminRoutesRequireRoleAdminFromJwtClaims() {
         webTestClient.get()
-                .uri("/admin/users")
+                .uri("/api/users/1/roles")
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
                 .exchange()
                 .expectStatus().isForbidden();
@@ -76,6 +81,16 @@ class ApiGatewayApplicationTests {
         webTestClient.get()
                 .uri("/api/v1/ticket-types")
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/users/1/roles")
+                .headers(headers -> headers.setBearerAuth(jwtWithRolesClaim(
+                        "user@sgitu.ma",
+                        List.of("ROLE_USER"),
+                        "10"
+                )))
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -106,28 +121,30 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void g3AuthRouteOwnsAuthAndAdminUsersPrefixes() {
+    void g3AuthRouteOwnsAuthPrefixAndRewritesToUserServiceApiContext() {
         var route = routeDefinitionLocator.getRouteDefinitions()
-                .filter(routeDefinition -> "g3-auth-users".equals(routeDefinition.getId()))
+                .filter(routeDefinition -> "g3-auth".equals(routeDefinition.getId()))
+                .blockFirst();
+
+        assertThat(route).isNotNull();
+        assertThat(route.getFilters()).anySatisfy(filter ->
+                assertThat(filter.getName()).isEqualTo("RewritePath"));
+        assertThat(route.getPredicates()).anySatisfy(predicate ->
+                assertThat(predicate.getArgs().values())
+                        .contains("/auth/**"));
+    }
+
+    @Test
+    void g3UsersRouteOwnsUsersAndProfilesPrefixesWithoutRewrite() {
+        var route = routeDefinitionLocator.getRouteDefinitions()
+                .filter(routeDefinition -> "g3-utilisateurs".equals(routeDefinition.getId()))
                 .blockFirst();
 
         assertThat(route).isNotNull();
         assertThat(route.getFilters()).isEmpty();
         assertThat(route.getPredicates()).anySatisfy(predicate ->
                 assertThat(predicate.getArgs().values())
-                        .contains("/auth/**", "/admin/users/**"));
-    }
-
-    @Test
-    void g3UsersRouteOwnsUsersAndProfilesPrefixes() {
-        var route = routeDefinitionLocator.getRouteDefinitions()
-                .filter(routeDefinition -> "g3-utilisateurs".equals(routeDefinition.getId()))
-                .blockFirst();
-
-        assertThat(route).isNotNull();
-        assertThat(route.getPredicates()).anySatisfy(predicate ->
-                assertThat(predicate.getArgs().values())
-                        .contains("/api/users/**", "/api/profiles/**"));
+                        .contains("/api/users", "/api/users/**", "/api/profiles", "/api/profiles/**"));
     }
 
     @Test
@@ -276,13 +293,43 @@ class ApiGatewayApplicationTests {
         });
     }
 
+    @Test
+    void g9RouteUsesIncidentContractPrefixesAndRewritesApiPrefix() {
+        var route = routeDefinitionLocator.getRouteDefinitions()
+                .filter(routeDefinition -> "g9-incidents".equals(routeDefinition.getId()))
+                .blockFirst();
+
+        assertThat(route).isNotNull();
+        assertThat(route.getFilters()).anySatisfy(filter ->
+                assertThat(filter.getName()).isEqualTo("RewritePath"));
+        assertThat(route.getPredicates()).anySatisfy(predicate -> {
+            assertThat(predicate.getArgs().values())
+                    .contains(
+                            "/api/incidents/**",
+                            "/api/rapports/**"
+                    );
+        });
+    }
+
     private String jwt(String email, String role, String userId) {
+        return buildJwt(email, Map.of(
+                "role", role,
+                "userId", userId,
+                "jti", UUID.randomUUID().toString()
+        ));
+    }
+
+    private String jwtWithRolesClaim(String email, List<String> roles, String userId) {
+        return buildJwt(email, Map.of(
+                "roles", roles,
+                "userId", userId,
+                "jti", UUID.randomUUID().toString()
+        ));
+    }
+
+    private String buildJwt(String email, Map<String, Object> claims) {
         return Jwts.builder()
-                .setClaims(Map.of(
-                        "role", role,
-                        "userId", userId,
-                        "jti", UUID.randomUUID().toString()
-                ))
+                .setClaims(claims)
                 .setSubject(email)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 3_600_000))

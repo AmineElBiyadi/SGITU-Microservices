@@ -8,7 +8,7 @@ skinparam packageStyle rectangle
 actor "Client Web / Mobile\nou Postman" as Client
 
 node "G10 - API Gateway & Securite\nSpring Cloud Gateway :8080" as G10 {
-  component "JWT Validation Filter\nsignature / exp / role" as JwtFilter
+  component "JWT Validation Filter\nsignature / exp / roles" as JwtFilter
   component "Authorization Rules\nRBAC par prefixe" as RBAC
   component "Correlation Filter\nX-Correlation-Id" as CorrFilter
   component "Gateway Routes\napplication.yml" as Routes
@@ -30,7 +30,7 @@ package "Microservices metier SGITU" {
 }
 
 Client --> G10 : REST + Bearer JWT
-G10 --> G3 : /auth/**, /admin/users/**,\n/api/users/**, /api/profiles/**
+G10 --> G3 : /auth/**,\n/api/users/**, /api/profiles/**
 G3 --> G3Db : persistance utilisateurs
 G3 --> G5 : email verification / reset
 

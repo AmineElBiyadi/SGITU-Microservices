@@ -47,25 +47,30 @@
       }
     },
     {
-      "name": "403 - Admin users with ROLE_USER",
+      "name": "403 - Update user roles with ROLE_USER",
       "request": {
-        "method": "GET",
+        "method": "PUT",
         "header": [
           { "key": "Authorization", "value": "Bearer {{userToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
           { "key": "X-Correlation-Id", "value": "postman-403-admin-users" }
         ],
-        "url": "{{baseUrl}}/admin/users"
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"roles\": [\"ROLE_OPERATOR\"]\n}"
+        },
+        "url": "{{baseUrl}}/api/users/1/roles"
       }
     },
     {
-      "name": "G3 Admin users via G10",
+      "name": "G3 Users via G10",
       "request": {
         "method": "GET",
         "header": [
           { "key": "Authorization", "value": "Bearer {{adminToken}}" },
           { "key": "X-Correlation-Id", "value": "postman-admin-users" }
         ],
-        "url": "{{baseUrl}}/admin/users"
+        "url": "{{baseUrl}}/api/users"
       }
     },
     {

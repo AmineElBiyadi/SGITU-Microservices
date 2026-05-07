@@ -9,7 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Key;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.function.Function;
 
 @Service
@@ -29,8 +32,8 @@ public class JwtService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans subject");
         }
 
-        String role = extractRole(claims);
-        if (role == null || role.isBlank()) {
+        List<String> roles = extractRoles(claims);
+        if (roles.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans role");
         }
 
@@ -54,11 +57,42 @@ public class JwtService {
     }
 
     public String extractRole(Claims claims) {
-        String role = claims.get("role", String.class);
-        if (role == null) {
-            role = claims.get("roles", String.class);
+        return extractRoles(claims)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<String> extractRoles(Claims claims) {
+        List<String> roles = new ArrayList<>();
+        addRoles(roles, claims.get("role"));
+        addRoles(roles, claims.get("roles"));
+
+        return roles.stream()
+                .map(String::trim)
+                .filter(role -> !role.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private void addRoles(List<String> roles, Object claimValue) {
+        if (claimValue == null) {
+            return;
         }
-        return role;
+
+        if (claimValue instanceof Collection<?> collection) {
+            collection.forEach(value -> addRoles(roles, value));
+            return;
+        }
+
+        if (claimValue instanceof String value) {
+            for (String role : value.split(",")) {
+                roles.add(role);
+            }
+            return;
+        }
+
+        roles.add(claimValue.toString());
     }
 
     public String extractUserId(Claims claims) {

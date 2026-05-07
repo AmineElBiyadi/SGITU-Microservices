@@ -89,25 +89,30 @@ X-Correlation-Id: test-404
 
 
 ### 403 - ROLE_USER interdit sur endpoint admin G3 route par G10
-GET {{baseUrl}}/admin/users
+PUT {{baseUrl}}/api/users/1/roles
 Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-403-admin-users
+Content-Type: application/json
+
+{
+  "roles": ["ROLE_OPERATOR"]
+}
 
 
-### Admin G3 route par G10 - lister comptes utilisateurs
-GET {{baseUrl}}/admin/users
+### G3 route par G10 - lister comptes utilisateurs
+GET {{baseUrl}}/api/users
 Authorization: Bearer {{adminToken}}
 X-Correlation-Id: test-admin-users
 
 
-### Admin G3 route par G10 - changer role
-PUT {{baseUrl}}/admin/users/1/role
+### Admin G3 route par G10 - changer roles
+PUT {{baseUrl}}/api/users/1/roles
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 X-Correlation-Id: test-admin-role
 
 {
-  "role": "ROLE_OPERATOR"
+  "roles": ["ROLE_OPERATOR"]
 }
 
 

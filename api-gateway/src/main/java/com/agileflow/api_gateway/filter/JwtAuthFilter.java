@@ -36,14 +36,17 @@ public class JwtAuthFilter implements WebFilter {
         try {
             Claims claims = jwtService.validateAndExtractClaims(token);
             String email = claims.getSubject();
-            String role = jwtService.extractRole(claims);
             String userId = jwtService.extractUserId(claims);
+            List<SimpleGrantedAuthority> authorities = jwtService.extractRoles(claims)
+                    .stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .toList();
 
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(
                             new JwtPrincipal(userId, email),
                             token,
-                            List.of(new SimpleGrantedAuthority(role))
+                            authorities
                     );
 
             return chain.filter(exchange)

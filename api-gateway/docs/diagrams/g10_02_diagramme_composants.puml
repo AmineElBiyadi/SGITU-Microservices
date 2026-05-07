@@ -38,7 +38,7 @@ Gateway --> Routes
 Gateway --> ErrorHandler
 Gateway --> Swagger
 
-Gateway --> IUserAuthAPI : route /auth/**\n/admin/users/**
+Gateway --> IUserAuthAPI : route /auth/**\n/api/users/**
 IUserAuthAPI - G3
 G3 --> G3Db
 G3 --> INotificationAPI

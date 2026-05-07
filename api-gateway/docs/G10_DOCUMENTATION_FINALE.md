@@ -45,7 +45,7 @@ Claims attendus :
 ```json
 {
   "sub": "user@sgitu.ma",
-  "role": "ROLE_USER",
+  "roles": ["ROLE_USER"],
   "userId": 10,
   "iat": 1715000000,
   "exp": 1715003600,
@@ -53,12 +53,14 @@ Claims attendus :
 }
 ```
 
+Compatibilite : G10 accepte aussi l'ancien claim `"role": "ROLE_USER"` si G3 garde ce format temporairement.
+
 G10 valide :
 
 - signature ;
 - expiration `exp` ;
 - presence du `sub` ;
-- presence du `role`.
+- presence d'au moins un role dans `roles` ou `role`.
 
 ## 4. Headers transmis aux microservices
 
@@ -78,9 +80,10 @@ X-Correlation-Id: test-123
 | Path | Responsable reel |
 | --- | --- |
 | `/auth/**` | G3 |
-| `/admin/users/**` | G3, protege par `ROLE_ADMIN` |
 | `/api/users/**` | G3 |
 | `/api/profiles/**` | G3 |
+
+Note integration : G10 expose `/auth/**`, mais transmet vers `/api/auth/**` dans `user-service`, car G3 utilise `server.servlet.context-path=/api`.
 
 ### Autres groupes
 
@@ -100,9 +103,9 @@ X-Correlation-Id: test-123
 Regles appliquees par G10 :
 
 - `/auth/login`, `/auth/register`, `/auth/refresh`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` sont publics et routes vers G3.
-- `/admin/**` demande `ROLE_ADMIN`.
 - `/api/v1/admin/**` demande `ROLE_ADMIN`.
 - `/api/v1/ticket-types/**` demande `ROLE_ADMIN`.
+- `/api/users/{id}/roles` et `/api/users/{id}/deactivate` demandent `ROLE_ADMIN`.
 - `/api/v1/analytics/**` et `/predict/**` demandent `ROLE_ADMIN` ou `ROLE_AGENT`.
 - `/api/**` demande un JWT valide.
 
@@ -121,6 +124,7 @@ Les tests couvrent :
 - role insuffisant -> 403 ;
 - route inconnue -> 404 structuree ;
 - conformite des routes G1, G2, G3, G4, G5, G6, G7, G8 ;
+- conformite de la route G9 ;
 - protection admin/analytics.
 
 ## 8. Logs
@@ -149,7 +153,7 @@ G10 fournit :
 - headers transmis aux services ;
 - codes d'erreur Gateway ;
 - regles de securite par prefixe ;
-- requirement G3 : JWT signe avec claims `sub`, `role`, `userId`, `iat`, `exp`.
+- requirement G3 : JWT signe avec claims `sub`, `roles`, `userId`, `iat`, `exp`.
 
 ## 10. Conclusion
 

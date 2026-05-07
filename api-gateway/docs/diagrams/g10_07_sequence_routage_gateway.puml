@@ -15,7 +15,7 @@ Gateway -> Corr : verifier/generer X-Correlation-Id
 Corr --> Gateway : correlationId
 Gateway -> JwtFilter : lire Authorization
 activate JwtFilter
-JwtFilter -> Jwt : valider signature, exp, sub, role
+JwtFilter -> Jwt : valider signature, exp, sub, roles
 Jwt --> JwtFilter : claims valides
 
 alt JWT invalide ou absent
@@ -24,7 +24,7 @@ alt JWT invalide ou absent
 else role insuffisant
   JwtFilter --> Gateway : erreur 403
   Gateway --> Client : 403 Forbidden
-else JWT et role valides
+else JWT et roles valides
   JwtFilter --> Gateway : authenticated principal
   deactivate JwtFilter
   Gateway -> Service : requete routee\nX-User-Id, X-User-Email, X-Roles,\nX-Correlation-Id

@@ -200,7 +200,7 @@ Claims minimaux :
 \begin{lstlisting}[style=codeStyle]
 {
   "sub": "user@sgitu.ma",
-  "role": "ROLE_USER",
+  "roles": ["ROLE_USER"],
   "userId": 10,
   "iat": 1715000000,
   "exp": 1715003600,
@@ -208,7 +208,7 @@ Claims minimaux :
 }
 \end{lstlisting}
 
-G10 verifie la signature, l'expiration, le \texttt{sub} et le \texttt{role}. Il ne consulte pas une table locale des utilisateurs.
+G10 verifie la signature, l'expiration, le \texttt{sub} et au moins un role dans \texttt{roles} ou \texttt{role}. Il ne consulte pas une table locale des utilisateurs.
 
 \section{Routes REST}
 
@@ -223,7 +223,7 @@ G10 verifie la signature, l'expiration, le \texttt{sub} et le \texttt{role}. Il 
 G1 & \texttt{/api/v1/tickets/**}, \texttt{/api/v1/admin/**} & JWT, admin pour admin \\
 \rowcolor{lightgray}
 G2 & \texttt{/api/abonnements/**}, \texttt{/api/plans/**} & JWT, admin pour admin \\
-G3 & \texttt{/auth/**}, \texttt{/admin/users/**}, \texttt{/api/users/**} & public/auth/admin selon path \\
+G3 & \texttt{/auth/**}, \texttt{/api/users/**}, \texttt{/api/profiles/**} & public/auth, JWT, admin pour roles/desactivation \\
 \rowcolor{lightgray}
 G4 & \texttt{/api/g4/**}, \texttt{/api/v1/operator/status} & JWT \\
 G5 & \texttt{/api/notifications/**} & JWT \\
