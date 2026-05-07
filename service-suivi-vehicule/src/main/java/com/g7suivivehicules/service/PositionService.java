@@ -3,7 +3,7 @@ package com.g7suivivehicules.service;
 import com.g7suivivehicules.dto.PositionGPSRequest;
 import com.g7suivivehicules.dto.PositionGPSResponse;
 import com.g7suivivehicules.entity.PositionGPS;
-import com.g7suivivehicules.kafka.KafkaProducer;
+import jakarta.persistence.EntityNotFoundException;
 import com.g7suivivehicules.repository.PositionGPSRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,6 @@ public class PositionService {
 
         private final PositionGPSRepository positionRepository;
         private final AnomalyDetectionService anomalyDetectionService;
-        // private final KafkaProducer kafkaProducer; // Désactivé pour test local
 
         // ================================
         // Enregistrer une position GPS
@@ -38,9 +37,6 @@ public class PositionService {
                                 .build();
 
                 PositionGPS saved = positionRepository.save(position);
-
-                // Publier sur Kafka (desactive car Kafka non lance)
-                // kafkaProducer.envoyerPosition(saved);
 
                 // Déclenchement de la détection d'anomalies
                 anomalyDetectionService.detecterAnomalies(saved, null);
@@ -65,7 +61,7 @@ public class PositionService {
         public PositionGPSResponse getPositionActuelle(UUID vehiculeId) {
                 PositionGPS position = positionRepository
                                 .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
-                                .orElseThrow(() -> new RuntimeException("Aucune position trouvee pour ce vehicule"));
+                                .orElseThrow(() -> new EntityNotFoundException("Aucune position trouvée pour ce véhicule"));
                 return toResponse(position);
         }
 
@@ -103,7 +99,7 @@ public class PositionService {
         public Long calculerRetard(UUID vehiculeId) {
                 PositionGPS derniere = positionRepository
                                 .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
-                                .orElseThrow(() -> new RuntimeException("Aucune position trouvee"));
+                                .orElseThrow(() -> new EntityNotFoundException("Aucune position trouvée pour ce véhicule"));
 
                 // Retard en secondes depuis derniere position
                 long retard = java.time.Duration.between(

@@ -62,8 +62,12 @@ public class KafkaProducerService {
                 .timestamp(alert.getTimestampDebut().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .build();
 
-        kafkaTemplate.send(topicAnomalieG4, dtoG4);
-        log.info("[KafkaProducer] Anomalie G4 publiée : {}", dtoG4);
+        try {
+            kafkaTemplate.send(topicAnomalieG4, dtoG4);
+            log.info("[KafkaProducer] Anomalie G4 publiée : {}", dtoG4);
+        } catch (Exception e) {
+            log.error("[KafkaProducer] Échec de publication G4 (Kafka absent?) : {}", e.getMessage());
+        }
     }
 
     private void publierVersG9(Alert alert) {
@@ -115,7 +119,11 @@ public class KafkaProducerService {
                 .dateDetection(alert.getTimestampDebut().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
                 .build();
 
-        kafkaTemplate.send(topicIncidentG9, dtoG9);
-        log.info("[KafkaProducer] Incident G9 publié : {}", dtoG9);
+        try {
+            kafkaTemplate.send(topicIncidentG9, dtoG9);
+            log.info("[KafkaProducer] Incident G9 publié : {}", dtoG9);
+        } catch (Exception e) {
+            log.error("[KafkaProducer] Échec de publication G9 (Kafka absent?) : {}", e.getMessage());
+        }
     }
 }

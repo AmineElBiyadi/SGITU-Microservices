@@ -3,7 +3,7 @@ package com.g7suivivehicules.service;
 import com.g7suivivehicules.dto.VehiculeRequest;
 import com.g7suivivehicules.dto.VehiculeResponse;
 import com.g7suivivehicules.entity.Vehicule;
-import com.g7suivivehicules.kafka.KafkaProducer;
+import jakarta.persistence.EntityNotFoundException;
 import com.g7suivivehicules.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 public class VehiculeService {
 
     private final VehiculeRepository vehiculeRepository;
-    // private final KafkaProducer kafkaProducer; // Temporairement désactivé pour test sans Kafka
 
     @Transactional
     public VehiculeResponse createVehicule(VehiculeRequest request) {
@@ -36,13 +35,8 @@ public class VehiculeService {
 
         Vehicule saved = vehiculeRepository.save(vehicule);
         
-        // Notification Kafka (Désactivée pour test local)
-        // kafkaProducer.envoyerEvenementVehicule("vehicle.registered", saved);
-
         return mapToResponse(saved);
     }
-
-
 
     public List<VehiculeResponse> getAllVehicules() {
         return vehiculeRepository.findAll().stream()
@@ -53,13 +47,13 @@ public class VehiculeService {
     public VehiculeResponse getVehiculeById(UUID id) {
         return vehiculeRepository.findById(id)
                 .map(this::mapToResponse)
-                .orElseThrow(() -> new RuntimeException("Vehicule non trouve"));
+                .orElseThrow(() -> new EntityNotFoundException("Véhicule introuvable avec l'ID : " + id));
     }
 
     @Transactional
     public VehiculeResponse updateVehicule(UUID id, VehiculeRequest request) {
         Vehicule vehicule = vehiculeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vehicule non trouve"));
+                .orElseThrow(() -> new EntityNotFoundException("Véhicule introuvable avec l'ID : " + id));
 
         vehicule.setImmatriculation(request.getImmatriculation());
         vehicule.setType(request.getType());
@@ -72,7 +66,7 @@ public class VehiculeService {
     @Transactional
     public void deleteVehicule(UUID id) {
         Vehicule vehicule = vehiculeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vehicule non trouve"));
+                .orElseThrow(() -> new EntityNotFoundException("Véhicule introuvable avec l'ID : " + id));
         vehicule.setStatut(Vehicule.StatutVehicule.HORS_SERVICE);
         vehiculeRepository.save(vehicule);
     }
@@ -98,7 +92,7 @@ public class VehiculeService {
     @Transactional
     public VehiculeResponse updateStatut(UUID id, Vehicule.StatutVehicule statut) {
         Vehicule vehicule = vehiculeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vehicule non trouve"));
+                .orElseThrow(() -> new EntityNotFoundException("Véhicule introuvable avec l'ID : " + id));
         vehicule.setStatut(statut);
         return mapToResponse(vehiculeRepository.save(vehicule));
     }
@@ -114,4 +108,3 @@ public class VehiculeService {
                 .build();
     }
 }
-
