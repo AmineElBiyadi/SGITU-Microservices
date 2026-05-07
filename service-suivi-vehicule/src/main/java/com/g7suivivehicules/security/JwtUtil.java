@@ -62,12 +62,22 @@ public class JwtUtil {
 
     public Collection<? extends GrantedAuthority> extractAuthorities(String token) {
         Claims claims = extractAllClaims(token);
-        String role = claims.get("role", String.class);
+        Object roleObj = claims.get("role");
         
-        if (role != null && !role.isEmpty()) {
+        if (roleObj instanceof String role && !role.isEmpty()) {
             return Collections.singletonList(new SimpleGrantedAuthority(role));
         }
         
         return Collections.emptyList();
+    }
+
+    public String generateToken(String username, java.util.Map<String, Object> extraClaims) {
+        return Jwts.builder()
+                .claims(extraClaims)
+                .subject(username)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 heures
+                .signWith(getSigningKey())
+                .compact();
     }
 }
