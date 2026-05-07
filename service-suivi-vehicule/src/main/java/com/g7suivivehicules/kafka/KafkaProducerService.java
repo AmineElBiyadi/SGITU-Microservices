@@ -21,8 +21,14 @@ public class KafkaProducerService {
     @Value("${kafka.topic.anomalie}")
     private String topicAnomalieG4;
 
+    @Value("${kafka.topic.position}")
+    private String topicPositionG4;
+
     @Value("${kafka.topic.incident}")
     private String topicIncidentG9;
+
+    @Value("${kafka.topic.g8}")
+    private String topicG8;
 
     public void publierAlerte(Alert alert) {
         // Envoi à G4 (Anomalies Terrain)
@@ -31,6 +37,31 @@ public class KafkaProducerService {
         // Envoi à G9 (Incidents) si HAUTE ou CRITIQUE
         if (alert.getSeverite() == Alert.Severite.HAUTE || alert.getSeverite() == Alert.Severite.CRITIQUE) {
             publierVersG9(alert);
+        }
+    }
+
+    public void envoyerPositionG4(com.g7suivivehicules.entity.PositionGPS position, String ligneId) {
+        G4PositionEventDTO dtoG4 = G4PositionEventDTO.builder()
+                .vehiculeId(position.getVehiculeId().toString())
+                .ligneId(ligneId != null ? ligneId : "NON_ASSIGNE")
+                .lat(position.getLatitude())
+                .longitude(position.getLongitude())
+                .vitesse(position.getVitesse())
+                .timestamp(position.getTimestamp().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .build();
+
+        kafkaTemplate.send(topicPositionG4, position.getVehiculeId().toString(), dtoG4);
+        log.info("[KafkaProducer] Position G4 publiée : {}", dtoG4);
+    }
+
+    public void envoyerStatusG8(G8VehiculeStatusDTO status) {
+        kafkaTemplate.send(topicG8, status.getVehicleId(), status);
+        log.info("[KafkaProducer] Statut G8 publié : {}", status);
+    }
+
+    public void envoyerStatusG8(java.util.List<G8VehiculeStatusDTO> statuses) {
+        for (G8VehiculeStatusDTO status : statuses) {
+            envoyerStatusG8(status);
         }
     }
 
@@ -51,7 +82,7 @@ public class KafkaProducerService {
                 break;
             case VITESSE_EXCESSIVE:
             default:
-                typeG4 = "PANNE"; // Default fallback if needed
+                typeG4 = "ALERTE";
                 break;
         }
 
@@ -59,7 +90,7 @@ public class KafkaProducerService {
                 .vehiculeId(alert.getVehiculeId().toString())
                 .type(typeG4)
                 .details(alert.getMessage())
-                .timestamp(alert.getTimestampDebut().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .timestamp(alert.getTimestampDebut().format(DateTimeFormatter.ISO_DATE_TIME))
                 .build();
 
         kafkaTemplate.send(topicAnomalieG4, dtoG4);
@@ -79,7 +110,7 @@ public class KafkaProducerService {
                 typeG9 = "RETARD";
                 break;
             case DEVIATION_ITINERAIRE:
-                typeG9 = "AUTRE"; // Or whatever fits best in G9
+                typeG9 = "AUTRE"; 
                 break;
             case VITESSE_EXCESSIVE:
             default:
@@ -110,9 +141,8 @@ public class KafkaProducerService {
                 .description(alert.getMessage())
                 .latitude(alert.getLatitude())
                 .longitude(alert.getLongitude())
-                .vehiculeId(alert.getVehiculeId().toString()) // Remarque : String utilisé ici au lieu de Long pour
-                                                              // passer l'UUID
-                .dateDetection(alert.getTimestampDebut().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .vehiculeId(alert.getVehiculeId().toString()) 
+                .dateDetection(alert.getTimestampDebut().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")))
                 .build();
 
         kafkaTemplate.send(topicIncidentG9, dtoG9);

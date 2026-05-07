@@ -3,7 +3,7 @@ package com.g7suivivehicules.service;
 import com.g7suivivehicules.dto.VehiculeRequest;
 import com.g7suivivehicules.dto.VehiculeResponse;
 import com.g7suivivehicules.entity.Vehicule;
-import com.g7suivivehicules.kafka.KafkaProducer;
+import com.g7suivivehicules.entity.Vehicule;
 import com.g7suivivehicules.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 public class VehiculeService {
 
     private final VehiculeRepository vehiculeRepository;
-    // private final KafkaProducer kafkaProducer; // Temporairement désactivé pour test sans Kafka
 
     @Transactional
     public VehiculeResponse createVehicule(VehiculeRequest request) {
