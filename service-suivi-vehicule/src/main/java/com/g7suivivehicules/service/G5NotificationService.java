@@ -84,7 +84,7 @@ public class G5NotificationService {
             case CARBURANT_CRITIQUE: return "Niveau carburant très bas, faites le plein";
             case VITESSE_EXCESSIVE: return "Vitesse excessive, réduisez la vitesse";
             case FREINAGE_BRUSQUE: return "Freinage brusque détecté, soyez prudent";
-            case ARRET_ANORMAL: return "Arrêt anormal détecté, vérifiez la situation";
+            case IMMOBILISATION: return "Arrêt anormal détecté, vérifiez la situation";
             case DEVIATION_ITINERAIRE: return "Déviation d'itinéraire détectée";
             default: return "Alerte de sécurité détectée sur votre véhicule";
         }

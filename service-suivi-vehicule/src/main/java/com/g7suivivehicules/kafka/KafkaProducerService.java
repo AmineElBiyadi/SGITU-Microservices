@@ -1,6 +1,8 @@
 package com.g7suivivehicules.kafka;
 
 import com.g7suivivehicules.dto.G4AnomalieTerrainDTO;
+import com.g7suivivehicules.dto.G4PositionEventDTO;
+import com.g7suivivehicules.dto.G8VehiculeStatusDTO;
 import com.g7suivivehicules.dto.G9IncidentEventDTO;
 import com.g7suivivehicules.entity.Alert;
 import lombok.RequiredArgsConstructor;
