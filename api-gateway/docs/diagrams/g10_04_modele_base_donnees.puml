@@ -1,0 +1,57 @@
+@startuml
+title G10 - Donnees et source de verite
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+component "G10 API Gateway" as G10
+database "Aucune base utilisateurs locale\nG10 ne stocke pas users/roles/tokens" as NoDb
+
+component "G3 Gestion utilisateurs" as G3
+database "User DB\npropriete G3" as UserDb
+
+entity "users" as users {
+  * id
+  * email
+  * passwordHash
+  * role
+  * enabled
+  * emailVerified
+}
+
+entity "refresh_tokens" as refresh {
+  * id
+  * tokenHash
+  * userId
+  * revoked
+  * expiresAt
+}
+
+entity "email_verification_tokens" as verify {
+  * id
+  * tokenHash
+  * userId
+  * expiresAt
+}
+
+entity "password_reset_tokens" as reset {
+  * id
+  * tokenHash
+  * userId
+  * expiresAt
+}
+
+G10 .. NoDb
+G10 --> G3 : route /auth/**\nvalidate JWT signed by G3
+G3 --> UserDb
+UserDb -- users
+users ||--o{ refresh
+users ||--o{ verify
+users ||--o{ reset
+
+note bottom of G10
+G10 peut avoir des logs techniques sur fichier,
+mais pas de base metier utilisateurs.
+end note
+
+@enduml

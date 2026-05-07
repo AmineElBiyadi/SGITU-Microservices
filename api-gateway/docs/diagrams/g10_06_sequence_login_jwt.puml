@@ -1,0 +1,30 @@
+@startuml
+title Sequence - Login via G10, JWT emis par G3
+
+autonumber
+actor "Utilisateur" as User
+participant "G10 Gateway" as G10
+participant "G3 User/Auth Service" as G3
+database "User DB G3" as Db
+
+User -> G10 : POST /auth/login\nemail, password
+activate G10
+G10 -> G3 : route /auth/login
+activate G3
+G3 -> Db : chercher utilisateur
+Db --> G3 : passwordHash, role, enabled
+G3 -> G3 : verifier mot de passe\nverifier compte actif
+
+alt identifiants invalides
+  G3 --> G10 : 401 Unauthorized
+  G10 --> User : 401 Unauthorized
+else login valide
+  G3 -> G3 : generer JWT\nsub, role, userId, iat, exp
+  G3 --> G10 : accessToken + refreshToken
+  G10 --> User : tokens emis par G3
+end
+
+deactivate G3
+deactivate G10
+
+@enduml

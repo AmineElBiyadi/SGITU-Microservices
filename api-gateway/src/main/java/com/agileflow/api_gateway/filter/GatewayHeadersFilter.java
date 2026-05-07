@@ -1,6 +1,6 @@
 package com.agileflow.api_gateway.filter;
 
-import com.agileflow.api_gateway.model.User;
+import com.agileflow.api_gateway.security.JwtPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -52,8 +52,10 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
             requestBuilder.header("X-User-Email", authentication.getName());
             requestBuilder.header("X-Roles", extractRoles(authentication));
 
-            if (authentication.getPrincipal() instanceof User user && user.getId() != null) {
-                requestBuilder.header("X-User-Id", user.getId().toString());
+            if (authentication.getPrincipal() instanceof JwtPrincipal principal
+                    && principal.userId() != null
+                    && !principal.userId().isBlank()) {
+                requestBuilder.header("X-User-Id", principal.userId());
             }
         }
 

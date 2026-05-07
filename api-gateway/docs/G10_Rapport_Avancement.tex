@@ -1,0 +1,338 @@
+% ============================================================
+%  Projet SGITU - Groupe 10 - API Gateway & Securite
+%  Rapport d'avancement technique - Architecture Microservices
+%  Version adaptee : G3 est source de verite utilisateurs/JWT
+% ============================================================
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{mathptmx}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{float}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small GI 2}
+\chead{\small Projet SGITU - Groupe 10}
+\rhead{\small API Gateway \& Securite}
+\lfoot{\small ENSATe}
+\cfoot{\small AU 2025/2026}
+\rfoot{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\definecolor{navyblue}{RGB}{13,27,62}
+\definecolor{blueaccent}{RGB}{26,86,219}
+\definecolor{greenok}{RGB}{5,150,105}
+\definecolor{redwarn}{RGB}{220,38,38}
+\definecolor{lightgray}{RGB}{248,250,252}
+\definecolor{codebg}{RGB}{15,17,23}
+\definecolor{codeyellow}{RGB}{251,191,36}
+\definecolor{codemuted}{RGB}{71,85,105}
+
+\titleformat{\section}{\fontsize{14}{17}\bfseries\color{navyblue}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\fontsize{13}{16}\bfseries\color{navyblue}}{\thesubsection.}{0.5em}{}
+\AtBeginDocument{\fontsize{11}{13.2}\selectfont}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlist[itemize,1]{label=\textbullet,leftmargin=1.5em,topsep=4pt,itemsep=2pt}
+\sloppy
+
+\tcbuselibrary{skins, breakable}
+\newtcolorbox{calloutinfo}{
+  colback=blue!5!white,colframe=blueaccent,boxrule=0pt,leftrule=4pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt,arc=4pt,breakable,
+  fonttitle=\bfseries\small\color{blueaccent},title=Information
+}
+\newtcolorbox{calloutsuccess}{
+  colback=green!5!white,colframe=greenok,boxrule=0pt,leftrule=4pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt,arc=4pt,breakable,
+  fonttitle=\bfseries\small\color{greenok},title=Decision retenue
+}
+\newtcolorbox{calloutdanger}{
+  colback=red!5!white,colframe=redwarn,boxrule=0pt,leftrule=4pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt,arc=4pt,breakable,
+  fonttitle=\bfseries\small\color{redwarn},title=Point critique
+}
+
+\lstdefinestyle{codeStyle}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\fontsize{9}{11}\selectfont\color{white},
+  stringstyle=\color{codeyellow},
+  commentstyle=\color{codemuted},
+  breaklines=true,
+  frame=single,
+  showstringspaces=false,
+  columns=fullflexible
+}
+
+\newcommand{\optionalfigure}[3]{
+\begin{figure}[H]
+  \centering
+  \IfFileExists{#1}{
+    \includegraphics[width=#2\textwidth]{#1}
+  }{
+    \fbox{
+      \begin{minipage}[c][4.5cm][c]{#2\textwidth}
+        \centering
+        \textbf{Diagramme a exporter depuis PlantUML}\\[6pt]
+        Fichier attendu : \texttt{\detokenize{#1}}\\[4pt]
+        Source : \texttt{diagrams/}
+      \end{minipage}
+    }
+  }
+  \caption{#3}
+\end{figure}
+}
+
+\hypersetup{colorlinks=true,linkcolor=navyblue,urlcolor=blueaccent}
+
+\begin{document}
+
+\thispagestyle{empty}
+\begin{titlepage}
+\begin{center}
+\vspace*{1cm}
+{\large\bfseries Universite Abdelmalek Essaadi}\\[4pt]
+{\large\bfseries Ecole Nationale des Sciences Appliquees de Tetouan}\\[1cm]
+\rule{\linewidth}{1pt}\\[0.4cm]
+{\Large\bfseries Module : Microservices}\\[0.3cm]
+{\Large\bfseries Projet SGITU}\\[0.4cm]
+\rule{\linewidth}{1pt}\\[1.5cm]
+{\fontsize{25}{30}\bfseries\selectfont Rapport d'avancement}\\[0.5cm]
+{\fontsize{22}{27}\bfseries\selectfont Groupe 10 - API Gateway \& Securite}\\[0.5cm]
+{\fontsize{16}{20}\selectfont Architecture adaptee : G3 est source de verite utilisateurs/JWT}\\[2cm]
+\vfill
+{\Large\bfseries Realise par :}\\[0.4cm]
+{\Large Groupe 10}\\[1cm]
+{\large\bfseries AU 2025/2026}
+\end{center}
+\end{titlepage}
+
+\newpage
+\setcounter{page}{2}
+
+\section*{Objectifs}
+\addcontentsline{toc}{section}{Objectifs}
+
+Ce rapport presente l'etat d'avancement du groupe 10 dans le projet SGITU. Le groupe 10 est responsable de l'\textbf{API Gateway} et de la \textbf{securite transverse}. Apres clarification architecturale, la responsabilite des comptes utilisateurs et des roles est attribuee au groupe 3, afin de respecter le principe microservices de source unique de verite.
+
+\section*{Resume}
+\addcontentsline{toc}{section}{Resume}
+
+G10 ne stocke plus les utilisateurs, les roles, les mots de passe, les refresh tokens ou les tokens de verification. Ces donnees appartiennent au microservice \textbf{G3 Gestion des utilisateurs}. G10 valide les JWT emis par G3, applique les regles d'acces, ajoute les headers utilisateur et route vers les microservices G1 a G9.
+
+\begin{calloutsuccess}
+La Gateway reste stateless concernant l'identite : elle valide le JWT, mais ne devient pas une deuxieme source de verite des comptes.
+\end{calloutsuccess}
+
+\section{Presentation du microservice}
+
+\subsection{Responsabilites de G10}
+
+\begin{itemize}
+  \item point d'entree unique du systeme SGITU ;
+  \item validation des JWT emis par G3 ;
+  \item controle d'acces par role ;
+  \item routage vers G1, G2, G3, G4, G5, G6, G7, G8 et G9 ;
+  \item propagation de \texttt{X-User-Id}, \texttt{X-User-Email}, \texttt{X-Roles} et \texttt{X-Correlation-Id} ;
+  \item gestion structuree des erreurs \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503} ;
+  \item journalisation avec SLF4J/Logback ;
+  \item documentation Swagger/OpenAPI ;
+  \item conteneurisation Docker.
+\end{itemize}
+
+\subsection{Responsabilites de G3}
+
+G3 est la source de verite pour :
+
+\begin{itemize}
+  \item comptes utilisateurs ;
+  \item profils ;
+  \item roles et permissions ;
+  \item mots de passe ;
+  \item inscription ;
+  \item verification email ;
+  \item forgot/reset password ;
+  \item emission des JWT ;
+  \item refresh tokens.
+\end{itemize}
+
+\section{Conception}
+
+\subsection{Architecture globale}
+
+\optionalfigure{diagrams/g10_01_architecture_globale.png}{0.95}{Architecture globale G10 adaptee}
+
+\subsection{Diagramme de composants}
+
+\optionalfigure{diagrams/g10_02_diagramme_composants.png}{0.95}{Diagramme de composants G10}
+
+\subsection{Cas d'utilisation}
+
+\optionalfigure{diagrams/g10_03_diagramme_cas_utilisation.png}{0.9}{Diagramme de cas d'utilisation G10}
+
+\section{Contrat JWT}
+
+G10 attend un JWT emis par G3. Le token est envoye par le client dans :
+
+\begin{lstlisting}[style=codeStyle]
+Authorization: Bearer <JWT_EMIS_PAR_G3>
+\end{lstlisting}
+
+Claims minimaux :
+
+\begin{lstlisting}[style=codeStyle]
+{
+  "sub": "user@sgitu.ma",
+  "role": "ROLE_USER",
+  "userId": 10,
+  "iat": 1715000000,
+  "exp": 1715003600,
+  "jti": "uuid"
+}
+\end{lstlisting}
+
+G10 verifie la signature, l'expiration, le \texttt{sub} et le \texttt{role}. Il ne consulte pas une table locale des utilisateurs.
+
+\section{Routes REST}
+
+\begin{center}
+\begin{longtable}{>{\bfseries}p{2.2cm} p{6.7cm} p{4cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Groupe} & \color{white}\textbf{Prefixes via G10} & \color{white}\textbf{Securite} \\
+\endfirsthead
+\rowcolor{navyblue}
+\color{white}\textbf{Groupe} & \color{white}\textbf{Prefixes via G10} & \color{white}\textbf{Securite} \\
+\endhead
+G1 & \texttt{/api/v1/tickets/**}, \texttt{/api/v1/admin/**} & JWT, admin pour admin \\
+\rowcolor{lightgray}
+G2 & \texttt{/api/abonnements/**}, \texttt{/api/plans/**} & JWT, admin pour admin \\
+G3 & \texttt{/auth/**}, \texttt{/admin/users/**}, \texttt{/api/users/**} & public/auth/admin selon path \\
+\rowcolor{lightgray}
+G4 & \texttt{/api/g4/**}, \texttt{/api/v1/operator/status} & JWT \\
+G5 & \texttt{/api/notifications/**} & JWT \\
+\rowcolor{lightgray}
+G6 & \texttt{/api/payments/**}, \texttt{/api/refunds/**} & JWT \\
+G7 & \texttt{/api/suivi-vehicules/**} & JWT \\
+\rowcolor{lightgray}
+G8 & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**}, \texttt{/predict/**} & JWT, admin/agent \\
+G9 & \texttt{/api/incidents/**}, \texttt{/api/rapports/**} & JWT \\
+\end{longtable}
+\end{center}
+
+\section{Base de donnees}
+
+\optionalfigure{diagrams/g10_04_modele_base_donnees.png}{0.9}{Source de verite des donnees utilisateurs}
+
+\begin{calloutdanger}
+G10 n'a pas de base utilisateurs. Toute modification d'un email, role ou permission doit passer par G3.
+\end{calloutdanger}
+
+\section{Diagrammes de sequence}
+
+\subsection{Inscription et verification email}
+
+\optionalfigure{diagrams/g10_05_sequence_inscription_email.png}{0.95}{Inscription routee vers G3 et notification via G5}
+
+\subsection{Login et emission JWT}
+
+\optionalfigure{diagrams/g10_06_sequence_login_jwt.png}{0.95}{Login via G10, JWT emis par G3}
+
+\subsection{Routage d'une requete}
+
+\optionalfigure{diagrams/g10_07_sequence_routage_gateway.png}{0.95}{Routage Gateway avec JWT emis par G3}
+
+\section{Implementation}
+
+\subsection{Couches}
+
+\begin{itemize}
+  \item \textbf{config} : securite, Swagger ;
+  \item \textbf{filter} : validation JWT et headers Gateway ;
+  \item \textbf{service} : service JWT de validation ;
+  \item \textbf{error} : erreurs structurees ;
+  \item \textbf{controller} : fallback Gateway uniquement.
+\end{itemize}
+
+\subsection{Technologies}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{4cm} p{8cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Technologie} & \color{white}\textbf{Role} \\
+\hline
+Spring Boot & Application principale \\
+\rowcolor{lightgray}
+Spring Cloud Gateway & Routage API Gateway \\
+Spring Security WebFlux & Controle d'acces reactive \\
+\rowcolor{lightgray}
+JJWT & Validation JWT \\
+SLF4J + Logback & Logs Gateway \\
+\rowcolor{lightgray}
+Docker & Conteneurisation \\
+Swagger/OpenAPI & Documentation interactive \\
+\end{tabular}
+\end{center}
+
+\section{Docker}
+
+\optionalfigure{diagrams/g10_08_deploiement_docker.png}{0.85}{Deploiement Docker G10}
+
+\begin{lstlisting}[style=codeStyle]
+cd api-gateway
+docker compose up -d --build
+\end{lstlisting}
+
+\section{Tests}
+
+\begin{lstlisting}[style=codeStyle]
+.\mvnw.cmd clean test
+\end{lstlisting}
+
+Les tests automatises couvrent la validation des erreurs de securite et la conformite des routes Gateway. Les tests Postman se trouvent dans \texttt{src/main/resources/test.http}.
+
+\section{Etat d'avancement}
+
+\subsection{Finalise}
+
+\begin{itemize}
+  \item Gateway fonctionnelle ;
+  \item validation JWT stateless ;
+  \item separation G3/G10 corrigee ;
+  \item suppression de la base utilisateurs G10 ;
+  \item routes G1-G9 ;
+  \item logs et correlation id ;
+  \item Docker Compose sans MySQL G10 ;
+  \item tests Maven.
+\end{itemize}
+
+\subsection{A verifier avec les autres groupes}
+
+\begin{itemize}
+  \item format exact du JWT emis par G3 ;
+  \item secret ou cle publique de verification JWT ;
+  \item endpoints definitifs de G3 pour auth/admin users ;
+  \item disponibilite des microservices cibles dans le meme reseau Docker.
+\end{itemize}
+
+\section{Conclusion}
+
+La version adaptee respecte mieux les principes microservices. G3 reste proprietaire de l'identite, tandis que G10 assure la securite transverse, le routage et l'observabilite. Cette separation evite la duplication des utilisateurs, les incoherences de roles et le couplage entre bases de donnees.
+
+\end{document}

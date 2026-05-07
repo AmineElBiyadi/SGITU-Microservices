@@ -4,20 +4,9 @@ server:
 spring:
   application:
     name: api-gateway
-
-  datasource:
-    url: jdbc:mysql://localhost:3360/gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: "root"
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
 
   cloud:
     gateway:
@@ -44,6 +33,11 @@ spring:
             - Path=/api/abonnements,/api/abonnements/**,/api/plans,/api/plans/**
           filters:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g3-auth-users
+          uri: http://user-service:8083
+          predicates:
+            - Path=/auth/**,/admin/users/**
 
         - id: g3-utilisateurs
           uri: http://user-service:8083
@@ -91,22 +85,6 @@ jwt:
   expiration: 3600000
   refresh-expiration: 604800000
 
-g10:
-  public-base-url: http://localhost:8080
-  email:
-    verification-expiration-minutes: 1440
-    password-reset-expiration-minutes: 15
-    log-tokens: true
-  notifications:
-    enabled: true
-    email-url: http://localhost:8085/api/notifications/send
-    bearer-token: ""
-  admin:
-    bootstrap:
-      enabled: true
-    email: admin@sgitu.ma
-    password: Admin123456
-
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -143,12 +121,3 @@ spring:
   config:
     activate:
       on-profile: docker
-  datasource:
-    url: jdbc:mysql://gateway-db:3306/gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password: root
-
-g10:
-  public-base-url: http://api-gateway:8080
-  notifications:
-    email-url: http://notification-service:8085/api/notifications/send

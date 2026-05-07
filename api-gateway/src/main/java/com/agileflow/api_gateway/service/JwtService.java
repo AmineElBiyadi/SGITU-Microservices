@@ -5,8 +5,10 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Key;
 import java.util.Date;
@@ -24,13 +26,13 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    @Value("${jwt.refresh-expiration}")
+    @Value("${jwt.refresh-expiration:604800000}")
     private long refreshExpiration;
 
-    // ────────────────────────────────────────────────
-    //  Génération des tokens
-    // ────────────────────────────────────────────────
-
+    /*
+     * Generation helpers are kept for tests and compatibility only.
+     * In the target architecture, G3 is the JWT issuer and G10 only validates.
+     */
     public String generateAccessToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", extractPrimaryRole(userDetails));
@@ -55,24 +57,28 @@ public class JwtService {
                 .compact();
     }
 
-    // ────────────────────────────────────────────────
-    //  Validation
-    // ────────────────────────────────────────────────
+    public Claims validateAndExtractClaims(String token) {
+        Claims claims = extractAllClaims(token);
 
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername())
-                && !isTokenExpired(token)
-                && userDetails.isEnabled();
+        if (claims.getExpiration() == null || claims.getExpiration().before(new Date())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT expire");
+        }
+
+        if (claims.getSubject() == null || claims.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans subject");
+        }
+
+        String role = extractRole(claims);
+        if (role == null || role.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans role");
+        }
+
+        return claims;
     }
 
     public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
-
-    // ────────────────────────────────────────────────
-    //  Extraction des claims
-    // ────────────────────────────────────────────────
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -83,7 +89,23 @@ public class JwtService {
     }
 
     public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+        return extractRole(extractAllClaims(token));
+    }
+
+    public String extractRole(Claims claims) {
+        String role = claims.get("role", String.class);
+        if (role == null) {
+            role = claims.get("roles", String.class);
+        }
+        return role;
+    }
+
+    public String extractUserId(Claims claims) {
+        Object userId = claims.get("userId");
+        if (userId == null) {
+            userId = claims.get("id");
+        }
+        return userId == null ? null : userId.toString();
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

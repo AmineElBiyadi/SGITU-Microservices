@@ -19,27 +19,28 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("SGITU — API Gateway G10")
+                        .title("SGITU - API Gateway G10")
                         .version("1.0.0")
                         .description("""
-                                **API Gateway & Sécurité** — Groupe 10 SGITU
-                                
-                                Ce service est le point d'entrée unique du système SGITU.
-                                Il gère :
-                                - L'authentification JWT (register, login, logout, refresh)
-                                - Le routage vers les 9 microservices métier (G1–G9)
-                                - Le contrôle d'accès par rôle (RBAC)
-                                - La propagation des Correlation IDs
-                                
-                                **Rôles disponibles :** ROLE_PASSENGER, ROLE_STUDENT, ROLE_DRIVER,
-                                ROLE_OPERATOR, ROLE_TECHNICIAN, ROLE_STAFF, ROLE_ADMIN
+                                **API Gateway & Securite** - Groupe 10 SGITU.
+
+                                G10 est le point d'entree unique du systeme SGITU.
+                                Il ne possede pas la base officielle des comptes utilisateurs.
+                                G3 Gestion des utilisateurs est la source de verite pour :
+                                - profils utilisateurs ;
+                                - roles et permissions ;
+                                - authentification et emission JWT.
+
+                                G10 valide les JWT emis par G3, applique les regles d'acces,
+                                propage `X-User-Id`, `X-User-Email`, `X-Roles`,
+                                `X-Correlation-Id`, puis route vers G1-G9.
                                 """)
                         .contact(new Contact()
-                                .name("Groupe 10 — KHALID WISSAL, HARISS HOUSSAM, ES-SERRAR ACHRAF, SADIKI ABDERRAHIM")
+                                .name("Groupe 10 - API Gateway & Securite")
                         )
                 )
                 .servers(List.of(
-                        new Server().url("http://localhost:8080").description("Développement local"),
+                        new Server().url("http://localhost:8080").description("Developpement local"),
                         new Server().url("http://api-gateway:8080").description("Docker")
                 ))
                 .components(new Components()
@@ -47,7 +48,7 @@ public class SwaggerConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")
-                                .description("Entrez votre access token JWT (sans le préfixe 'Bearer ')")
+                                .description("Access token JWT emis par G3")
                         )
                 )
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
