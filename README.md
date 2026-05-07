@@ -52,3 +52,35 @@ Chaque service est contenu dans son propre répertoire. Pour développer un serv
 3. Commiter vos changements (`git commit -m 'Ajouter une fonctionnalité incroyable'`)
 4. Pousser vers la branche (`git push origin feature/AmazingFeature`)
 5. Ouvrir une Pull Request
+
+## Demarrage G10 uniquement
+
+Pour travailler seulement sur le groupe 10, lancer l'API Gateway, sa base MySQL et phpMyAdmin :
+
+```bash
+cd api-gateway
+docker compose up -d --build
+```
+
+URLs utiles :
+
+- API Gateway : http://localhost:8080
+- Health check : http://localhost:8080/actuator/health
+- Swagger : http://localhost:8080/swagger-ui.html
+- phpMyAdmin : http://localhost:8090
+
+Connexion phpMyAdmin :
+
+```text
+Serveur : gateway-db
+Utilisateur : root
+Mot de passe : root
+Base : gateway_db
+```
+
+Pour arreter seulement G10 :
+
+```bash
+cd api-gateway
+docker compose down
+```

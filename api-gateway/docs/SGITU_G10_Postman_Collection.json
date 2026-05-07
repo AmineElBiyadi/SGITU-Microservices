@@ -232,7 +232,7 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{baseUrl}}/api/analytics/dashboard", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "dashboard"] }
+            "url": { "raw": "{{baseUrl}}/api/v1/analytics/dashboard", "host": ["{{baseUrl}}"], "path": ["api", "v1", "analytics", "dashboard"] }
           }
         }
       ]
