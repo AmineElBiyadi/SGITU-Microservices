@@ -15,7 +15,7 @@ public class NotificationProducer {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void envoyerNotification(NotificationEvent event) {
-        log.info("Publication notification type {} pour l'événement {}",
+        log.info("Publication notification type {} avec l'ID {}",
                 event.getEventType(), event.getNotificationId());
         kafkaTemplate.send(MessagingConstants.NOTIFICATION_TOPIC, event);
         log.info("Notification publiée avec succès");

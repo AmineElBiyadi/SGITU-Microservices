@@ -16,10 +16,13 @@ public class IncidentDetecteEvent implements Serializable {
 
     private String type;            // PANNE_VEHICULE, RETARD, ACCIDENT, etc.
     private String gravite;         // FAIBLE, MOYEN, ELEVE, CRITIQUE
+    
+    private String vehiculeId;
+    private String ligneTransport;
+    
     private String description;
     private Double latitude;
     private Double longitude;
-    private String vehiculeId;
-    private String ligneTransport;
+    
     private LocalDateTime dateDetection;
 }

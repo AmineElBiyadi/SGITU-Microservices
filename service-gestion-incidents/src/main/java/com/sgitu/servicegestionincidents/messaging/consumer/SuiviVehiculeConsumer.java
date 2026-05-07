@@ -39,16 +39,16 @@ public class SuiviVehiculeConsumer {
 
             Incident incident = Incident.builder()
                     .reference(referenceGenerator.generate())
+                    .source("IOT")
                     .type(TypeIncident.valueOf(event.getType()))
-                    .description(event.getDescription())
-                    .dateSignalement(LocalDateTime.now())
-                    .dateIncident(event.getDateDetection())
                     .statut(StatutIncident.NOUVEAU)
                     .gravite(NiveauGravite.valueOf(event.getGravite()))
-                    .declarantId(0L) // Système automatique
                     .vehiculeId(event.getVehiculeId())
-                    .source("IOT")
+                    .declarantId(0L) // 0L = Système automatique IoT
+                    .description(event.getDescription())
                     .localisation(localisation)
+                    .dateSignalement(LocalDateTime.now())
+                    .dateIncident(event.getDateDetection())
                     .build();
 
             Incident saved = incidentRepository.save(incident);
