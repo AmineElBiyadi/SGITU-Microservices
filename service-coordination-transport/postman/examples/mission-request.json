@@ -1,0 +1,12 @@
+{
+	"vehiculeId": "VH-001",
+	"ligneId": 1,
+	"trajetId": 1,
+	"affectationId": 1,
+	"statut": "PLANIFIEE",
+	"plannedStart": "2026-05-07T08:00:00Z",
+	"actualStart": null,
+	"endedAt": null,
+	"referenceG3": "BIL-G3-1001",
+	"notes": "Mission régulière matin"
+}

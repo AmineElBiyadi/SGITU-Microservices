@@ -1,0 +1,9 @@
+{
+	"type": "INCIDENT",
+	"status": "CONFIRME",
+	"missionId": 1,
+	"vehiculeId": "VH-001",
+	"description": "Voie réduite — incident confirmé par G9",
+	"payloadJson": "{\"g9Reference\":\"INC-2026-089\",\"severity\":\"HIGH\"}",
+	"occurredAt": "2026-05-07T09:45:00Z"
+}

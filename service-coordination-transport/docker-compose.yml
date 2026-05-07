@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sgitu-g4-postgres
+    environment:
+      POSTGRES_DB: sgitu_g4
+      POSTGRES_USER: g4
+      POSTGRES_PASSWORD: g4
+    ports:
+      - "5434:5432"
+    volumes:
+      - sgitu_g4_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U g4 -d sgitu_g4"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sgitu-net
+
+  g4-coordination:
+    build: .
+    container_name: sgitu-g4-coordination
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: "8084"
+      JPA_DDL_AUTO: update
+      SGITU_KAFKA_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sgitu-net
+
+volumes:
+  sgitu_g4_pgdata:
+
+networks:
+  sgitu-net:
+    driver: bridge
