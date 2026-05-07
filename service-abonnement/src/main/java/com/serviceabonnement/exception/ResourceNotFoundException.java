@@ -2,8 +2,8 @@ package com.serviceabonnement.exception;
 
 import org.springframework.http.HttpStatus;
 
-public class AbonnementNotFoundException extends BaseException {
-    public AbonnementNotFoundException(String message) {
+public class ResourceNotFoundException extends BaseException {
+    public ResourceNotFoundException(String message) {
         super(message, HttpStatus.NOT_FOUND);
     }
 }
