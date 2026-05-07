@@ -6,8 +6,8 @@ import java.time.Instant;
 
 @Data
 public class TransferRecordResponse {
-    private String fromHolderId;
-    private String toHolderId;
+    private String fromHolder;
+    private String toHolder;
     private Instant transferredAt;
     private String reason;
 }

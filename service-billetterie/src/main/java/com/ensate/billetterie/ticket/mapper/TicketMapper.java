@@ -23,7 +23,7 @@ public interface TicketMapper {
 
     List<TicketResponse> toResponseList(List<Ticket> tickets);
 
-    TransferRecordResponse toTransferRecordResponse(TransferRecord transferRecord);
+    //TransferRecordResponse toTransferRecordResponse(TransferRecord transferRecord);
 
     // ─── CreateRequest → Entity ───────────────────────────────────────────
 
