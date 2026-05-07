@@ -1,0 +1,21 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: g8-analytics-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/g8_analytics}
+      database: g8_analytics
+
+logging:
+  level:
+    ma.sgitu.g8: DEBUG
+
+g5:
+  notification:
+    url: ${G5_NOTIFICATION_URL:http://localhost:8085/api/notifications/send}
+ml:
+  service:
+    url: ${ML_SERVICE_URL:http://localhost:5000}
