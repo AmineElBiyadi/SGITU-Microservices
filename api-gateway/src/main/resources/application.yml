@@ -1,0 +1,141 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  datasource:
+    url: jdbc:mysql://localhost:3360/gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: "root"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  cloud:
+    gateway:
+      enabled: true
+      handler-mapping:
+        order: -1
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      routes:
+        - id: g1-billetterie
+          uri: http://service-billetterie:8081
+          predicates:
+            - Path=/api/v1/tickets/**,/api/v1/admin/tickets/**,/api/v1/admin/dashboard,/api/v1/ticket-types/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g2-abonnements
+          uri: http://service-abonnement:8082
+          predicates:
+            - Path=/api/abonnements/**,/api/plans/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g3-utilisateurs
+          uri: http://user-service:8083
+          predicates:
+            - Path=/api/users/**,/api/profiles/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g4-coordination
+          uri: http://coordination-service:8084
+          predicates:
+            - Path=/api/g4/**,/api/v1/operator/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g5-notifications
+          uri: http://notification-service:8085
+          predicates:
+            - Path=/api/notifications/**,/api/notify/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g6-paiement
+          uri: http://payment-service:8086
+          predicates:
+            - Path=/api/payments/**,/api/payment-accounts/**,/api/invoices/**,/api/paiement/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g7-suivi-vehicules
+          uri: http://g7-suivi-vehicules:8087
+          predicates:
+            - Path=/api/vehicles/**,/api/vehicules/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g8-analytics
+          uri: http://analytics-service:8088
+          predicates:
+            - Path=/api/analytics/**,/api/reports/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+        - id: g9-incidents
+          uri: http://service-gestion-incidents:8089
+          predicates:
+            - Path=/api/incidents/**,/api/rapports/**
+          filters:
+            - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+jwt:
+  secret: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
+  expiration: 3600000
+  refresh-expiration: 604800000
+
+g10:
+  public-base-url: http://localhost:8080
+  email:
+    verification-expiration-minutes: 1440
+    password-reset-expiration-minutes: 15
+    log-tokens: true
+  notifications:
+    enabled: true
+    email-url: http://notification-service:8085/api/notifications/email
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+# Profil Docker : surcharge des URLs pour conteneurs
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:mysql://gateway-db:3306/gateway_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: root
+
+g10:
+  public-base-url: http://api-gateway:8080
+  notifications:
+    email-url: http://notification-service:8085/api/notifications/send
