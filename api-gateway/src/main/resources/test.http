@@ -1,0 +1,164 @@
+### Health
+GET http://localhost:8080/actuator/health
+
+
+### Register ROLE_USER
+### Apres cette requete, copier le token/lien affiche dans les logs:
+### DEV email verification link for user1@sgitu.ma: http://localhost:8080/auth/verify-email?token=...
+POST http://localhost:8080/auth/register
+Content-Type: application/json
+
+{
+  "email": "user1@sgitu.ma",
+  "password": "123456",
+  "role": "ROLE_USER"
+}
+
+
+### Login avant verification email - attendu 401
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@sgitu.ma",
+  "password": "123456"
+}
+
+
+### Verify email
+GET http://localhost:8080/auth/verify-email?token=COLLER_EMAIL_VERIFICATION_TOKEN_ICI
+
+
+### Login apres verification email
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@sgitu.ma",
+  "password": "123456"
+}
+
+
+### Forgot password
+### Copier ensuite le reset token affiche dans les logs:
+### DEV password reset token for user1@sgitu.ma: ...
+POST http://localhost:8080/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "user1@sgitu.ma"
+}
+
+
+### Reset password
+POST http://localhost:8080/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "COLLER_PASSWORD_RESET_TOKEN_ICI",
+  "newPassword": "newPassword123"
+}
+
+
+### Login avec nouveau mot de passe
+POST http://localhost:8080/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@sgitu.ma",
+  "password": "newPassword123"
+}
+
+
+### 401 - Route protegee sans JWT
+GET http://localhost:8080/api/payments/1
+
+
+### 404 - JWT valide mais route inconnue
+GET http://localhost:8080/api/unknown/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-404
+
+
+### 403 - ROLE_USER interdit sur route admin
+PUT http://localhost:8080/api/users/1/roles
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+Content-Type: application/json
+X-Correlation-Id: test-403
+
+{
+  "role": "ROLE_ADMIN"
+}
+
+
+### Routage G1 Billetterie
+GET http://localhost:8080/api/tickets/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g1
+
+
+### Routage G2 Abonnements
+GET http://localhost:8080/api/abonnements/1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g2
+
+
+### Routage G3 Utilisateurs
+GET http://localhost:8080/api/users/1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g3
+
+
+### Routage G4 Coordination
+GET http://localhost:8080/api/coordination/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g4
+
+
+### Routage G5 Notifications
+GET http://localhost:8080/api/notifications/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g5
+
+
+### Routage G6 Paiement
+GET http://localhost:8080/api/payments/1
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g6
+
+
+### Routage G7 Suivi Vehicules
+GET http://localhost:8080/api/vehicles/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g7
+
+
+### Routage G8 Analytics
+GET http://localhost:8080/api/analytics/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g8
+
+
+### Routage G9 Incidents
+GET http://localhost:8080/api/incidents/test
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+X-Correlation-Id: test-g9
+
+
+### Refresh token
+POST http://localhost:8080/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "COLLER_REFRESH_TOKEN_ICI"
+}
+
+
+### Logout
+POST http://localhost:8080/auth/logout
+Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+Content-Type: application/json
+
+{
+  "refreshToken": "COLLER_REFRESH_TOKEN_ICI"
+}

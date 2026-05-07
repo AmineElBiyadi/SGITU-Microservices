@@ -1,0 +1,178 @@
+version: '3.8'
+
+# =============================================================
+#  SGITU — Infrastructure Microservice G5 Notifications
+#  Kafka KRaft + MySQL + MailHog + Kafka UI + phpMyAdmin
+#  Port G5 : 8085
+# =============================================================
+
+networks:
+  sgitu-network:
+    driver: bridge
+
+volumes:
+  mysql_notification_data:
+  kafka_data:
+
+services:
+
+  # ─────────────────────────────────────────────────────────
+  #  KAFKA KRaft (sans Zookeeper)
+  # ─────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.8.7
+    container_name: sgitu-kafka          # ← préfixé pour éviter conflit
+    hostname: kafka
+    networks:
+      - sgitu-network
+    ports:
+      - "9093:9092"
+      - "29093:29092"
+    environment:
+      CLUSTER_ID: "sgitu-kafka-cluster-001"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ─────────────────────────────────────────────────────────
+  #  KAFKA UI
+  #  Accessible sur http://localhost:8091
+  # ─────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: sgitu-kafka-ui       # ← préfixé
+    networks:
+      - sgitu-network
+    ports:
+      - "8091:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "sgitu-local"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────
+  #  MAILHOG — Serveur SMTP de test
+  #  SMTP : localhost:1026 | Interface Web : http://localhost:8026
+  # ─────────────────────────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: sgitu-mailhog        # ← préfixé
+    networks:
+      - sgitu-network
+    ports:
+      - "1026:1025"
+      - "8026:8025"
+
+  # ─────────────────────────────────────────────────────────
+  #  PHPMYADMIN — Interface web MySQL
+  #  Accessible sur http://localhost:8889
+  # ─────────────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: sgitu-phpmyadmin     # ← préfixé
+    networks:
+      - sgitu-network
+    ports:
+      - "8889:80"
+    environment:
+      PMA_HOST: mysql-notification
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      mysql-notification:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────
+  #  BASE DE DONNÉES MySQL — notifications_db
+  # ─────────────────────────────────────────────────────────
+  mysql-notification:
+    image: mysql:8.0
+    container_name: sgitu-mysql-notification  # ← préfixé
+    hostname: mysql-notification
+    networks:
+      - sgitu-network
+    ports:
+      - "3314:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: notifications_db
+      MYSQL_USER: sgitu
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_notification_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ─────────────────────────────────────────────────────────
+  #  MICROSERVICE G5 — Notifications
+  #  Port : 8085
+  # ─────────────────────────────────────────────────────────
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-service
+    hostname: notification-service
+    networks:
+      - sgitu-network
+    ports:
+      - "8085:8085"
+    environment:
+      # Base de données
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-notification:3306/notifications_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: sgitu
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      # Kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_CONSUMER_GROUP_ID: notification-group
+      # MailHog (SMTP)
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_PROTOCOL: smtp
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
+      # JWT (fourni par G10)
+      JWT_SECRET: ${JWT_SECRET}
+      # Profil actif
+      SPRING_PROFILES_ACTIVE: docker
+    restart: on-failure
+    depends_on:
+      mysql-notification:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "java -version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

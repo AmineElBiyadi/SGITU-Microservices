@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  user-service:
+    build: .
+    image: sgitu/user-service:1.0
+    container_name: user-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: secret
+      SERVER_PORT: 8083
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      INTERNAL_KEY: ${INTERNAL_SECRET_KEY:-SGITU_INTERNAL_SECRET_KEY_CHANGE_ME}
+    depends_on:
+      users-db:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+
+  users-db:
+    image: postgres:15-alpine
+    container_name: users-db
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sgitu-network
+
+networks:
+  sgitu-network:
+    external: true
+
+volumes:
+  users_data:
