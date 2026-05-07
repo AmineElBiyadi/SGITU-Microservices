@@ -24,7 +24,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 // Documentation et Actuator (Public)
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/**").permitAll()
+                .requestMatchers("/api/auth/test/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/**").permitAll()
                 
                 // Gestion des véhicules (Admin uniquement)
                 .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN")
