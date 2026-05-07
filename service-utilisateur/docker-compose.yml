@@ -13,7 +13,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: secret
       SERVER_PORT: 8083
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
-      INTERNAL_KEY: ${INTERNAL_SECRET_KEY:-SGITU_INTERNAL_SECRET_KEY_CHANGE_ME}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
       # G8 — Analyse & données: ask them for their container name and port
       G8_BASE_URL: ${G8_BASE_URL:-}
     depends_on:
@@ -25,6 +25,8 @@ services:
   users-db:
     image: postgres:15-alpine
     container_name: users-db
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: users_db
       POSTGRES_USER: postgres

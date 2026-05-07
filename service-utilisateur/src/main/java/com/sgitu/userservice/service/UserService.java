@@ -27,6 +27,4 @@ public interface UserService {
     void deleteUser(Long id);
 
     boolean userExists(Long id);
-
-    CredentialsResponseDTO getCredentialsByEmail(String email);
 }
