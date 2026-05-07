@@ -17,6 +17,9 @@ public interface PositionGPSRepository extends JpaRepository<PositionGPS, UUID> 
     // Historique complet d'un vehicule
     List<PositionGPS> findByVehiculeIdOrderByTimestampDesc(UUID vehiculeId);
 
+    // Récupérer les N dernières positions (avec pagination)
+    List<PositionGPS> findByVehiculeIdOrderByTimestampDesc(UUID vehiculeId, org.springframework.data.domain.Pageable pageable);
+
     // Toutes les positions
     List<PositionGPS> findAllByOrderByTimestampDesc();
 }

@@ -19,118 +19,122 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PositionService {
 
-    private final PositionGPSRepository positionRepository;
-    // private final KafkaProducer kafkaProducer; // Désactivé pour test local
+        private final PositionGPSRepository positionRepository;
+        private final AnomalyDetectionService anomalyDetectionService;
+        // private final KafkaProducer kafkaProducer; // Désactivé pour test local
 
-    // ================================
-    // Enregistrer une position GPS
-    // ================================
-    public PositionGPSResponse enregistrerPosition(PositionGPSRequest request) {
+        // ================================
+        // Enregistrer une position GPS
+        // ================================
+        public PositionGPSResponse enregistrerPosition(PositionGPSRequest request) {
 
-        PositionGPS position = PositionGPS.builder()
-                .vehiculeId(request.getVehiculeId())
-                .latitude(request.getLatitude())
-                .longitude(request.getLongitude())
-                .vitesse(request.getVitesse())
-                .cap(request.getCap())
-                .timestamp(LocalDateTime.now())
-                .build();
+                PositionGPS position = PositionGPS.builder()
+                                .vehiculeId(request.getVehiculeId())
+                                .latitude(request.getLatitude())
+                                .longitude(request.getLongitude())
+                                .vitesse(request.getVitesse())
+                                .cap(request.getCap())
+                                .timestamp(LocalDateTime.now())
+                                .build();
 
-        PositionGPS saved = positionRepository.save(position);
+                PositionGPS saved = positionRepository.save(position);
 
-        // Publier sur Kafka (desactive car Kafka non lance)
-        // kafkaProducer.envoyerPosition(saved);
+                // Publier sur Kafka (desactive car Kafka non lance)
+                // kafkaProducer.envoyerPosition(saved);
 
-        log.info("Position enregistree pour vehicule {}", request.getVehiculeId());
-        return toResponse(saved);
-    }
+                // Déclenchement de la détection d'anomalies
+                anomalyDetectionService.detecterAnomalies(saved, null);
 
-    // ================================
-    // Toutes les positions
-    // ================================
-    public List<PositionGPSResponse> getToutesLesPositions() {
-        return positionRepository.findAllByOrderByTimestampDesc()
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
+                log.info("Position enregistree pour vehicule {}", request.getVehiculeId());
+                return toResponse(saved);
+        }
 
-    // ================================
-    // Position actuelle d'un vehicule
-    // ================================
-    public PositionGPSResponse getPositionActuelle(UUID vehiculeId) {
-        PositionGPS position = positionRepository
-                .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
-                .orElseThrow(() -> new RuntimeException("Aucune position trouvee pour ce vehicule"));
-        return toResponse(position);
-    }
+        // ================================
+        // Toutes les positions
+        // ================================
+        public List<PositionGPSResponse> getToutesLesPositions() {
+                return positionRepository.findAllByOrderByTimestampDesc()
+                                .stream()
+                                .map(this::toResponse)
+                                .collect(Collectors.toList());
+        }
 
-    // ================================
-    // Historique d'un vehicule
-    // ================================
-    public List<PositionGPSResponse> getHistorique(UUID vehiculeId) {
-        return positionRepository
-                .findByVehiculeIdOrderByTimestampDesc(vehiculeId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
+        // ================================
+        // Position actuelle d'un vehicule
+        // ================================
+        public PositionGPSResponse getPositionActuelle(UUID vehiculeId) {
+                PositionGPS position = positionRepository
+                                .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
+                                .orElseThrow(() -> new RuntimeException("Aucune position trouvee pour ce vehicule"));
+                return toResponse(position);
+        }
 
-    // ================================
-    // Vitesse moyenne
-    // ================================
-    public Double calculerVitesseMoyenne(UUID vehiculeId) {
-        List<PositionGPS> positions = positionRepository
-                .findByVehiculeIdOrderByTimestampDesc(vehiculeId);
+        // ================================
+        // Historique d'un vehicule
+        // ================================
+        public List<PositionGPSResponse> getHistorique(UUID vehiculeId) {
+                return positionRepository
+                                .findByVehiculeIdOrderByTimestampDesc(vehiculeId)
+                                .stream()
+                                .map(this::toResponse)
+                                .collect(Collectors.toList());
+        }
 
-        if (positions.isEmpty()) return 0.0;
+        // ================================
+        // Vitesse moyenne
+        // ================================
+        public Double calculerVitesseMoyenne(UUID vehiculeId) {
+                List<PositionGPS> positions = positionRepository
+                                .findByVehiculeIdOrderByTimestampDesc(vehiculeId);
 
-        return positions.stream()
-                .filter(p -> p.getVitesse() != null)
-                .mapToDouble(PositionGPS::getVitesse)
-                .average()
-                .orElse(0.0);
-    }
+                if (positions.isEmpty())
+                        return 0.0;
 
-    // ================================
-    // Calcul retard (comparaison timestamp)
-    // ================================
-    public Long calculerRetard(UUID vehiculeId) {
-        PositionGPS derniere = positionRepository
-                .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
-                .orElseThrow(() -> new RuntimeException("Aucune position trouvee"));
+                return positions.stream()
+                                .filter(p -> p.getVitesse() != null)
+                                .mapToDouble(PositionGPS::getVitesse)
+                                .average()
+                                .orElse(0.0);
+        }
 
-        // Retard en secondes depuis derniere position
-        long retard = java.time.Duration.between(
-                derniere.getTimestamp(),
-                LocalDateTime.now()
-        ).getSeconds();
+        // ================================
+        // Calcul retard (comparaison timestamp)
+        // ================================
+        public Long calculerRetard(UUID vehiculeId) {
+                PositionGPS derniere = positionRepository
+                                .findTopByVehiculeIdOrderByTimestampDesc(vehiculeId)
+                                .orElseThrow(() -> new RuntimeException("Aucune position trouvee"));
 
-        return retard;
-    }
+                // Retard en secondes depuis derniere position
+                long retard = java.time.Duration.between(
+                                derniere.getTimestamp(),
+                                LocalDateTime.now()).getSeconds();
 
-    // ================================
-    // Supprimer historique
-    // ================================
-    public void supprimerHistorique(UUID vehiculeId) {
-        List<PositionGPS> positions = positionRepository
-                .findByVehiculeIdOrderByTimestampDesc(vehiculeId);
-        positionRepository.deleteAll(positions);
-        log.info("Historique supprime pour vehicule {}", vehiculeId);
-    }
+                return retard;
+        }
 
-    // ================================
-    // Mapper entite -> DTO
-    // ================================
-    private PositionGPSResponse toResponse(PositionGPS position) {
-        return PositionGPSResponse.builder()
-                .id(position.getId())
-                .vehiculeId(position.getVehiculeId())
-                .latitude(position.getLatitude())
-                .longitude(position.getLongitude())
-                .timestamp(position.getTimestamp())
-                .vitesse(position.getVitesse())
-                .cap(position.getCap())
-                .build();
-    }
+        // ================================
+        // Supprimer historique
+        // ================================
+        public void supprimerHistorique(UUID vehiculeId) {
+                List<PositionGPS> positions = positionRepository
+                                .findByVehiculeIdOrderByTimestampDesc(vehiculeId);
+                positionRepository.deleteAll(positions);
+                log.info("Historique supprime pour vehicule {}", vehiculeId);
+        }
+
+        // ================================
+        // Mapper entite -> DTO
+        // ================================
+        private PositionGPSResponse toResponse(PositionGPS position) {
+                return PositionGPSResponse.builder()
+                                .id(position.getId())
+                                .vehiculeId(position.getVehiculeId())
+                                .latitude(position.getLatitude())
+                                .longitude(position.getLongitude())
+                                .timestamp(position.getTimestamp())
+                                .vitesse(position.getVitesse())
+                                .cap(position.getCap())
+                                .build();
+        }
 }
