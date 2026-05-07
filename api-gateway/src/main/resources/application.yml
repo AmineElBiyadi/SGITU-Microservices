@@ -36,7 +36,7 @@ spring:
         - id: g1-billetterie
           uri: http://service-billetterie:8081
           predicates:
-            - Path=/api/tickets/**
+            - Path=/api/v1/tickets/**,/api/v1/admin/tickets/**,/api/v1/admin/dashboard,/api/v1/ticket-types/**
           filters:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
 
@@ -57,7 +57,7 @@ spring:
         - id: g4-coordination
           uri: http://coordination-service:8084
           predicates:
-            - Path=/api/coordination/**,/api/routes/**,/api/schedules/**
+            - Path=/api/g4/**,/api/v1/operator/**
           filters:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
 
