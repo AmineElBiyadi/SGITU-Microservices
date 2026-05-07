@@ -1,0 +1,455 @@
+{
+  "info": {
+    "_postman_id": "g8-analytics-collection",
+    "name": "G8 Analytics Service",
+    "description": "Full test suite for the G8 Analytics Service. Run requests in order:\n1. Ingest data (01-06)\n2. Wait ~60 seconds for the scheduler\n3. Read analytics (07-13)\n4. Generate and fetch a report (14-15)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Auto-set today's date (YYYY-MM-DD) for report period",
+          "var today = new Date().toISOString().split('T')[0];",
+          "pm.collectionVariables.set('today', today);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8088",
+      "type": "string"
+    },
+    {
+      "key": "reportId",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically after running request 14"
+    },
+    {
+      "key": "today",
+      "value": "",
+      "type": "string",
+      "description": "Auto-set to today's date (YYYY-MM-DD) by the collection pre-request script"
+    }
+  ],
+  "item": [
+    {
+      "name": "--- PHASE 1: Ingest Data ---",
+      "item": [
+        {
+          "name": "01 - Ingest Tickets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "tickets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"userId\": \"USR-001\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"ticketId\": \"TCK-001\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-002\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:45:00Z\",\n    \"ticketId\": \"TCK-002\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"userId\": \"USR-003\",\n    \"status\": \"expired\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"ticketId\": \"TCK-003\"\n  },\n  {\n    \"userId\": \"USR-004\",\n    \"status\": \"validated\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"2026-05-04T17:10:00Z\",\n    \"ticketId\": \"TCK-004\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-005\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-15\",\n    \"timestamp\": \"2026-05-04T17:30:00Z\",\n    \"ticketId\": \"TCK-005\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-006\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T17:50:00Z\",\n    \"ticketId\": \"TCK-006\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"userId\": \"USR-007\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-20\",\n    \"timestamp\": \"2026-05-04T18:05:00Z\",\n    \"ticketId\": \"TCK-007\",\n    \"scanType\": \"NFC\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Simulates ticket validations from validators on multiple lines. Includes validated, expired, and various times of day to trigger peak-hour analysis.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        },
+        {
+          "name": "02 - Ingest Incidents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/incidents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "incidents"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"incidentId\": \"INC-001\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\",\n    \"severity\": \"HIGH\",\n    \"description\": \"Vehicle collision near main station\"\n  },\n  {\n    \"incidentId\": \"INC-002\",\n    \"type\": \"breakdown\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\",\n    \"severity\": \"CRITICAL\",\n    \"description\": \"Engine failure on bus 404\",\n    \"resolutionMinutes\": 30\n  },\n  {\n    \"incidentId\": \"INC-003\",\n    \"type\": \"delay\",\n    \"line\": \"L3\",\n    \"zone\": \"Z_SOUTH\",\n    \"timestamp\": \"2026-05-04T14:00:00Z\",\n    \"severity\": \"MEDIUM\",\n    \"resolutionMinutes\": 15\n  },\n  {\n    \"incidentId\": \"INC-004\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T15:30:00Z\",\n    \"severity\": \"MEDIUM\",\n    \"description\": \"Minor collision, road cleared\",\n    \"resolutionMinutes\": 20\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Simulates incident reports from different zones and severities. Z_NORTH will appear as a repeat-incident zone, triggering INC_05.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        },
+        {
+          "name": "03 - Ingest Payments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "payments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"transactionId\": \"TXN-001\",\n    \"status\": \"completed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  },\n  {\n    \"transactionId\": \"TXN-002\",\n    \"status\": \"completed\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"amount\": 10.00,\n    \"method\": \"CASH\"\n  },\n  {\n    \"transactionId\": \"TXN-003\",\n    \"status\": \"completed\",\n    \"line\": \"L2\",\n    \"timestamp\": \"2026-05-04T10:15:00Z\",\n    \"amount\": 50.00,\n    \"method\": \"CARD\"\n  },\n  {\n    \"transactionId\": \"TXN-004\",\n    \"status\": \"completed\",\n    \"line\": \"L3\",\n    \"timestamp\": \"2026-05-04T12:00:00Z\",\n    \"amount\": 15.75,\n    \"method\": \"CASH\"\n  },\n  {\n    \"transactionId\": \"TXN-005\",\n    \"status\": \"failed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"2026-05-04T13:00:00Z\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Simulates payment transactions via POS and kiosk terminals. Includes both CARD and CASH methods, plus one failed transaction.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        },
+        {
+          "name": "04 - Ingest Subscriptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "subscriptions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"userId\": \"USR-101\",\n    \"action\": \"created\",\n    \"planType\": \"MONTHLY_STUDENT\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-102\",\n    \"action\": \"renewed\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T09:15:00Z\"\n  },\n  {\n    \"userId\": \"USR-103\",\n    \"action\": \"renewed\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-104\",\n    \"action\": \"cancelled\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"reason\": \"PAYMENT_FAILED\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-105\",\n    \"action\": \"created\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T14:00:00Z\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Simulates subscription lifecycle events: new registrations, renewals, and a cancellation. Tests SUB_01 through SUB_05 aggregations.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        },
+        {
+          "name": "05 - Ingest Vehicles",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/vehicles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "vehicles"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"vehicleId\": \"BUS_101\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T08:00:00Z\",\n    \"speed\": 42.5,\n    \"occupancy\": 80,\n    \"delayMinutes\": 0\n  },\n  {\n    \"vehicleId\": \"BUS_202\",\n    \"status\": \"in_service\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T08:05:00Z\",\n    \"speed\": 35.0,\n    \"occupancy\": 120,\n    \"delayMinutes\": 8\n  },\n  {\n    \"vehicleId\": \"TRAM_01\",\n    \"status\": \"out_of_service\",\n    \"line\": \"T1\",\n    \"zone\": \"Z_EAST\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"speed\": 0.0,\n    \"alertCode\": \"ENG_TEMP_HIGH\"\n  },\n  {\n    \"vehicleId\": \"BUS_303\",\n    \"status\": \"in_service\",\n    \"line\": \"L3\",\n    \"zone\": \"Z_SOUTH\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\",\n    \"speed\": 50.0,\n    \"occupancy\": 45,\n    \"delayMinutes\": 2\n  },\n  {\n    \"vehicleId\": \"BUS_404\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_WEST\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\",\n    \"speed\": 38.0,\n    \"occupancy\": 95,\n    \"delayMinutes\": 5\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "NOTE: In production, G7 sends vehicle data via Kafka. This REST endpoint is for testing only.\n\nSimulates telemetry from active buses and one tram in maintenance. BUS_202 is overcapacity (occupancy=120) and will affect VEH_03.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        },
+        {
+          "name": "06 - Ingest Users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "users"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"userId\": \"USR-201\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T08:00:00Z\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"userId\": \"USR-202\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T08:10:00Z\",\n    \"deviceOS\": \"Android\"\n  },\n  {\n    \"userId\": \"USR-203\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"userId\": \"USR-204\",\n    \"action\": \"inactive\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-205\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T17:00:00Z\",\n    \"deviceOS\": \"Android\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Simulates user activity events from the mobile app and web portal.\n\nExpected response: 201 Created with status=SUCCESS"
+          }
+        }
+      ]
+    },
+    {
+      "name": "--- WAIT ~60 SECONDS FOR SCHEDULER ---",
+      "item": [
+        {
+          "name": "07 - Health Check (Ping)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            },
+            "description": "Send this immediately after ingesting to confirm the service is alive. The values will still be zero until the scheduler runs (every 60 seconds). After ~60 seconds, re-send this request and the values should reflect your ingested data."
+          }
+        }
+      ]
+    },
+    {
+      "name": "--- PHASE 2: Read Analytics ---",
+      "item": [
+        {
+          "name": "08 - GET Dashboard (All Snapshots)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            },
+            "description": "Returns ALL current snapshots in one call. This is the main dashboard endpoint used by G10.\n\nExpected: 200 OK with an array of all StatSnapshot documents (FREQ_01 through SUB_05)."
+          }
+        },
+        {
+          "name": "09 - GET Trips Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/trips/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "trips", "summary"]
+            },
+            "description": "Returns only TRIPS snapshots (FREQ_01 through FREQ_07):\n- FREQ_01: Total validations count\n- FREQ_02: Peak hour distribution map\n- FREQ_03: Peak hours list\n- FREQ_04: Avg daily passengers\n- FREQ_05: Line usage ranking\n- FREQ_06: Station footfall\n- FREQ_07: Weekend vs weekday ratio"
+          }
+        },
+        {
+          "name": "10 - GET Revenue Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/revenue/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "revenue", "summary"]
+            },
+            "description": "Returns REVENUE snapshots (REV_01 through REV_05):\n- REV_01: Total revenue\n- REV_02: Revenue by ticket type\n- REV_03: Avg revenue per passenger\n- REV_04: Payment method breakdown (CARD vs CASH)\n- REV_05: Revenue trend"
+          }
+        },
+        {
+          "name": "11 - GET Incidents Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/incidents/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "incidents", "stats"]
+            },
+            "description": "Returns INCIDENTS snapshots (INC_01 through INC_05):\n- INC_01: Total incidents count\n- INC_02: Incidents by type (accident, breakdown, delay)\n- INC_03: Incidents by zone\n- INC_04: Average resolution time in minutes\n- INC_05: Repeat incident zones (zones with more than 1 incident)"
+          }
+        },
+        {
+          "name": "12 - GET Vehicles Activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/vehicles/activity",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "vehicles", "activity"]
+            },
+            "description": "Returns VEHICLES snapshots (VEH_01 through VEH_05):\n- VEH_01: Active vehicle count\n- VEH_02: Average punctuality rate (%)\n- VEH_03: Delay distribution / overcapacity count\n- VEH_04: Vehicle utilization rate\n- VEH_05: Average speed by line"
+          }
+        },
+        {
+          "name": "13 - GET Subscriptions Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/subscriptions/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "subscriptions", "stats"]
+            },
+            "description": "Returns SUBSCRIPTIONS snapshots (SUB_01 through SUB_05):\n- SUB_01: Active subscriptions count\n- SUB_02: New subscriptions today\n- SUB_03: Renewal rate\n- SUB_04: Churn rate (%)\n- SUB_05: Subscription type distribution"
+          }
+        },
+        {
+          "name": "14 - GET Users Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/users/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "users", "stats"]
+            },
+            "description": "Returns USERS snapshots."
+          }
+        }
+      ]
+    },
+    {
+      "name": "--- PHASE 3: Generate Report ---",
+      "item": [
+        {
+          "name": "15 - POST Generate Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "    pm.collectionVariables.set('reportId', json.id);",
+                  "    console.log('Report ID saved: ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/reports/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "reports", "generate"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"period\": \"{{today}}\",\n  \"types\": [\"TRIPS\", \"REVENUE\", \"INCIDENTS\", \"VEHICLES\", \"SUBSCRIPTIONS\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Generates a full analytics report for today bundling all requested snapshot types.\n\nThe test script in this request automatically saves the returned report ID into the {{reportId}} collection variable, so request 16 can use it directly.\n\nExpected: 200 OK with a Report object containing all snapshots."
+          }
+        },
+        {
+          "name": "16 - GET Report by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/reports/{{reportId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "reports", "{{reportId}}"]
+            },
+            "description": "Retrieves the report generated in request 15 using the {{reportId}} variable that was automatically saved.\n\nExpected: 200 OK with the full Report object.\nIf you get 404, make sure you ran request 15 first so the reportId variable is populated."
+          }
+        }
+      ]
+    },
+    {
+      "name": "--- PHASE 4: Error / Edge Cases ---",
+      "item": [
+        {
+          "name": "17 - Ingest Empty Batch (Expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "tickets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sends an empty array to test validation. The @NotEmpty constraint on the controller should reject this.\n\nExpected: 400 Bad Request"
+          }
+        },
+        {
+          "name": "18 - Ingest with Missing Timestamp (Expect 207 PARTIAL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ingestion/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ingestion", "tickets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"userId\": \"USR-GOOD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"ticketId\": \"TCK-GOOD\"\n  },\n  {\n    \"userId\": \"USR-BAD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"ticketId\": \"TCK-BAD\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sends a batch where one event is valid and one is missing its required timestamp field.\n\nExpected: 207 Multi-Status with status=PARTIAL, totalAccepted=1, totalRejected=1"
+          }
+        },
+        {
+          "name": "19 - GET Report with Invalid ID (Expect 404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/reports/000000000000000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "reports", "000000000000000000000000"]
+            },
+            "description": "Attempts to fetch a report using a valid-format but non-existent MongoDB ID.\n\nExpected: 404 Not Found"
+          }
+        }
+      ]
+    }
+  ]
+}

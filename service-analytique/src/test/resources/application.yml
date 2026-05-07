@@ -1,0 +1,17 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/g8_analytics_test
+      database: g8_analytics_test
+
+g5:
+  notification:
+    url: http://localhost:9999/notifications-test
+
+ml:
+  service:
+    url: http://localhost:5000
+
+logging:
+  level:
+    ma.sgitu.g8: WARN
