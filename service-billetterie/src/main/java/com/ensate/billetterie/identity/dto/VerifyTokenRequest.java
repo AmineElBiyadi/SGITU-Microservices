@@ -15,5 +15,5 @@ public class VerifyTokenRequest {
     private IdentityToken token;
     private String holderId;
     private String eventId;
-    private Map<String, Object> rawPayload;
+    Map<String, Object> rawPayload;
 }

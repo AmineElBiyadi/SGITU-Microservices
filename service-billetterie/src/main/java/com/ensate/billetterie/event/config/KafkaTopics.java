@@ -4,6 +4,8 @@ public class KafkaTopics {
     public static final String TICKET_ISSUED = "ticket.issued";
     public static final String TICKET_VALIDATED = "ticket.validated";
     public static final String TICKET_FLAGGED = "ticket.flagged";
+    public static final String TICKET_PAYMENT_FAILED = "ticket.payment.failed";
+    public static final String TICKET_PAYMENT_SUCCESS = "ticket.payment.success";
     public static final String TICKET_FLAG_REVIEWED = "ticket.flag.reviewed";
     public static final String TICKET_CANCELLED = "ticket.cancelled";
     public static final String TICKET_TRANSFER_INITIATED = "ticket.transfer.initiated";
