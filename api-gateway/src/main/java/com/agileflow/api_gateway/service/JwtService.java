@@ -2,19 +2,14 @@ package com.agileflow.api_gateway.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Key;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -22,40 +17,6 @@ public class JwtService {
 
     @Value("${jwt.secret}")
     private String secretKey;
-
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
-
-    @Value("${jwt.refresh-expiration:604800000}")
-    private long refreshExpiration;
-
-    /*
-     * Generation helpers are kept for tests and compatibility only.
-     * In the target architecture, G3 is the JWT issuer and G10 only validates.
-     */
-    public String generateAccessToken(UserDetails userDetails) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("role", extractPrimaryRole(userDetails));
-        return buildToken(claims, userDetails, jwtExpiration);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, refreshExpiration);
-    }
-
-    private String buildToken(Map<String, Object> extraClaims,
-                              UserDetails userDetails,
-                              long expiration) {
-        extraClaims.put("jti", UUID.randomUUID().toString());
-
-        return Jwts.builder()
-                .setClaims(extraClaims)
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSignKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
 
     public Claims validateAndExtractClaims(String token) {
         Claims claims = extractAllClaims(token);
@@ -123,13 +84,5 @@ public class JwtService {
     private Key getSignKey() {
         byte[] keyBytes = secretKey.getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    private String extractPrimaryRole(UserDetails userDetails) {
-        return userDetails.getAuthorities()
-                .stream()
-                .findFirst()
-                .map(Object::toString)
-                .orElse("ROLE_USER");
     }
 }
