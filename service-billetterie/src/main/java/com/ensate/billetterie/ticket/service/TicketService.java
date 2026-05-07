@@ -78,11 +78,11 @@ public class TicketService {
         ticket.setTokenValue(tokenResp.getTokenValue());
 
 
+        ticket.setStatus(TicketStatus.CREATED);
         Ticket saved = ticketRepository.save(ticket);
         log.info("Ticket created: id={}, holder={}", saved.getId(), saved.getHolderId());
 
 
-        eventPublisher.publish(KafkaTopics.TICKET_ISSUED, saved);
 
         return ticketMapper.toResponse(saved);
     }
