@@ -34,21 +34,20 @@ public class SuiviVehiculeConsumer {
             Localisation localisation = Localisation.builder()
                     .latitude(event.getLatitude())
                     .longitude(event.getLongitude())
+                    .ligneTransport(event.getLigneTransport())
                     .build();
-
-            String finalDescription = event.getDescription() != null ? event.getDescription() : "";
-            if (event.getVehiculeId() != null) finalDescription += "\nVéhicule: " + event.getVehiculeId();
-            if (event.getLigneTransport() != null) finalDescription += "\nLigne: " + event.getLigneTransport();
 
             Incident incident = Incident.builder()
                     .reference(referenceGenerator.generate())
                     .type(TypeIncident.valueOf(event.getType()))
-                    .description(finalDescription)
+                    .description(event.getDescription())
                     .dateSignalement(LocalDateTime.now())
                     .dateIncident(event.getDateDetection())
                     .statut(StatutIncident.NOUVEAU)
                     .gravite(NiveauGravite.valueOf(event.getGravite()))
                     .declarantId(0L) // Système automatique
+                    .vehiculeId(event.getVehiculeId())
+                    .source("IOT")
                     .localisation(localisation)
                     .build();
 

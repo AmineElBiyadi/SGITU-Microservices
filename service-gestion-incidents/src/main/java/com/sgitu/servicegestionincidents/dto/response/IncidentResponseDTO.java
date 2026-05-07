@@ -17,11 +17,14 @@ public class IncidentResponseDTO {
     private String description;
     private LocalDateTime dateSignalement;
     private LocalDateTime dateIncident;
+    private LocalDateTime dateLimiteResolution;
     private StatutIncident statut;
     private NiveauGravite gravite;
     private Long declarantId;
     private Long responsableId;
-    private String adresse;
+    private String vehiculeId;
+    private String source;
+    private String ligneTransport;
     private Double latitude;
     private Double longitude;
 }

@@ -15,7 +15,7 @@ public class TransportProducer {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void notifierTransport(IncidentTransportEvent event) {
-        log.info("Publication événement transport pour incident {}", event.getReference());
+        log.info("Publication événement transport (G4) pour incident {}", event.getIncidentId());
         kafkaTemplate.send(MessagingConstants.TRANSPORT_TOPIC, event);
         log.info("Événement transport publié avec succès");
     }

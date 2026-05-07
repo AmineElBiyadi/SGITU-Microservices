@@ -14,13 +14,12 @@ import java.time.LocalDateTime;
 @Builder
 public class IncidentTransportEvent implements Serializable {
 
-    private Long incidentId;
-    private String reference;
-    private String type;           // PANNE_VEHICULE, RETARD, ACCIDENT, etc.
-    private String gravite;        // FAIBLE, MOYEN, ELEVE, CRITIQUE
-    private String statut;         // NOUVEAU, EN_COURS, RESOLU, etc.
+    private String incidentId;
+    private String type;            // PANNE_VEHICULE, ACCIDENT, etc.
     private String description;
     private Double latitude;
     private Double longitude;
-    private LocalDateTime dateIncident;
+    private String vehicleId;
+    private String ligneId;
+    private LocalDateTime timestamp;
 }

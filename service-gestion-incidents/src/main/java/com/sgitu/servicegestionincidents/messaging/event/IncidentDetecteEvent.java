@@ -19,7 +19,7 @@ public class IncidentDetecteEvent implements Serializable {
     private String description;
     private Double latitude;
     private Double longitude;
-    private Long vehiculeId;
+    private String vehiculeId;
     private String ligneTransport;
     private LocalDateTime dateDetection;
 }

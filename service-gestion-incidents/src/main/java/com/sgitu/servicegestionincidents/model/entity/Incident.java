@@ -54,14 +54,16 @@ public class Incident {
     private Long declarantId;
 
     private Long responsableId;
+    
+    private String vehiculeId;
+
+    @Column(nullable = false)
+    private String source; // "USER", "IOT"
 
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "localisation_id", nullable = false)
     private Localisation localisation;
 
-    @ManyToOne
-    @JoinColumn(name = "categorie_id")
-    private CategorieIncident categorie;
 
     @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
