@@ -4,6 +4,7 @@ import com.g7suivivehicules.dto.VehiculeRequest;
 import com.g7suivivehicules.dto.VehiculeResponse;
 import com.g7suivivehicules.entity.Vehicule;
 import jakarta.persistence.EntityNotFoundException;
+import com.g7suivivehicules.entity.Vehicule;
 import com.g7suivivehicules.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ public class VehiculeService {
                 .build();
 
         Vehicule saved = vehiculeRepository.save(vehicule);
-        
+
         return mapToResponse(saved);
     }
 

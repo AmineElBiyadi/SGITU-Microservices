@@ -24,6 +24,7 @@ public class AlertService {
 
     private final AlertRepository alertRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final G5NotificationService g5NotificationService;
 
     // ========== CRÉATION / MISE À JOUR ==========
 
@@ -87,6 +88,9 @@ public class AlertService {
 
         // Publication asynchrone sur Kafka (gère l'envoi G4 et G9 en interne)
         kafkaProducerService.publierAlerte(sauvegardee);
+
+        // Notification PUSH au conducteur via G5
+        g5NotificationService.notifierConducteur(sauvegardee);
 
         return sauvegardee;
     }

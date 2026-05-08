@@ -5,6 +5,7 @@ import com.g7suivivehicules.dto.PositionGPSResponse;
 import com.g7suivivehicules.entity.PositionGPS;
 import jakarta.persistence.EntityNotFoundException;
 import com.g7suivivehicules.repository.PositionGPSRepository;
+import com.g7suivivehicules.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,9 @@ import java.util.stream.Collectors;
 public class PositionService {
 
         private final PositionGPSRepository positionRepository;
+        private final VehiculeRepository vehiculeRepository;
         private final AnomalyDetectionService anomalyDetectionService;
+        private final com.g7suivivehicules.kafka.KafkaProducerService kafkaProducerService;
 
         // ================================
         // Enregistrer une position GPS
@@ -38,10 +41,18 @@ public class PositionService {
 
                 PositionGPS saved = positionRepository.save(position);
 
+                // Récupération de la ligne du véhicule pour G4
+                String ligneId = vehiculeRepository.findById(request.getVehiculeId())
+                                .map(v -> v.getLigne())
+                                .orElse("NON_ASSIGNE");
+
+                // Publier sur Kafka pour G4 (Suivi temps réel)
+                kafkaProducerService.envoyerPositionG4(saved, ligneId);
+
                 // Déclenchement de la détection d'anomalies
                 anomalyDetectionService.detecterAnomalies(saved, null);
 
-                log.info("Position enregistree pour vehicule {}", request.getVehiculeId());
+                log.info("Position enregistree et publiee sur Kafka pour vehicule {}", request.getVehiculeId());
                 return toResponse(saved);
         }
 
