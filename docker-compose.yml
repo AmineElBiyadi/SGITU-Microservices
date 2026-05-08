@@ -9,7 +9,9 @@
 #  4. Ajoutez vos volumes en bas du fichier.
 #
 #  PORTS UTILISÉS :
+#  G2  → 8082 (abonnement-service), 3307 (db-abonnement), 8080 (phpmyadmin)
 #  G3  → 8083 (user-service), 5433 (users-db)
+#  G7  → 8087 (g7-service), 5437 (db-g7)
 #
 #  DÉMARRAGE :
 #    cp .env.example .env     # première fois
@@ -19,6 +21,69 @@
 services:
 
   # ---------------------------------------------------------------
+  #  G1 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G2 — Service Abonnement (port 8082)
+  # ---------------------------------------------------------------
+  abonnement-service:
+    build: 
+      context: ./service-abonnement
+      dockerfile: Dockerfile
+      target: runner
+      
+    container_name: service-abonnement
+    ports:
+      - "8082:8082"
+    depends_on:
+      db-abonnement:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_NAME=${abonnement_DB_NAME}
+      - DB_USER=${abonnement_DB_USER}
+      - DB_PASSWORD=${abonnement_DB_PASSWORD}
+      - UTILISATEUR_SERVICE_URL=${G3_BASE_URL}
+      - PAIEMENT_SERVICE_URL=${G6_BASE_URL}
+      - ANALYSE_SERVICE_URL=${G8_BASE_URL}
+    networks:
+      - sgitu-network
+      - abonnement-db-network
+  db-abonnement:
+    image: mysql:8.0
+    container_name: db-abonnement
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_DATABASE=${abonnement_DB_NAME}
+      - MYSQL_USER=${abonnement_DB_USER}
+      - MYSQL_PASSWORD=${abonnement_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${abonnement_DB_ROOT_PASSWORD}
+    volumes:
+      - abonnement_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+    networks:
+      - abonnement-db-network
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=db-abonnement
+      - PMA_PORT=3306
+    depends_on:
+      - db-abonnement
+    networks:
+      - abonnement-db-network
+  # ---------------------------------------------------------------
   #  G3 — Service Utilisateur (port 8083)
   # ---------------------------------------------------------------
   user-service:
@@ -27,9 +92,9 @@ services:
     ports:
       - "8083:8083"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://g3-users-db:5432/users_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: secret
+      SPRING_DATASOURCE_URL: jdbc:postgresql://g3-users-db:5432/${users_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${users_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${users_DB_PASSWORD}
       SERVER_PORT: 8083
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
@@ -39,33 +104,25 @@ services:
         condition: service_healthy
     networks:
       - sgitu-network
-
+      - users-db-network
   g3-users-db:
     image: postgres:15-alpine
     container_name: g3-users-db
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DB: users_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: ${users_DB_NAME}
+      POSTGRES_USER: ${users_DB_USER}
+      POSTGRES_PASSWORD: ${users_DB_PASSWORD}
     volumes:
       - g3_users_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${users_DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - sgitu-network
-
-  # ---------------------------------------------------------------
-  #  G1 — (ajoutez votre service ici)
-  # ---------------------------------------------------------------
-
-  # ---------------------------------------------------------------
-  #  G2 — (ajoutez votre service ici)
-  # ---------------------------------------------------------------
+      - users-db-network
 
   # ---------------------------------------------------------------
   #  G4 — (ajoutez votre service ici)
@@ -80,7 +137,7 @@ services:
   # ---------------------------------------------------------------
 
   # ---------------------------------------------------------------
-  #  G7 — Suivi des Véhicules
+  #  G7 — Service Suivi des Véhicules (port 8087)
   # ---------------------------------------------------------------
   g7-service:
     build:
@@ -91,34 +148,40 @@ services:
     ports:
       - "8087:8087"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-g7:5432/g7_vehicules
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-g7:5432/${suivi_vehicule_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${suivi_vehicule_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${suivi_vehicule_DB_PASSWORD}
+      SERVER_PORT: 8087
+      G4_BASE_URL: ${G4_BASE_URL:-}
+      G5_BASE_URL: ${G5_BASE_URL:-}
+      G8_BASE_URL: ${G8_BASE_URL:-}
     depends_on:
       db-g7:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - sgitu-network
+      - g7-db-network
 
   db-g7:
     image: postgres:15-alpine
     container_name: db-g7
     ports:
-      - "5437:5432" 
+      - "5437:5432"
     environment:
-      POSTGRES_DB: g7_vehicules
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${suivi_vehicule_DB_NAME}
+      POSTGRES_USER: ${suivi_vehicule_DB_USER}
+      POSTGRES_PASSWORD: ${suivi_vehicule_DB_PASSWORD}
     volumes:
       - g7_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d g7_vehicules"]
+      test: ["CMD-SHELL", "pg_isready -U ${suivi_vehicule_DB_USER} -d ${suivi_vehicule_DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - sgitu-network
-
+      - g7-db-network
 
   # ---------------------------------------------------------------
   #  G8 — (ajoutez votre service ici)
@@ -132,10 +195,57 @@ services:
   #  G10 — (ajoutez votre service ici)
   # ---------------------------------------------------------------
 
+  # ---------------------------------------------------------------
+  # Services transversaux (Kafka)
+  # ---------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.8.7
+    container_name: sgitu-kafka          # ← préfixé pour éviter conflit
+    hostname: kafka
+    networks:
+      - sgitu-network
+    ports:
+      - "9093:9092"
+      - "29093:29092"
+    environment:
+      CLUSTER_ID: "sgitu-kafka-cluster-001"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29093"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
 networks:
   sgitu-network:
+    driver: bridge
+  abonnement-db-network:
+    driver: bridge
+  users-db-network:
+    driver: bridge
+  g7-db-network:
     driver: bridge
 
 volumes:
   g3_users_data:
+  abonnement_data:
   g7_db_data:
+  kafka_data:
