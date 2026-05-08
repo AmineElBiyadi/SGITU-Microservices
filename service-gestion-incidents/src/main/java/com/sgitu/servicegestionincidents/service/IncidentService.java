@@ -13,9 +13,9 @@ public interface IncidentService {
     IncidentResponseDTO consulterIncident(Long id);
     List<ActionDTO> consulterSuivi(Long incidentId);
     List<IncidentResponseDTO> filtrerIncidents(Map<String, Object> criteres);
-    void cloturerIncident(Long id, String motif);
-    void escaladerIncident(Long id, String motif);
-    void affecterResponsable(Long id, Long responsableId);
-    void mettreAJourStatut(Long id, StatutIncident statut);
-    void annulerIncident(Long id, String motif);
+    void cloturerIncident(Long id, String motif, Long auteurId);
+    void escaladerIncident(Long id, String motif, Long auteurId);
+    void affecterResponsable(Long id, Long responsableId, Long auteurId);
+    void mettreAJourStatut(Long id, StatutIncident statut, Long auteurId);
+    void annulerIncident(Long id, String motif, Long auteurId);
 }

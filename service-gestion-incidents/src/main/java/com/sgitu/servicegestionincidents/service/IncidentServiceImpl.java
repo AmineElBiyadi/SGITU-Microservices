@@ -69,11 +69,12 @@ public class IncidentServiceImpl implements IncidentService {
 
     // ============================================================
     // Task 1.2 — affecterResponsable()
-    // Validate ANALYSE status → ASSIGNE, fire G4 CONFIRME + G5
+    // Validate ANALYSE/ESCALADE status → ASSIGNE, fire G5 notification
+    // Note: G4 CONFIRME is sent at NOUVEAU → ANALYSE (in mettreAJourStatut)
     // ============================================================
     @Override
-    public void affecterResponsable(Long id, Long responsableId) {
-        log.info("Affectation du responsable {} à l'incident {}", responsableId, id);
+    public void affecterResponsable(Long id, Long responsableId, Long auteurId) {
+        log.info("Affectation du responsable {} à l'incident {} par {}", responsableId, id, auteurId);
 
         Incident incident = trouverIncidentOuErreur(id);
 
@@ -93,7 +94,7 @@ public class IncidentServiceImpl implements IncidentService {
         Action action = Action.builder()
                 .type(TypeAction.ASSIGNATION)
                 .description(String.format("Incident assigné au responsable %d", responsableId))
-                .auteurId(responsableId) // Le superviseur qui assigne
+                .auteurId(auteurId)
                 .dateAction(LocalDateTime.now())
                 .ancienStatut(ancienStatut)
                 .nouveauStatut(StatutIncident.ASSIGNE)
@@ -107,11 +108,6 @@ public class IncidentServiceImpl implements IncidentService {
         incidentRepository.save(incident);
         log.info("Incident {} assigné au responsable {} — Statut: ASSIGNE", incident.getReference(), responsableId);
 
-        // Déclencher G4 (Transport) — statut CONFIRME
-        envoyerEvenementTransport(incident, "CONFIRME");
-        incident.setTransportNotifie(true);
-        incidentRepository.save(incident);
-
         // Déclencher G5 (Notification) — changement de statut
         notificationService.envoyerChangementStatut(incident, ancienStatut.name());
     }
@@ -121,8 +117,8 @@ public class IncidentServiceImpl implements IncidentService {
     // Transitions EN_TRAITEMENT et RESOLU avec vérification
     // ============================================================
     @Override
-    public void mettreAJourStatut(Long id, StatutIncident nouveauStatut) {
-        log.info("Mise à jour du statut de l'incident {} vers {}", id, nouveauStatut);
+    public void mettreAJourStatut(Long id, StatutIncident nouveauStatut, Long auteurId) {
+        log.info("Mise à jour du statut de l'incident {} vers {} par {}", id, nouveauStatut, auteurId);
 
         Incident incident = trouverIncidentOuErreur(id);
         StatutIncident ancienStatut = incident.getStatut();
@@ -141,7 +137,7 @@ public class IncidentServiceImpl implements IncidentService {
         Action action = Action.builder()
                 .type(TypeAction.CHANGEMENT_STATUT)
                 .description(String.format("Statut changé de %s à %s", ancienStatut, nouveauStatut))
-                .auteurId(0L) // TODO: sera rempli par le controller via JWT (Membre 2)
+                .auteurId(auteurId)
                 .dateAction(LocalDateTime.now())
                 .ancienStatut(ancienStatut)
                 .nouveauStatut(nouveauStatut)
@@ -151,7 +147,14 @@ public class IncidentServiceImpl implements IncidentService {
         incidentRepository.save(incident);
         log.info("Incident {} — Statut mis à jour: {} → {}", incident.getReference(), ancienStatut, nouveauStatut);
 
-        // Déclencher G4 (Transport) si RESOLU
+        // Déclencher G4 (Transport) — CONFIRME dès que le Superviseur confirme l'incident
+        if (nouveauStatut == StatutIncident.ANALYSE) {
+            envoyerEvenementTransport(incident, "CONFIRME");
+            incident.setTransportNotifie(true);
+            incidentRepository.save(incident);
+        }
+
+        // Déclencher G4 (Transport) — RESOLU quand le technicien termine
         if (nouveauStatut == StatutIncident.RESOLU) {
             envoyerEvenementTransport(incident, "RESOLU");
         }
@@ -165,8 +168,8 @@ public class IncidentServiceImpl implements IncidentService {
     // Gravité → CRITIQUE, Statut → ESCALADE, G5 alerte urgence
     // ============================================================
     @Override
-    public void escaladerIncident(Long id, String motif) {
-        log.info("Escalade de l'incident {} — Motif: {}", id, motif);
+    public void escaladerIncident(Long id, String motif, Long auteurId) {
+        log.info("Escalade de l'incident {} — Motif: {} par {}", id, motif, auteurId);
 
         Incident incident = trouverIncidentOuErreur(id);
 
@@ -185,7 +188,7 @@ public class IncidentServiceImpl implements IncidentService {
         Action action = Action.builder()
                 .type(TypeAction.ESCALADE)
                 .description(String.format("Incident escaladé — Motif: %s", motif))
-                .auteurId(0L) // TODO: sera rempli par le controller via JWT (Membre 2)
+                .auteurId(auteurId)
                 .dateAction(LocalDateTime.now())
                 .ancienStatut(ancienStatut)
                 .nouveauStatut(StatutIncident.ESCALADE)
@@ -204,8 +207,8 @@ public class IncidentServiceImpl implements IncidentService {
     // Vérification RESOLU → CLOTURE, envoi G8 analytique
     // ============================================================
     @Override
-    public void cloturerIncident(Long id, String motif) {
-        log.info("Clôture de l'incident {} — Motif: {}", id, motif);
+    public void cloturerIncident(Long id, String motif, Long auteurId) {
+        log.info("Clôture de l'incident {} — Motif: {} par {}", id, motif, auteurId);
 
         Incident incident = trouverIncidentOuErreur(id);
 
@@ -222,7 +225,7 @@ public class IncidentServiceImpl implements IncidentService {
         Action action = Action.builder()
                 .type(TypeAction.CLOTURE)
                 .description(String.format("Incident clôturé — Motif: %s", motif))
-                .auteurId(0L) // TODO: sera rempli par le controller via JWT (Membre 2)
+                .auteurId(auteurId)
                 .dateAction(LocalDateTime.now())
                 .ancienStatut(ancienStatut)
                 .nouveauStatut(StatutIncident.CLOTURE)
@@ -244,8 +247,8 @@ public class IncidentServiceImpl implements IncidentService {
     // ANNULE + G4 REJETE si transportNotifie + G8 analytique
     // ============================================================
     @Override
-    public void annulerIncident(Long id, String motif) {
-        log.info("Annulation de l'incident {} — Motif: {}", id, motif);
+    public void annulerIncident(Long id, String motif, Long auteurId) {
+        log.info("Annulation de l'incident {} — Motif: {} par {}", id, motif, auteurId);
 
         Incident incident = trouverIncidentOuErreur(id);
 
@@ -263,7 +266,7 @@ public class IncidentServiceImpl implements IncidentService {
         Action action = Action.builder()
                 .type(TypeAction.CHANGEMENT_STATUT)
                 .description(String.format("Incident annulé (fausse alerte) — Motif: %s", motif))
-                .auteurId(0L) // TODO: sera rempli par le controller via JWT (Membre 2)
+                .auteurId(auteurId)
                 .dateAction(LocalDateTime.now())
                 .ancienStatut(ancienStatut)
                 .nouveauStatut(StatutIncident.ANNULE)
@@ -351,13 +354,12 @@ public class IncidentServiceImpl implements IncidentService {
      * Détermine la source du signalement en fonction du rôle.
      */
     private String determinerSource(String role) {
-        if (role == null) {
-            return "USER";
+        if (role == null || role.isBlank()) {
+            return "VOYAGEUR"; // Par défaut, un utilisateur non défini clairement est traité comme un voyageur
         }
         return switch (role.toUpperCase()) {
-            case "CONDUCTEUR" -> "CONDUCTEUR";
-            case "VOYAGEUR" -> "VOYAGEUR";
-            default -> "USER";
+            case "CONDUCTEUR", "ROLE_CONDUCTEUR" -> "CONDUCTEUR";
+            default -> "VOYAGEUR";
         };
     }
 
