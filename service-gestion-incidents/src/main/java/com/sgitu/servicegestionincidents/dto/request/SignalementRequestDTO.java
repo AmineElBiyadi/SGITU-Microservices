@@ -31,8 +31,5 @@ public class SignalementRequestDTO {
 
     private List<PreuveDTO> preuves;
 
-    @NotNull(message = "L'ID du déclarant est obligatoire")
-    private Long declarantId;
-
     private String vehiculeId;
 }

@@ -9,7 +9,7 @@ import java.util.Map;
 
 public interface IncidentService {
 
-    SignalementResponseDTO signalerIncident(SignalementRequestDTO request);
+    SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId);
     IncidentResponseDTO consulterIncident(Long id);
     List<ActionDTO> consulterSuivi(Long incidentId);
     List<IncidentResponseDTO> filtrerIncidents(Map<String, Object> criteres);
