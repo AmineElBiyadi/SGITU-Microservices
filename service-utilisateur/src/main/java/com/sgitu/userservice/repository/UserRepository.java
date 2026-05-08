@@ -20,6 +20,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByRolesName(String roleName);
 
+    @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.name = :roleName")
+    List<Long> findIdsByRolesName(@Param("roleName") String roleName);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query(value = "UPDATE users SET password = :password WHERE id = :id", nativeQuery = true)
