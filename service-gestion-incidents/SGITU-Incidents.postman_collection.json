@@ -1,0 +1,250 @@
+{
+	"info": {
+		"name": "SGITU-Gestion-Incidents",
+		"description": "Collection pour tester les APIs du service de gestion des incidents.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Incidents",
+			"item": [
+				{
+					"name": "Signaler un incident",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"ACCIDENT\",\n  \"description\": \"Accident léger entre deux bus à la station centrale.\",\n  \"dateIncident\": \"2024-05-08T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"declarantId\": 1,\n  \"vehiculeId\": \"BUS-123\",\n  \"preuves\": [\n    {\n      \"type\": \"PHOTO\",\n      \"fichierBase64\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\",\n      \"description\": \"Vue d'ensemble de l'accident\"\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/signaler",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"signaler"
+							]
+						}
+					}
+				},
+				{
+					"name": "Consulter un incident",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Consulter le suivi (historique)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/1/suivi",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1",
+								"suivi"
+							]
+						}
+					}
+				},
+				{
+					"name": "Filtrer les incidents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}?statut=NOUVEAU&declarantId=1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"query": [
+								{
+									"key": "statut",
+									"value": "NOUVEAU"
+								},
+								{
+									"key": "declarantId",
+									"value": "1"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Clôturer un incident",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motif\": \"Incident résolu, bus réparé et remis en service.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/1/cloturer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1",
+								"cloturer"
+							]
+						}
+					}
+				},
+				{
+					"name": "Escalader un incident",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motif\": \"Dégâts matériels importants nécessitant l'intervention de la police.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/1/escalader",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1",
+								"escalader"
+							]
+						}
+					}
+				},
+				{
+					"name": "Affecter un responsable",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"responsableId\": 42\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/1/affecter",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1",
+								"affecter"
+							]
+						}
+					}
+				},
+				{
+					"name": "Mettre à jour le statut",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"statut\": \"EN_TRAITEMENT\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/1/statut",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"1",
+								"statut"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Rapports",
+			"item": [
+				{
+					"name": "Générer un rapport",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/rapports?periode=mois",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"rapports"
+							],
+							"query": [
+								{
+									"key": "periode",
+									"value": "mois"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Tableau de bord",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/rapports/tableau-bord",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"rapports",
+								"tableau-bord"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8089/api/incidents",
+			"type": "string"
+		}
+	]
+}
