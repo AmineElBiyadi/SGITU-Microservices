@@ -1,1 +1,103 @@
+# ================================================================
+#  SGITU — Global Docker Compose
+#  Regroupe tous les microservices du projet SGITU (G1 à G10).
+#
+#  POUR AJOUTER VOTRE SERVICE :
+#  1. Préfixez container_name avec votre groupe (ex: g5-service).
+#  2. Choisissez un port hôte libre et mettez à jour le tableau.
+#  3. Connectez au réseau "sgitu-network".
+#  4. Ajoutez vos volumes en bas du fichier.
+#
+#  PORTS UTILISÉS :
+#  G3  → 8083 (user-service), 5433 (users-db)
+#
+#  DÉMARRAGE :
+#    cp .env.example .env     # première fois
+#    docker compose up -d
+# ================================================================
 
+services:
+
+  # ---------------------------------------------------------------
+  #  G3 — Service Utilisateur (port 8083)
+  # ---------------------------------------------------------------
+  user-service:
+    image: i5m4il/sgitu-user-service:1.0
+    container_name: g3-user-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://g3-users-db:5432/users_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: secret
+      SERVER_PORT: 8083
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
+      G8_BASE_URL: ${G8_BASE_URL:-}
+    depends_on:
+      g3-users-db:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+
+  g3-users-db:
+    image: postgres:15-alpine
+    container_name: g3-users-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: users_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - g3_users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sgitu-network
+
+  # ---------------------------------------------------------------
+  #  G1 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G2 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G4 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G5 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G6 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G7 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G8 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G9 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+  # ---------------------------------------------------------------
+  #  G10 — (ajoutez votre service ici)
+  # ---------------------------------------------------------------
+
+networks:
+  sgitu-network:
+    driver: bridge
+
+volumes:
+  g3_users_data:

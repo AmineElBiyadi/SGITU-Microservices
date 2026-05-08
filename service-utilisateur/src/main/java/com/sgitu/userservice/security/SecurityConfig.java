@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
-    private final InternalKeyFilter internalKeyFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -68,8 +67,7 @@ public class SecurityConfig {
                 // Everything else -- authenticated
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(internalKeyFilter, JwtFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
