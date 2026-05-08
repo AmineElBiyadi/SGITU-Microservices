@@ -7,7 +7,9 @@ import com.ensate.billetterie.identity.dto.IssueTokenResponse;
 import com.ensate.billetterie.identity.dto.VerifyTokenRequest;
 import com.ensate.billetterie.identity.factories.IdentityMethodFactory;
 import com.ensate.billetterie.identity.interfaces.IdentityMethod;
+import org.springframework.stereotype.Service;
 
+@Service
 public class IdentityService {
 
     public IssueTokenResponse issue(IssueTokenRequest request) {
