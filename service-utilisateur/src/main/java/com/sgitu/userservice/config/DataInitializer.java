@@ -23,10 +23,17 @@ public class DataInitializer implements CommandLineRunner {
             "ROLE_PASSENGER",   // G1, G2 — regular customer
             "ROLE_STUDENT",     // G2 — student identity (discount subscriptions)
             "ROLE_DRIVER",      // G4 — bus/tram driver
-            "ROLE_STAFF",       // G4, G9 — operational staff
-            "ROLE_OPERATOR",    // G7 — IoT/tracking operator
+            "ROLE_DISPATCHER",
+            "ROLE_OPERATOR",      // G4, G9 — operational staff
+            "ROLE_OPERATOR_G4",    // G7 — IoT/tracking operator
             "ROLE_TECHNICIAN",  // G9 — incident technician
-            "ROLE_ADMIN"        // G10 — system administrator
+            "ROLE_ADMIN",
+            "ROLE_ADMIN_G1",
+            "ROLE_ADMIN_G2",
+            "ROLE_ADMIN_G4",
+            "ROLE_ADMIN_G7",
+            "ROLE_ADMIN_G9"
+                   // G10 — system administrator
     );
 
     @Override
