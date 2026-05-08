@@ -27,4 +27,6 @@ public class IncidentResponseDTO {
     private String ligneTransport;
     private Double latitude;
     private Double longitude;
+    private String incidentParentRef;
+    private LocalDateTime dateResolution;
 }

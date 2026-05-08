@@ -42,6 +42,8 @@ public class Incident {
 
     private LocalDateTime dateLimiteResolution;
 
+    private LocalDateTime dateResolution;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutIncident statut;
@@ -56,6 +58,13 @@ public class Incident {
     private Long responsableId;
     
     private String vehiculeId;
+
+    // Référence parent pour les accidents multi-véhicules (Task 1.7)
+    private String incidentParentRef;
+
+    // Flag pour savoir si G4 (Transport) a déjà été notifié (pour le edge-case REJETE)
+    @Builder.Default
+    private boolean transportNotifie = false;
 
     @Column(nullable = false)
     private String source; // "USER", "IOT"
@@ -85,8 +94,15 @@ public class Incident {
     }
 
     public boolean isEscaladable() {
-        return this.gravite == NiveauGravite.CRITIQUE &&
+        return (this.statut == StatutIncident.ASSIGNE ||
+                this.statut == StatutIncident.EN_TRAITEMENT) &&
                 this.statut != StatutIncident.ESCALADE;
+    }
+
+    public boolean isAnnulable() {
+        return this.statut == StatutIncident.NOUVEAU ||
+                this.statut == StatutIncident.ANALYSE ||
+                this.statut == StatutIncident.ASSIGNE;
     }
 
     public void addPreuve(Preuve preuve) {

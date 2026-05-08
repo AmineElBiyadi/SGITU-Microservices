@@ -32,4 +32,9 @@ public class SignalementRequestDTO {
     private List<PreuveDTO> preuves;
 
     private String vehiculeId;
+
+    private String ligneTransport;
+
+    // Rempli par le controller à partir du JWT (VOYAGEUR, CONDUCTEUR, etc.)
+    private String role;
 }
