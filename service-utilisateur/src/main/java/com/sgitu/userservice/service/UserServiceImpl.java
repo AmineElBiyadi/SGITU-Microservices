@@ -21,6 +21,7 @@ public class UserServiceImpl implements UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserEventPublisher eventPublisher;
+    private final KafkaNotificationService notificationService;
 
     @Override
     public UserResponseDTO createUser(UserRequestDTO request) {
@@ -50,8 +51,13 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         User saved = userRepository.save(user);
-        // Notify consumers: new user is active
+        
+        // Notify Group 8 (Analytics) via HTTP
         eventPublisher.publish(saved.getId(), "active");
+        
+        // Notify Group 5 (Notifications) via Kafka
+        notificationService.sendNotification("WELCOME", saved);
+        
         return toResponseDTO(saved);
     }
 
@@ -134,9 +140,15 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
         user.setActive(false);
-        UserResponseDTO result = toResponseDTO(userRepository.save(user));
-        // Notify consumers: user is now inactive
+        User saved = userRepository.save(user);
+        UserResponseDTO result = toResponseDTO(saved);
+        
+        // Notify Group 8 (Analytics) via HTTP
         eventPublisher.publish(id, "inactive");
+        
+        // Notify Group 5 (Notifications) via Kafka
+        notificationService.sendNotification("ACCOUNT_DEACTIVATED", saved);
+        
         return result;
     }
 
