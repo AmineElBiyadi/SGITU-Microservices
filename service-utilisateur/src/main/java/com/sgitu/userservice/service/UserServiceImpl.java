@@ -5,6 +5,7 @@ import com.sgitu.userservice.entity.*;
 import com.sgitu.userservice.exception.*;
 import com.sgitu.userservice.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,9 +21,18 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserEventPublisher eventPublisher;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public UserResponseDTO createUser(UserRequestDTO request) {
+        if (request.getEmail() == null || request.getEmail().isBlank())
+            throw new IllegalArgumentException("L'email est obligatoire");
+        if (request.getPassword() == null || request.getPassword().isBlank())
+            throw new IllegalArgumentException("Le mot de passe est obligatoire");
+        if (request.getRole() == null || request.getRole().isBlank())
+            throw new IllegalArgumentException("Le role est obligatoire");
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
@@ -49,6 +59,8 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         User saved = userRepository.save(user);
+        // Notify consumers: new user is active
+        eventPublisher.publish(saved.getId(), "active");
         return toResponseDTO(saved);
     }
 
@@ -88,6 +100,12 @@ public class UserServiceImpl implements UserService {
             user.setEmail(request.getEmail());
         }
 
+        // Update password when provided (JDBC bypasses Hibernate to avoid dirty-check conflicts)
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            jdbcTemplate.update("UPDATE users SET password = ? WHERE id = ?",
+                    passwordEncoder.encode(request.getPassword()), id);
+        }
+
         if (request.getProfile() != null) {
             UserProfile profile = user.getProfile();
             if (profile == null) {
@@ -105,11 +123,16 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void changePassword(Long id, String newPassword) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
+        }
+        String encoded = passwordEncoder.encode(newPassword);
+        int updated = jdbcTemplate.update("UPDATE users SET password = ? WHERE id = ?", encoded, id);
+        if (updated == 0) {
+            throw new UserNotFoundException(id);
+        }
     }
 
     @Override
@@ -131,7 +154,21 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
         user.setActive(false);
-        return toResponseDTO(userRepository.save(user));
+        UserResponseDTO result = toResponseDTO(userRepository.save(user));
+        // Notify consumers: user is now inactive
+        eventPublisher.publish(id, "inactive");
+        return result;
+    }
+
+    @Override
+    public UserResponseDTO activateUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+        user.setActive(true);
+        UserResponseDTO result = toResponseDTO(userRepository.save(user));
+        // Notify consumers: user is active again
+        eventPublisher.publish(id, "active");
+        return result;
     }
 
     @Override
@@ -148,20 +185,6 @@ public class UserServiceImpl implements UserService {
         return userRepository.existsById(id);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public CredentialsResponseDTO getCredentialsByEmail(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException(email));
-
-        return CredentialsResponseDTO.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .passwordHash(user.getPassword())
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
-                .active(user.getActive())
-                .build();
-    }
 
     // ── Mapping helpers ──
 
