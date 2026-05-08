@@ -3,6 +3,7 @@ package com.ensate.billetterie.ticket.controller;
 
 import com.ensate.billetterie.ticket.dto.request.*;
 import com.ensate.billetterie.ticket.dto.response.TicketResponse;
+import com.ensate.billetterie.ticket.dto.response.TicketTransferResponse;
 import com.ensate.billetterie.ticket.service.TicketService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,13 +23,6 @@ public class TicketController {
 
     private final TicketService ticketService;
 
-
-
-    @GetMapping
-    @Operation(summary = "Get all tickets")
-    public ResponseEntity<List<TicketResponse>> getTickets() {
-        return ResponseEntity.ok(ticketService.getAllTickets());
-    }
 
     @GetMapping("/{ticketId}")
     @Operation(summary = "Get a single ticket by its ID")
@@ -91,7 +85,7 @@ public class TicketController {
 
     @PostMapping("/{ticketId}/transfer")
     @Operation(summary = "Initiate a ticket transfer to a new holder")
-    public ResponseEntity<TicketResponse> transferTicket(
+    public ResponseEntity<TicketTransferResponse> transferTicket(
             @PathVariable String ticketId,
             @Valid @RequestBody TicketTransferRequest ticketTransferRequest) {
         return ResponseEntity.ok(ticketService.transferTicket(ticketId, ticketTransferRequest));
@@ -107,7 +101,7 @@ public class TicketController {
 
     @PostMapping("/{ticketId}/transfer/reject")
     @Operation(summary = "Reject a pending ticket transfer")
-    public ResponseEntity<TicketResponse> rejectTicket(
+    public ResponseEntity<TicketTransferResponse> rejectTicket(
             @PathVariable String ticketId,
             @Valid @RequestBody TicketAcceptRequest ticketAcceptRequest) {
         return ResponseEntity.ok(ticketService.rejectTransfer(ticketId, ticketAcceptRequest));
@@ -117,8 +111,7 @@ public class TicketController {
     @PostMapping("/{ticketId}/transfer/cancel")
     @Operation(summary = "Cancel a pending ticket transfer (initiated by the original holder)")
     public ResponseEntity<TicketResponse> cancelTicketTransfer(
-            @PathVariable String ticketId,
-            @Valid @RequestBody TicketCancelRequest ticketCancelRequest) {
-        return ResponseEntity.ok(ticketService.cancelTransfer(ticketId, ticketCancelRequest));
+            @PathVariable String ticketId) {
+        return ResponseEntity.ok(ticketService.cancelTransfer(ticketId));
     }
 }

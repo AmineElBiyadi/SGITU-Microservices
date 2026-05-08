@@ -34,10 +34,12 @@ public class AdminTicketService  {
 
 
 
+    public List<TicketResponse> getAllTickets() {
+        return ticketMapper.toResponseList(ticketRepository.findAll());
+    }
 
     public List<TicketResponse> getFlaggedTickets() {
-        List<Ticket> flagged = ticketRepository.findByStatusInAndExpiresAtBefore(
-                List.of(TicketStatus.FLAGGED), Instant.MAX);
+        List<Ticket> flagged = ticketRepository.findByStatusIn(List.of(TicketStatus.FLAGGED));
         return ticketMapper.toResponseList(flagged);
     }
 

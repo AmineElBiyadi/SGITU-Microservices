@@ -15,18 +15,24 @@ import com.ensate.billetterie.ticket.domain.enums.TicketStatus;
 import com.ensate.billetterie.ticket.dto.request.*;
 import com.ensate.billetterie.ticket.dto.response.PaymentResponse;
 import com.ensate.billetterie.ticket.dto.response.TicketResponse;
+import com.ensate.billetterie.ticket.dto.response.TicketTransferResponse;
 import com.ensate.billetterie.ticket.dto.result.ValidationResult;
 import com.ensate.billetterie.ticket.mapper.TicketMapper;
 import com.ensate.billetterie.ticket.repository.TicketRepository;
+import com.ensate.billetterie.ticket.utils.Utils;
 import com.ensate.billetterie.validation.domain.ValidationContext;
 import com.ensate.billetterie.validation.pipeline.ValidationPipeline;
 import com.ensate.billetterie.validation.steps.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -43,11 +49,6 @@ public class TicketService {
     private final EventPublisher<Object> eventPublisher;
     private final PaymentServiceClient paymentServiceClient;
 
-
-
-    public List<TicketResponse> getAllTickets() {
-        return ticketMapper.toResponseList(ticketRepository.findAll());
-    }
 
 
     public TicketResponse getTicketById(String ticketId) {
@@ -127,6 +128,7 @@ public class TicketService {
         Ticket ticket = findOrThrow(ticketId);
 
         assertStatus(ticket, TicketStatus.CREATED);
+        assertCurrentHolder(ticket, paymentRequest.getUserId());
 
         if (ticket.isExpired()) {
             ticket.markExpired();
@@ -135,15 +137,15 @@ public class TicketService {
         }
 
 
-        PaymentResponse paymentResponse = paymentServiceClient.pay(paymentRequest);
-
-        if(paymentResponse.getPaymentStatus().equals("FAILED") ||
-                paymentResponse.getInvoiceId() == null ||
-                paymentResponse.getInvoiceNumber() == null) {
-
-            eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_FAILED, ticket);
-            return ticketMapper.toResponse(ticket);
-        }
+//        PaymentResponse paymentResponse = paymentServiceClient.pay(paymentRequest);
+//
+//        if(paymentResponse.getPaymentStatus().equals("FAILED") ||
+//                paymentResponse.getInvoiceId() == null ||
+//                paymentResponse.getInvoiceNumber() == null) {
+//
+//            eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_FAILED, ticket);
+//            return ticketMapper.toResponse(ticket);
+//        }
 
 
 
@@ -151,7 +153,7 @@ public class TicketService {
         ticket.setIssuedAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_SUCCESS, saved);
+        //eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_SUCCESS, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -164,11 +166,13 @@ public class TicketService {
         assertNotStatus(ticket, TicketStatus.CANCELLED, TicketStatus.REDEEMED,
                 TicketStatus.REFUNDED, TicketStatus.EXPIRED);
 
+        //TODO: Process refund
+
         ticket.cancel();
         ticket.setCancelledAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        eventPublisher.publish(KafkaTopics.TICKET_CANCELLED, saved);
+//        eventPublisher.publish(KafkaTopics.TICKET_CANCELLED, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -178,25 +182,34 @@ public class TicketService {
     public TicketResponse refundTicket(String ticketId) {
         Ticket ticket = findOrThrow(ticketId);
 
-        assertStatus(ticket, TicketStatus.CANCELLED);
+        assertStatus(ticket, TicketStatus.ISSUED);
 
 
-        ticket.setStatus(TicketStatus.REFUND_PENDING);
 
-        //Communicate with payment service here to initiate refund
-        //Modify ticket state if refund effected
+//        PaymentResponse paymentResponse = paymentServiceClient.refund(ticket.getId());
+//
+//        if(paymentResponse.getPaymentStatus().equals("FAILED") ||
+//                paymentResponse.getInvoiceId() == null ||
+//                paymentResponse.getInvoiceNumber() == null) {
+//
+//            eventPublisher.publish(KafkaTopics.TICKET_REFUND_CANCELLED, ticket);
+//            return ticketMapper.toResponse(ticket);
+//        }
 
+
+        ticket.setStatus(TicketStatus.REFUNDED);
         ticket.setRefundedAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        eventPublisher.publish(KafkaTopics.TICKET_REFUND_REQUESTED, saved);
+        //eventPublisher.publish(KafkaTopics.TICKET_REFUND_REQUESTED, saved);
         return ticketMapper.toResponse(saved);
     }
 
 
 
 
-    public TicketResponse transferTicket(String ticketId, TicketTransferRequest request) {
+    @Transactional
+    public TicketTransferResponse transferTicket(String ticketId, TicketTransferRequest request) {
         Ticket ticket = findOrThrow(ticketId);
 
         assertStatus(ticket, TicketStatus.ISSUED, TicketStatus.TRANSFERRED);
@@ -205,77 +218,137 @@ public class TicketService {
             throw new TicketOperationException("Cannot transfer an expired ticket");
         }
 
-        // transferTo() appends a TransferRecord and sets status = TRANSFERRED
-        ticket.transferTo(request.getNewHolderId(), request.getReason());
+        // Issue token for new holder
+        IssueTokenRequest tokenReq = IssueTokenRequest.builder()
+                .holderId(request.getNewHolderId())
+                .eventId(ticket.getTripId())
+                .methodType(ticket.getIdentityMethod())
+                .build();
+
+        IssueTokenResponse tokenResp = identityService.issue(tokenReq);
+
+        // Build new holder's ticket
+        Ticket newHolderTicket = ticket.copyAsNew();
+        newHolderTicket.setHolderId(request.getNewHolderId());
+        newHolderTicket.setTokenValue(tokenResp.getTokenValue());
+        newHolderTicket.setStatus(TicketStatus.TRANSFER_PENDING);
+        newHolderTicket.setTransferredFromUserId(ticket.getHolderId());
+        newHolderTicket.setParentTicketId(ticket.getId());
+        newHolderTicket.setTransferReason(request.getReason());
+        newHolderTicket.setMetadata(ticket.copyMetadata());
+        Ticket savedNewTicket = ticketRepository.save(newHolderTicket);
+
+
+        ticket.transferPendingTo(request.getNewHolderId(), request.getReason());
         ticket.setTransferredAt(Instant.now());
-        Ticket saved = ticketRepository.save(ticket);
+        Ticket savedOriginal = ticketRepository.save(ticket);
 
-        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_INITIATED, saved);
-        return ticketMapper.toResponse(saved);
+//        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_INITIATED, savedOriginal);
+
+        return new TicketTransferResponse(
+                ticketMapper.toResponse(savedOriginal),
+                ticketMapper.toResponse(savedNewTicket)
+        );
     }
 
 
 
 
+
+
+
+
+    @Transactional
     public TicketResponse acceptTransfer(String ticketId, TicketAcceptRequest request) {
+
         Ticket ticket = findOrThrow(ticketId);
 
-        assertStatus(ticket, TicketStatus.TRANSFERRED);
+        assertStatus(ticket, TicketStatus.TRANSFER_PENDING);
         assertCurrentHolder(ticket, request.getAcceptingUserId());
 
-        // Status stays TRANSFERRED; we just confirm by persisting + publishing
+
+
+        Ticket fromTicket = findOrThrow(Utils.assertNotNull(ticket.getParentTicketId(), String.class));
+
+        //Double check the status of the original ticket is still PENDING
+        assertStatus(fromTicket, TicketStatus.TRANSFER_PENDING);
+
+        ticket.setStatus(TicketStatus.ISSUED);
+        ticket.setIssuedAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_COMPLETED, saved);
+        //Updating status of ticket from which the current ticket is derived
+        fromTicket.transferTo(saved.getHolderId(), ticket.getTransferReason());
+        fromTicket.setTransferredAt(Instant.now());
+        ticketRepository.save(fromTicket);
+
+        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_COMPLETED, saved);
         return ticketMapper.toResponse(saved);
     }
 
 
 
 
-    public TicketResponse rejectTransfer(String ticketId, TicketAcceptRequest request) {
-        Ticket ticket = findOrThrow(ticketId);
+    @Transactional
+    public TicketTransferResponse rejectTransfer(String ticketId, TicketAcceptRequest request) {
 
-        assertStatus(ticket, TicketStatus.TRANSFERRED);
-        assertCurrentHolder(ticket, request.getAcceptingUserId());
+        Ticket pendingTicket = findOrThrow(ticketId);
 
-        // Roll back: pop last TransferRecord and restore previous holder
-        List<TransferRecord> history = ticket.getTransferHistory();
-        if (history == null || history.isEmpty()) {
-            throw new TicketOperationException("No transfer record found to reject");
+        assertStatus(pendingTicket, TicketStatus.TRANSFER_PENDING);
+        assertCurrentHolder(pendingTicket, request.getAcceptingUserId());
+
+
+        Ticket originalTicket = findOrThrow(Utils.assertNotNull(pendingTicket.getParentTicketId(), String.class));
+
+        // Restore original ticket back to ISSUED
+        originalTicket.setStatus(TicketStatus.ISSUED);
+        originalTicket.setTransferredAt(null);
+
+        // Remove the last TransferRecord that was added during initiation
+        List<TransferRecord> history = originalTicket.getTransferHistory();
+        if (history != null && !history.isEmpty()) {
+            history.removeLast();
         }
 
-        return getHistoryResponse(ticket, history);
+        Ticket savedOriginal = ticketRepository.save(originalTicket);
+
+
+        pendingTicket.setStatus(TicketStatus.CANCELLED);
+        pendingTicket.setCancelledAt(Instant.now());
+        Ticket savedPending = ticketRepository.save(pendingTicket);
+
+        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_REJECTED, savedOriginal);
+
+        return new TicketTransferResponse(
+                ticketMapper.toResponse(savedOriginal),
+                ticketMapper.toResponse(savedPending)
+        );
     }
 
 
 
 
-    public TicketResponse cancelTransfer(String ticketId, TicketCancelRequest request) {
+    public TicketResponse cancelTransfer(String ticketId) {
         Ticket ticket = findOrThrow(ticketId);
+        assertStatus(ticket, TicketStatus.TRANSFER_PENDING);
 
-        assertStatus(ticket, TicketStatus.TRANSFERRED);
+        //TODO: find a way of asserting that the transferred ticket is also pending
 
         List<TransferRecord> history = ticket.getTransferHistory();
+
         if (history == null || history.isEmpty()) {
             throw new TicketOperationException("No pending transfer to cancel");
         }
-
-
-        return getHistoryResponse(ticket, history);
-    }
-
-    private TicketResponse getHistoryResponse(Ticket ticket, List<TransferRecord> history) {
-        TransferRecord last = history.get(history.size() - 1);
+        TransferRecord last = history.getLast();
         ticket.setHolderId(last.getFromHolder());
         ticket.setStatus(TicketStatus.ISSUED);
-        history.remove(history.size() - 1);
+        ticket.setUpdatedAt(Instant.now());
+        history.removeLast();
 
+        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_CANCELLED, saved);
         Ticket saved = ticketRepository.save(ticket);
-        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_CANCELLED, saved);
         return ticketMapper.toResponse(saved);
     }
-
 
 
     private Ticket findOrThrow(String id) {
@@ -305,6 +378,19 @@ public class TicketService {
             throw new TicketOperationException(
                     "User " + userId + " is not the current holder of ticket " + ticket.getId());
         }
+    }
+
+
+    private String extractStringFromMetaData(Ticket ticket, String property){
+        Object raw = Optional.ofNullable(ticket.getMetadata())
+                .map(m -> m.get(property))
+                .orElseThrow(() -> new TicketOperationException("Missing fromTicketId in metadata"));
+
+        if (!(raw instanceof String extracted) || extracted.isBlank()) {
+            throw new TicketOperationException("Invalid fromTicketId in metadata");
+        }
+
+        return extracted;
     }
 
 

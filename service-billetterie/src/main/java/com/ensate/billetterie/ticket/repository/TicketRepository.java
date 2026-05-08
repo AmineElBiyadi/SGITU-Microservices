@@ -12,6 +12,7 @@ public interface TicketRepository extends MongoRepository<Ticket,String> {
 
     Optional<Ticket> findByTokenValue(String tokenValue);
     List<Ticket> findByHolderId(String holderId);
+    List<Ticket> findByStatusIn(List<TicketStatus> statuses);
 //    List<Ticket>     findByEventId(String eventId);
 //    List<Ticket>     findByEventIdAndStatus(String eventId, TicketStatus status);
 

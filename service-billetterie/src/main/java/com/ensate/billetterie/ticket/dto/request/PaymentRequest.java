@@ -10,7 +10,6 @@ public class PaymentRequest {
     @NotBlank
     private String userId;
     private String sourceType = "TICKET";
-    @NotBlank
     private PaymentMethod paymentMethod;
     private String savedPaymentToken;
 }

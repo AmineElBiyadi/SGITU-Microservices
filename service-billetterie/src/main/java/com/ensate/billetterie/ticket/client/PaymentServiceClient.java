@@ -25,6 +25,11 @@ public class PaymentServiceClient {
                 paymentServiceUrl);
     }
 
+
+    public PaymentResponse refund(String ticketId) {
+        return null;
+    }
+
     public PaymentResponse pay(PaymentRequest paymentRequest) {
 
 

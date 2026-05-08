@@ -18,12 +18,19 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/admin")
+@RequestMapping("/admin")
 @Tag(name = "Admin – Ticket Management", description = "Administrative operations on tickets")
 @RequiredArgsConstructor
 public class AdminTicketController {
 
     private final AdminTicketService adminTicketService;
+
+
+    @GetMapping("/tickets")
+    @Operation(summary = "Get all tickets")
+    public ResponseEntity<List<TicketResponse>> getTickets() {
+        return ResponseEntity.ok(adminTicketService.getAllTickets());
+    }
 
     // ─── Flagged tickets ──────────────────────────────────────────────────
 
