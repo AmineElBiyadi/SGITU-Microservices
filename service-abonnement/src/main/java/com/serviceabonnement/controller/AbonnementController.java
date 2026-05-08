@@ -19,7 +19,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.serviceabonnement.dto.external.ActiveSubscriptionResponseDTO;
+import com.serviceabonnement.dto.external.PaymentCallbackDTO;
+import com.serviceabonnement.dto.external.RefundCallbackDTO;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/abonnements")
@@ -148,5 +152,11 @@ public class AbonnementController {
             @Parameter(description = "Nombre de jours de désactivation") @RequestParam int jours) {
         abonnementService.desactiver(id, jours);
         return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Vérification d'abonnement actif pour G6")
+    @GetMapping("/users/{userId}/actif")
+    public ResponseEntity<ActiveSubscriptionResponseDTO> verifierAbonnementG6(@PathVariable Long userId) {
+        return ResponseEntity.ok(abonnementService.verifierAbonnementActif(userId));
     }
 }

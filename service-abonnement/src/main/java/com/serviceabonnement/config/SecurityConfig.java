@@ -31,7 +31,9 @@ public class SecurityConfig {
                         .requestMatchers("/plans/**").hasRole("ADMIN_G2")
                         
                         // Abonnements
-                        .requestMatchers("/api/abonnements/**").authenticated()
+                        .requestMatchers("/abonnements/paiement/confirmation").permitAll()
+                        .requestMatchers("/abonnements/remboursement/confirmation").permitAll()
+                        .requestMatchers("/abonnements/users/*/actif").permitAll()
                         .requestMatchers("/abonnements/**").authenticated()
                         
                         .requestMatchers("/actuator/**").permitAll()

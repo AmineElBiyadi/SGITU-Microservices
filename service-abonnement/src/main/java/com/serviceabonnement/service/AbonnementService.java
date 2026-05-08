@@ -1,5 +1,8 @@
 package com.serviceabonnement.service;
 
+import com.serviceabonnement.dto.external.ActiveSubscriptionResponseDTO;
+import com.serviceabonnement.dto.external.PaymentCallbackDTO;
+import com.serviceabonnement.dto.external.RefundCallbackDTO;
 import com.serviceabonnement.entity.Abonnement;
 import com.serviceabonnement.entity.Renouvellement;
 import org.springframework.data.domain.Page;
@@ -28,7 +31,8 @@ public interface AbonnementService {
     Abonnement getActif(Long userId);
     List<Renouvellement> getHistoriquePaiements(Long abonnementId);
 
-    // Callbacks
-    void confirmerPaiement(String transactionId);
-    void confirmerRemboursement(String transactionId);
+    // Callbacks & Verification (G6 Integration)
+    void confirmerPaiement(PaymentCallbackDTO callback);
+    void confirmerRemboursement(RefundCallbackDTO callback);
+    ActiveSubscriptionResponseDTO verifierAbonnementActif(Long userId);
 }
