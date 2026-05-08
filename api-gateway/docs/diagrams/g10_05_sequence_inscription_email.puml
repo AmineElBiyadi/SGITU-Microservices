@@ -8,9 +8,9 @@ participant "G3 User/Auth Service" as G3
 database "User DB G3" as Db
 participant "G5 Notifications" as G5
 
-Visitor -> G10 : POST /auth/register
+Visitor -> G10 : POST /api/users
 activate G10
-G10 -> G3 : route /auth/register
+G10 -> G3 : route /api/users
 activate G3
 G3 -> Db : creer utilisateur\nemailVerified=false
 Db --> G3 : userId

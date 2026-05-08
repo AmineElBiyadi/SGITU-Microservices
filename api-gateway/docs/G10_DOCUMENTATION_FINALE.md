@@ -103,11 +103,12 @@ Note integration : G10 expose `/auth/**`, mais transmet vers `/api/auth/**` dans
 
 Regles appliquees par G10 :
 
-- `/auth/login`, `/auth/register`, `/auth/refresh`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` sont publics et routes vers G3.
+- `/auth/login`, `/auth/refresh`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` sont publics et routes vers G3.
+- `POST /api/users` est public pour la creation de compte via G3.
 - `/api/v1/admin/**` demande `ROLE_ADMIN`.
 - `/api/v1/ticket-types/**` demande `ROLE_ADMIN`.
-- `/api/users/{id}/roles` et `/api/users/{id}/deactivate` demandent `ROLE_ADMIN`.
-- `/api/v1/analytics/**` et `/predict/**` demandent `ROLE_ADMIN` ou `ROLE_AGENT`.
+- `GET /api/users`, `/api/users/{id}/roles`, `/api/users/{id}/activate`, `/api/users/{id}/deactivate` et `DELETE /api/users/{id}` demandent `ROLE_ADMIN`.
+- `/api/v1/analytics/**` et `/predict/**` demandent `ROLE_ADMIN`, `ROLE_OPERATOR` ou `ROLE_STAFF`.
 - `/api/**` demande un JWT valide.
 
 ## 7. Tests

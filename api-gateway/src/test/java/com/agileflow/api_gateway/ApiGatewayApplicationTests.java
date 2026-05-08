@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AutoConfigureWebTestClient
 class ApiGatewayApplicationTests {
 
-    private static final String JWT_SECRET = "G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS";
+    private static final String JWT_SECRET = "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -73,6 +73,12 @@ class ApiGatewayApplicationTests {
                 .expectStatus().isForbidden();
 
         webTestClient.get()
+                .uri("/api/users")
+                .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
                 .uri("/api/v1/admin/dashboard")
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
                 .exchange()
@@ -105,7 +111,7 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void g8AnalyticsAndPredictionRoutesRequireRoleAdminOrAgent() {
+    void g8AnalyticsAndPredictionRoutesRequireRoleAdminOperatorOrStaff() {
         webTestClient.get()
                 .uri("/api/v1/analytics/dashboard")
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
@@ -124,6 +130,19 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
+    void userRegistrationThroughG3IsPublicAtApiUsers() {
+        webTestClient.post()
+                .uri("/api/users")
+                .bodyValue(Map.of(
+                        "email", "new.user@sgitu.ma",
+                        "password", "Password123",
+                        "role", "ROLE_PASSENGER"
+                ))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+    }
+
+    @Test
     void swaggerDocumentsGatewaySecurityAndG8Contract() {
         webTestClient.get()
                 .uri("/v3/api-docs")
@@ -133,6 +152,14 @@ class ApiGatewayApplicationTests {
                 .jsonPath("$.info.title").isEqualTo("SGITU - API Gateway G10")
                 .jsonPath("$.components.securitySchemes.bearerAuth.type").isEqualTo("http")
                 .jsonPath("$.components.securitySchemes.bearerAuth.scheme").isEqualTo("bearer")
+                .jsonPath("$.paths['/api/users'].post.summary").isEqualTo("Create user route vers G3")
+                .jsonPath("$.paths['/api/users'].get.summary").isEqualTo("List users")
+                .jsonPath("$.paths['/api/users/{id}'].get.summary").isEqualTo("Get user by id")
+                .jsonPath("$.paths['/api/users/{id}'].put.summary").isEqualTo("Update user profile")
+                .jsonPath("$.paths['/api/users/{id}'].delete.summary").isEqualTo("Delete user")
+                .jsonPath("$.paths['/api/users/{id}/roles'].put.summary").isEqualTo("Update user roles")
+                .jsonPath("$.paths['/api/users/{id}/activate'].put.summary").isEqualTo("Activate user")
+                .jsonPath("$.paths['/api/users/{id}/deactivate'].put.summary").isEqualTo("Deactivate user")
                 .jsonPath("$.paths['/api/v1/ingestion/payments'].post.summary").isEqualTo("Ingest payments")
                 .jsonPath("$.paths['/api/v1/analytics/dashboard'].get.summary").isEqualTo("Get complete analytics dashboard")
                 .jsonPath("$.paths['/api/v1/analytics/reports/generate'].post.summary").isEqualTo("Generate analytics report")

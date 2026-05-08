@@ -1,7 +1,6 @@
 % ============================================================
 %  Projet SGITU - Groupe 10 - API Gateway & Securite
-%  Rapport d'avancement technique - Architecture Microservices
-%  Version adaptee : G3 est source de verite utilisateurs/JWT
+%  Rapport technique - Rendu intermediaire
 % ============================================================
 \documentclass[12pt, a4paper]{article}
 
@@ -100,6 +99,25 @@
 \end{figure}
 }
 
+\newcommand{\optionalscreenshot}[3]{
+\begin{figure}[H]
+  \centering
+  \IfFileExists{#1}{
+    \includegraphics[width=#2\textwidth]{#1}
+  }{
+    \fbox{
+      \begin{minipage}[c][4.2cm][c]{#2\textwidth}
+        \centering
+        \textbf{Capture Postman a inserer}\\[6pt]
+        Fichier attendu : \texttt{\detokenize{#1}}\\[4pt]
+        Executer le test Postman correspondant puis enregistrer la capture dans \texttt{screenshots/}.
+      \end{minipage}
+    }
+  }
+  \caption{#3}
+\end{figure}
+}
+
 \hypersetup{colorlinks=true,linkcolor=navyblue,urlcolor=blueaccent}
 
 \begin{document}
@@ -113,14 +131,19 @@
 \rule{\linewidth}{1pt}\\[0.4cm]
 {\Large\bfseries Module : Microservices}\\[0.3cm]
 {\Large\bfseries Projet SGITU}\\[0.4cm]
-\rule{\linewidth}{1pt}\\[1.5cm]
-{\fontsize{25}{30}\bfseries\selectfont Rapport d'avancement}\\[0.5cm]
-{\fontsize{22}{27}\bfseries\selectfont Groupe 10 - API Gateway \& Securite}\\[0.5cm]
-{\fontsize{16}{20}\selectfont Architecture adaptee : G3 est source de verite utilisateurs/JWT}\\[2cm]
+\rule{\linewidth}{1pt}\\[1.2cm]
+{\fontsize{24}{29}\bfseries\selectfont Rapport Technique -- Rendu Intermediaire}\\[0.5cm]
+{\fontsize{21}{26}\bfseries\selectfont Groupe 10 - API Gateway \& Securite}\\[0.4cm]
+{\fontsize{15}{19}\selectfont Systeme de Gestion Intelligente des Transports Urbains}\\[1.2cm]
+\begin{tabular}{>{\bfseries}p{4.3cm} p{8cm}}
+Membres du groupe : & [PLACEHOLDER - Nom Prenom] \\
+Encadrant : & Pr. BESRI \\
+Date de rendu : & 08 mai 2026 \\
+Filiere : & GI2 - Genie Informatique \\
+Annee universitaire : & 2025/2026 \\
+\end{tabular}
 \vfill
-{\Large\bfseries Realise par :}\\[0.4cm]
-{\Large Groupe 10}\\[1cm]
-{\large\bfseries AU 2025/2026}
+{\large\bfseries ENSA Tetouan}
 \end{center}
 \end{titlepage}
 
@@ -129,67 +152,562 @@
 
 \section*{Objectifs}
 \addcontentsline{toc}{section}{Objectifs}
+Ce rapport presente l'avancement technique du microservice G10. Il decrit la conception, l'implementation, la securite, la documentation API, les tests et le deploiement Docker. Il montre aussi comment la Gateway coordonne les appels entre les clients et les microservices SGITU. L'objectif est de verifier la conformite du travail avec les principes microservices et les consignes du rendu intermediaire.
 
-Ce rapport presente l'etat d'avancement du groupe 10 dans le projet SGITU. Le groupe 10 est responsable de l'\textbf{API Gateway} et de la \textbf{securite transverse}. Apres clarification architecturale, la responsabilite des comptes utilisateurs et des roles est attribuee au groupe 3, afin de respecter le principe microservices de source unique de verite.
-
-\section*{Resume}
-\addcontentsline{toc}{section}{Resume}
-
-G10 ne stocke plus les utilisateurs, les roles, les mots de passe, les refresh tokens ou les tokens de verification. Ces donnees appartiennent au microservice \textbf{G3 Gestion des utilisateurs}. G10 valide les JWT emis par G3, applique les regles d'acces, ajoute les headers utilisateur et route vers les microservices G1 a G9.
-
-\begin{calloutsuccess}
-La Gateway reste stateless concernant l'identite : elle valide le JWT, mais ne devient pas une deuxieme source de verite des comptes.
-\end{calloutsuccess}
+\newpage
+\tableofcontents
+\newpage
 
 \section{Presentation du microservice}
+
+\subsection{Description du sous-systeme G10}
+
+Le groupe 10 realise le sous-systeme \textbf{API Gateway \& Securite}. G10 constitue le point d'entree unique pour les clients Web, mobile ou Postman. Son role fonctionnel est de recevoir les requetes externes, d'appliquer les controles de securite transverses, puis de router chaque requete vers le microservice responsable.
+
+Techniquement, le microservice est developpe avec Spring Boot, Spring Cloud Gateway, Spring Security WebFlux, JJWT, Swagger/OpenAPI et Docker. Il permet de centraliser la securite sans dupliquer la logique metier des autres groupes.
+
+\subsection{Fonctionnalites metier implementees}
+
+\begin{itemize}
+  \item exposition d'un point d'entree commun pour les microservices SGITU ;
+  \item routage vers les services G1 a G9 selon les prefixes REST ;
+  \item validation des JWT recus dans le header \texttt{Authorization} ;
+  \item controle d'acces selon les roles presents dans le JWT ;
+  \item propagation des informations utilisateur vers les services cibles ;
+  \item generation automatique d'un \texttt{X-Correlation-Id} lorsqu'il est absent ;
+  \item gestion uniforme des erreurs techniques et de securite ;
+  \item documentation des routes via Swagger/OpenAPI ;
+  \item execution conteneurisee avec Docker et Docker Compose.
+\end{itemize}
 
 \subsection{Responsabilites de G10}
 
 \begin{itemize}
   \item point d'entree unique du systeme SGITU ;
-  \item validation des JWT emis par G3 ;
+  \item validation stateless des JWT ;
   \item controle d'acces par role ;
   \item routage vers G1, G2, G3, G4, G5, G6, G7, G8 et G9 ;
   \item propagation de \texttt{X-User-Id}, \texttt{X-User-Email}, \texttt{X-Roles} et \texttt{X-Correlation-Id} ;
-  \item gestion structuree des erreurs \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503} ;
+  \item gestion structuree des erreurs \texttt{400}, \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503} et \texttt{504} ;
   \item journalisation avec SLF4J/Logback ;
   \item documentation Swagger/OpenAPI ;
   \item conteneurisation Docker.
 \end{itemize}
 
-\subsection{Responsabilites de G3}
+\subsection{Ce que G10 ne fait PAS}
 
-G3 est la source de verite pour :
+\begin{calloutsuccess}
+G3 est la source de verite pour les utilisateurs, les profils, les roles, les permissions, les mots de passe et l'emission des JWT. G10 ne possede donc pas de base utilisateurs et ne genere pas les tokens d'authentification.
+\end{calloutsuccess}
 
-\begin{itemize}
-  \item comptes utilisateurs ;
-  \item profils ;
-  \item roles et permissions ;
-  \item mots de passe ;
-  \item inscription ;
-  \item verification email ;
-  \item forgot/reset password ;
-  \item emission des JWT ;
-  \item refresh tokens.
-\end{itemize}
+G10 ne modifie pas directement les comptes, les roles ou les permissions. Toute operation d'identite est routee vers le service utilisateur. La Gateway reste un composant transversal : elle controle, enrichit et route les requetes, mais ne devient pas proprietaire des donnees metier.
 
 \section{Conception}
 
-\subsection{Architecture globale}
+\subsection{Diagramme de cas d'utilisation}
 
-\optionalfigure{diagrams/g10_01_architecture_globale.png}{0.95}{Architecture globale G10 adaptee}
+\optionalfigure{diagrams/g10_03_diagramme_cas_utilisation.png}{0.9}{Diagramme de cas d'utilisation G10}
+
+\subsection{Diagramme de classes}
+
+\optionalfigure{diagrams/g10_09_diagramme_classes_gateway.png}{0.95}{Diagramme de classes G10}
 
 \subsection{Diagramme de composants}
 
 \optionalfigure{diagrams/g10_02_diagramme_composants.png}{0.95}{Diagramme de composants G10}
 
-\subsection{Cas d'utilisation}
+\optionalfigure{diagrams/g10_01_architecture_globale.png}{0.95}{Architecture globale G10 adaptee}
 
-\optionalfigure{diagrams/g10_03_diagramme_cas_utilisation.png}{0.9}{Diagramme de cas d'utilisation G10}
+\subsection{Diagrammes de sequence}
 
-\section{Contrat JWT}
+\optionalfigure{diagrams/g10_05_sequence_inscription_email.png}{0.95}{Inscription routee vers G3 et notification via G5}
 
-G10 attend un JWT emis par G3. Le token est envoye par le client dans :
+\optionalfigure{diagrams/g10_06_sequence_login_jwt.png}{0.95}{Login via G10, JWT emis par G3}
+
+\optionalfigure{diagrams/g10_07_sequence_routage_gateway.png}{0.95}{Routage Gateway avec JWT emis par G3}
+
+\subsection{Endpoints REST exposes par G10}
+
+\begin{center}
+\begin{longtable}{>{\bfseries}p{1.7cm} p{2.2cm} p{4.3cm} p{3cm} p{3.4cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Groupe} & \color{white}\textbf{Methodes} & \color{white}\textbf{Endpoint} & \color{white}\textbf{Role requis} & \color{white}\textbf{Description} \\
+\endfirsthead
+\rowcolor{navyblue}
+\color{white}\textbf{Groupe} & \color{white}\textbf{Methodes} & \color{white}\textbf{Endpoint} & \color{white}\textbf{Role requis} & \color{white}\textbf{Description} \\
+\endhead
+G10 & GET & \texttt{/health} & Public & Verification simple de disponibilite. \\
+\rowcolor{lightgray}
+G10 & GET & \texttt{/actuator/health} & Public & Health check Spring Boot. \\
+G3 & POST & \texttt{/auth/login} & Public & Authentification utilisateur. \\
+\rowcolor{lightgray}
+G3 & POST & \texttt{/auth/register} & Public & Inscription si exposee par G3. \\
+G3 & POST & \texttt{/api/users} & Public & Creation d'un utilisateur. \\
+\rowcolor{lightgray}
+G3 & GET, PUT & \texttt{/api/users/\{id\}} & JWT & Consultation ou modification utilisateur. \\
+G3 & GET & \texttt{/api/users} & \texttt{ROLE\_ADMIN} & Liste des utilisateurs. \\
+\rowcolor{lightgray}
+G3 & PUT & \texttt{/api/users/\{id\}/roles} & \texttt{ROLE\_ADMIN} & Modification des roles. \\
+G3 & PUT & \texttt{/api/users/\{id\}/activate} & \texttt{ROLE\_ADMIN} & Activation d'un compte. \\
+\rowcolor{lightgray}
+G3 & PUT & \texttt{/api/users/\{id\}/deactivate} & \texttt{ROLE\_ADMIN} & Desactivation d'un compte. \\
+G3 & DELETE & \texttt{/api/users/\{id\}} & \texttt{ROLE\_ADMIN} & Suppression utilisateur. \\
+\rowcolor{lightgray}
+G1 & GET, POST, PUT, DELETE & \texttt{/api/v1/tickets/**} & JWT & Billetterie dematerialisee. \\
+G1 & GET, POST, PUT, DELETE & \texttt{/api/v1/admin/**} & \texttt{ROLE\_ADMIN} & Administration billetterie. \\
+\rowcolor{lightgray}
+G2 & GET, POST, PUT, DELETE & \texttt{/api/abonnements/**} & JWT & Gestion des abonnements. \\
+G2 & GET, POST, PUT, DELETE & \texttt{/api/plans/**} & JWT & Plans d'abonnement. \\
+\rowcolor{lightgray}
+G4 & GET, POST, PUT, DELETE & \texttt{/api/g4/**} & JWT & Coordination des transports. \\
+G4 & GET & \texttt{/api/v1/operator/status} & JWT & Statut operationnel. \\
+\rowcolor{lightgray}
+G5 & GET, POST, PUT, DELETE & \texttt{/api/notifications/**} & JWT & Notifications. \\
+G6 & GET, POST, PUT, DELETE & \texttt{/api/payments/**} & JWT & Paiement. \\
+\rowcolor{lightgray}
+G6 & GET, POST, PUT, DELETE & \texttt{/api/refunds/**} & JWT & Remboursements. \\
+G7 & GET, POST, PUT, DELETE & \texttt{/api/suivi-vehicules/**} & JWT & Suivi des vehicules. \\
+\rowcolor{lightgray}
+G8 & POST & \texttt{/api/v1/ingestion/**} & JWT & Ingestion de donnees analytiques. \\
+G8 & GET, POST & \texttt{/api/v1/analytics/**} & \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR}, \texttt{ROLE\_STAFF} & Analyse et tableaux de bord. \\
+\rowcolor{lightgray}
+G8 & POST & \texttt{/predict/peak-hours} & \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR}, \texttt{ROLE\_STAFF} & Prediction des heures de pointe. \\
+G8 & POST & \texttt{/predict/incidents} & \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR}, \texttt{ROLE\_STAFF} & Prediction des incidents. \\
+\rowcolor{lightgray}
+G9 & GET, POST, PUT, DELETE & \texttt{/api/incidents/**} & JWT & Gestion des incidents. \\
+G9 & GET, POST, PUT, DELETE & \texttt{/api/rapports/**} & JWT & Rapports incidents. \\
+\end{longtable}
+\end{center}
+
+\subsection{Formats JSON}
+
+\textbf{Login utilisateur via G10 vers G3}
+
+\begin{lstlisting}[style=codeStyle]
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "admin.g10@sgitu.ma",
+  "password": "Password123"
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=codeStyle]
+HTTP/1.1 200 OK
+
+{
+  "token": "<JWT_EMIS_PAR_G3>",
+  "userId": 1,
+  "email": "admin.g10@sgitu.ma",
+  "roles": ["ROLE_ADMIN"]
+}
+\end{lstlisting}
+
+\textbf{Headers propages}
+
+\begin{lstlisting}[style=codeStyle]
+Authorization: Bearer <JWT_EMIS_PAR_G3>
+X-Correlation-Id: demo-g10-g8-dashboard
+X-User-Id: 1
+X-User-Email: admin.g10@sgitu.ma
+X-Roles: ROLE_ADMIN
+\end{lstlisting}
+
+\textbf{Erreur de securite}
+
+\begin{lstlisting}[style=codeStyle]
+HTTP/1.1 401 Unauthorized
+
+{
+  "timestamp": "2026-05-08T00:21:40.830Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "code": "INVALID_TOKEN",
+  "message": "JWT invalide ou expire",
+  "path": "/api/v1/analytics/dashboard",
+  "correlationId": "demo-g10-g8-dashboard"
+}
+\end{lstlisting}
+
+\subsection{Gestion des erreurs HTTP}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{2.2cm} p{10.2cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Code} & \color{white}\textbf{Signification} \\
+\hline
+400 & Requete invalide ou payload JSON non conforme. \\
+\rowcolor{lightgray}
+401 & JWT absent, invalide, expire ou sans claims obligatoires. \\
+403 & Role insuffisant pour acceder a la route demandee. \\
+\rowcolor{lightgray}
+404 & Route inconnue ou ressource inexistante dans le service cible. \\
+503 & Microservice cible indisponible ou non joignable par la Gateway. \\
+\rowcolor{lightgray}
+504 & Timeout lors de l'appel d'un microservice cible. \\
+\end{tabular}
+\end{center}
+
+\section{Implementation}
+
+\subsection{Architecture en couches}
+
+\begin{itemize}
+  \item \textbf{config} : configuration Spring Security, routes et Swagger ;
+  \item \textbf{filter} : validation JWT et enrichissement des headers Gateway ;
+  \item \textbf{service} : service JWT de validation et extraction des claims ;
+  \item \textbf{error} : representation et ecriture des erreurs structurees ;
+  \item \textbf{controller} : endpoints techniques et fallback Gateway.
+\end{itemize}
+
+\subsection{Technologies utilisees}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{4cm} p{8.5cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Technologie} & \color{white}\textbf{Role} \\
+\hline
+Spring Boot & Application principale et configuration du microservice. \\
+\rowcolor{lightgray}
+Spring Cloud Gateway & Routage dynamique vers les microservices SGITU. \\
+Spring Security WebFlux & Authentification reactive et controle d'acces. \\
+\rowcolor{lightgray}
+JJWT & Validation de signature, expiration et claims JWT. \\
+SLF4J + Logback & Journalisation des requetes, reponses et erreurs. \\
+\rowcolor{lightgray}
+Swagger/OpenAPI & Documentation interactive des endpoints exposes par G10. \\
+Docker & Construction et execution du conteneur Gateway. \\
+\rowcolor{lightgray}
+Docker Compose & Orchestration locale avec les services partenaires. \\
+Maven & Build, dependances et tests automatises. \\
+\rowcolor{lightgray}
+JUnit 5 / WebTestClient & Tests automatises de securite et de routage. \\
+\end{tabular}
+\end{center}
+
+\subsection{Organisation du projet}
+
+\begin{lstlisting}[style=codeStyle]
+api-gateway/
+|-- src/main/java/com/agileflow/api_gateway
+|   |-- config        # SecurityConfig, SwaggerConfig
+|   |-- filter        # JwtAuthFilter, GatewayHeadersFilter
+|   |-- service       # JwtService
+|   |-- error         # ApiError, ApiErrorWriter
+|   `-- controller    # fallback et endpoints techniques
+|-- src/main/resources
+|   |-- application.yml
+|   `-- test.http
+|-- src/test/java
+|-- docs
+|   |-- G10_Rapport_Avancement.tex
+|   |-- G10_G3_G8_Integration_Postman_Collection.json
+|   `-- screenshots/
+|-- Dockerfile
+|-- docker-compose.yml
+`-- pom.xml
+\end{lstlisting}
+
+\section{Documentation API}
+
+\subsection{Swagger / OpenAPI URLs}
+
+\begin{lstlisting}[style=codeStyle]
+http://localhost:8080/swagger-ui.html
+http://localhost:8080/v3/api-docs
+\end{lstlisting}
+
+\begin{calloutinfo}
+Dans un navigateur local, l'URL Swagger doit utiliser \texttt{localhost:8080}. Le nom Docker \texttt{api-gateway:8080} est utilisable uniquement entre conteneurs du meme reseau Docker.
+\end{calloutinfo}
+
+\subsection{Ce que la documentation inclut}
+
+\begin{itemize}
+  \item les endpoints d'authentification et utilisateurs de G3 routes par G10 ;
+  \item les endpoints d'ingestion, analytics et ML de G8 routes par G10 ;
+  \item le header de securite \texttt{Authorization: Bearer <JWT>} ;
+  \item le header optionnel \texttt{X-Correlation-Id} ;
+  \item les exemples de reponses \texttt{200}, \texttt{201}, \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503} et \texttt{504}.
+\end{itemize}
+
+\subsection{Exemples requetes / reponses}
+
+\textbf{Requete protegee vers G8 Analytics}
+
+\begin{lstlisting}[style=codeStyle]
+GET /api/v1/analytics/dashboard
+Authorization: Bearer <JWT_EMIS_PAR_G3>
+X-Correlation-Id: demo-g10-g8-dashboard
+\end{lstlisting}
+
+\begin{lstlisting}[style=codeStyle]
+HTTP/1.1 200 OK
+X-Correlation-Id: demo-g10-g8-dashboard
+
+[
+  {
+    "snapshotType": "TRIPS",
+    "period": "2026-05-08",
+    "value": 120,
+    "prediction": false
+  }
+]
+\end{lstlisting}
+
+\section{Tests}
+
+\subsection{Tests automatises Maven}
+
+\begin{lstlisting}[style=codeStyle]
+.\mvnw.cmd clean test
+\end{lstlisting}
+
+Les tests automatises couvrent la validation JWT, les erreurs de securite, les routes Gateway, la propagation du \texttt{X-Correlation-Id} et la documentation OpenAPI.
+
+\subsection{Tests Postman}
+
+Les tests Postman principaux se trouvent dans :
+
+\begin{lstlisting}[style=codeStyle]
+docs/G10_G3_G8_Integration_Postman_Collection.json
+docs/G10_Gateway_G3_Relation_Postman_Collection.json
+docs/G10_Gateway_G8_Relation_Postman_Collection.json
+\end{lstlisting}
+
+Scenarios fonctionnels retenus :
+
+\begin{itemize}
+  \item \textbf{Scenario 1} : login reussi via \texttt{/auth/login}, recuperation du JWT, puis acces a une ressource protegee ;
+  \item \textbf{Scenario 2} : requete protegee sans token, retour attendu \texttt{401 Unauthorized} ;
+  \item \textbf{Scenario 3} : token valide mais role insuffisant, retour attendu \texttt{403 Forbidden} ;
+  \item \textbf{Scenario 4} : token expire, retour attendu \texttt{401 INVALID\_TOKEN} ;
+  \item \textbf{Scenario 5} : routage G10 vers G8 avec \texttt{X-Correlation-Id} pour verifier la tracabilite.
+\end{itemize}
+
+La collection d'integration valide le flux complet \textbf{Client -> G10 -> G3} et \textbf{Client -> G10 -> G8}. Les appels sont effectues via \texttt{http://localhost:8080}, c'est-a-dire par l'API Gateway.
+
+\begin{center}
+\begin{longtable}{>{\bfseries}p{4.2cm} p{5.6cm} p{3.1cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Test Postman} & \color{white}\textbf{Objectif} & \color{white}\textbf{Resultat attendu} \\
+\endfirsthead
+\rowcolor{navyblue}
+\color{white}\textbf{Test Postman} & \color{white}\textbf{Objectif} & \color{white}\textbf{Resultat attendu} \\
+\endhead
+00.1 - G10 health & Verifier que la Gateway est disponible. & \texttt{200 UP} \\
+\rowcolor{lightgray}
+01.1 - Creation utilisateur publique & Verifier le routage G10 vers G3 pour l'inscription. & \texttt{201 Created} \\
+01.4 - 200 login G3 via G10 & Verifier que G3 genere le JWT et que G10 route l'authentification. & \texttt{200 + token} \\
+\rowcolor{lightgray}
+01.6 - Get utilisateur cree & Verifier qu'un endpoint G3 protege accepte le JWT. & \texttt{200 OK} \\
+02.1 - 401 route protegee sans JWT & Verifier le blocage des requetes non authentifiees. & \texttt{401} \\
+\rowcolor{lightgray}
+02.2 - 401 JWT invalide & Verifier la validation de la signature et du format JWT. & \texttt{401 INVALID\_TOKEN} \\
+02.4 - Passenger interdit sur liste users & Verifier le controle d'acces admin sur G3. & \texttt{403} \\
+\rowcolor{lightgray}
+03.2 - 201/207 ingestion tickets & Verifier le routage G10 vers G8 ingestion avec contexte utilisateur. & \texttt{201} ou \texttt{207} \\
+04.1 - Analytics dashboard admin & Verifier l'acces admin aux analytics G8. & \texttt{200 OK} \\
+\rowcolor{lightgray}
+04.2 - 200 analytics trips ROLE_OPERATOR & Verifier que \texttt{ROLE\_OPERATOR} est autorise sur G8 analytics. & \texttt{200 OK} \\
+02.5 - 403 ROLE_PASSENGER interdit sur analytics & Verifier que \texttt{ROLE\_PASSENGER} est refuse pour analytics. & \texttt{403} \\
+\rowcolor{lightgray}
+04.5 - 200 ML peak hours ROLE_OPERATOR & Verifier le routage G10 vers le service ML de G8. & \texttt{200 OK} \\
+05.1 - Update roles admin & Verifier que la modification des roles passe par G3 avec \texttt{ROLE\_ADMIN}. & \texttt{200 OK} \\
+\end{longtable}
+\end{center}
+
+\optionalscreenshot{screenshots/postman_01_g10_health.png}{0.95}{Postman - G10 health retourne \texttt{200 UP}}
+
+\optionalscreenshot{screenshots/postman_02_login_g3_jwt.png}{0.95}{Postman - Login via G10, JWT emis par G3}
+
+\optionalscreenshot{screenshots/postman_03_jwt_invalide_401.png}{0.95}{Postman - JWT invalide bloque par G10 avec \texttt{401}}
+
+\optionalscreenshot{screenshots/postman_04_rbac_passenger_403.png}{0.95}{Postman - \texttt{ROLE\_PASSENGER} refuse sur une route protegee}
+
+\optionalscreenshot{screenshots/postman_05_ingestion_g8_ticket.png}{0.95}{Postman - Ingestion ticket G8 via G10 avec \texttt{X-Correlation-Id}}
+
+\optionalscreenshot{screenshots/postman_06_analytics_operator_200.png}{0.95}{Postman - Analytics G8 autorise avec \texttt{ROLE\_OPERATOR}}
+
+\optionalscreenshot{screenshots/postman_07_ml_peak_hours_200.png}{0.95}{Postman - Prediction ML G8 via G10}
+
+\optionalscreenshot{screenshots/postman_08_update_roles_admin.png}{0.95}{Postman - Modification des roles dans G3 avec \texttt{ROLE\_ADMIN}}
+
+\subsection{Logs et tracabilite}
+
+Les captures des logs permettent de verifier que la requete entre par G10, que le JWT est valide, que les headers de contexte sont ajoutes, puis que la requete arrive au microservice cible. Le \texttt{X-Correlation-Id} sert a relier les logs entre les services.
+
+Pour observer les logs des trois services, nous utilisons un scenario de tracabilite compose de deux requetes Postman successives. Une seule requete HTTP ne peut pas appeler directement G3 et G8 en meme temps : la premiere requete sert donc a authentifier l'utilisateur aupres de G3 via G10, puis la deuxieme utilise le JWT obtenu pour envoyer une donnee d'ingestion vers G8 via G10.
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{2.1cm} p{5.8cm} p{4.8cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Etape} & \color{white}\textbf{Test Postman} & \color{white}\textbf{Objectif observe dans les logs} \\
+\hline
+1 & \texttt{01.4 - 200 login G3 via G10} & G10 recoit \texttt{/auth/login}, route vers G3, et G3 genere le JWT. \\
+\rowcolor{lightgray}
+2 & \texttt{03.2 - 201/207 ingestion tickets} & G10 valide le JWT, ajoute les headers de contexte, puis route vers G8. \\
+\end{tabular}
+\end{center}
+
+\optionalscreenshot{screenshots/logs_01_g10_gateway_request_response.png}{0.95}{Logs G10 - Requete recue, JWT valide, routage et reponse Gateway}
+
+\optionalscreenshot{screenshots/logs_02_g3_user_service.png}{0.95}{Logs G3 - Requete utilisateur routee par G10 vers le service utilisateur}
+
+\optionalscreenshot{screenshots/logs_03_g8_analytics_ingestion.png}{0.95}{Logs G8 - Ingestion analytique recue avec le meme \texttt{X-Correlation-Id}}
+
+\begin{lstlisting}[style=codeStyle]
+# Commandes utiles pour suivre les logs
+cd api-gateway
+docker compose logs -f api-gateway
+
+cd ../service-utilisateur
+docker compose logs -f user-service
+
+cd ../service-analytique
+docker compose logs -f g8-analytics ml-service
+\end{lstlisting}
+
+\begin{calloutinfo}
+Pour une demonstration, il est recommande de lancer les trois commandes de logs en parallele, puis d'executer dans Postman un test contenant un \texttt{X-Correlation-Id} explicite. Les captures doivent montrer le meme identifiant dans G10 et dans le service cible.
+\end{calloutinfo}
+
+\section{Conteneurisation}
+
+\subsection{Dockerfile}
+
+\begin{lstlisting}[style=codeStyle]
+# ===== ETAPE 1 : BUILD =====
+FROM maven:3.9.5-eclipse-temurin-17 AS build
+WORKDIR /app
+
+# Copier pom.xml d'abord (optimisation cache Docker)
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Copier le code source
+COPY src ./src
+
+# Compiler et packager
+RUN mvn clean package -DskipTests
+
+# ===== ETAPE 2 : RUNTIME =====
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+# Copier le jar depuis l'etape build
+COPY --from=build /app/target/*.jar app.jar
+
+# Port expose
+EXPOSE 8080
+
+# Creer un utilisateur non-root
+RUN addgroup -S sgitu && adduser -S g10 -G sgitu
+USER g10
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+# Lancer l'application avec le profil docker
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar", "--spring.profiles.active=docker"]
+\end{lstlisting}
+
+\subsection{Construction et execution}
+
+\begin{lstlisting}[style=codeStyle]
+mvn clean package -DskipTests
+docker build -t sgitu-g10-api-gateway .
+docker run --name sgitu-g10-api-gateway --network sgitu-network -p 8080:8080 sgitu-g10-api-gateway
+\end{lstlisting}
+
+\section{Orchestration}
+
+\subsection{docker-compose.yml}
+
+\begin{lstlisting}[style=codeStyle]
+networks:
+  sgitu-network:
+    external: true
+
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sgitu-g10-api-gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      G8_ANALYTICS_URI: ${G8_ANALYTICS_URI:-http://g8-analytics:8088}
+      G8_ML_URI: ${G8_ML_URI:-http://ml-service:5000}
+    networks:
+      - sgitu-network
+    restart: unless-stopped
+
+  user-service:
+    image: sgitu-user-service
+    container_name: user-service
+    ports:
+      - "8083:8083"
+    networks:
+      - sgitu-network
+
+  g8-analytics:
+    image: service-analytique-g8-analytics
+    container_name: g8-analytics-service
+    ports:
+      - "8088:8088"
+    networks:
+      - sgitu-network
+
+  ml-service:
+    image: service-analytique-ml-service
+    container_name: g8-ml-service
+    ports:
+      - "5000:5000"
+    networks:
+      - sgitu-network
+\end{lstlisting}
+
+\subsection{Reseau sgitu-network}
+
+\begin{lstlisting}[style=codeStyle]
+docker network create sgitu-network
+\end{lstlisting}
+
+\subsection{Services dans le reseau}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{3.4cm} p{4.2cm} p{4cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Service} & \color{white}\textbf{Nom Docker} & \color{white}\textbf{Port} \\
+\hline
+G10 Gateway & \texttt{api-gateway} & \texttt{8080} \\
+\rowcolor{lightgray}
+G3 Utilisateurs & \texttt{user-service} & \texttt{8083} \\
+G8 Analytics & \texttt{g8-analytics} & \texttt{8088} \\
+\rowcolor{lightgray}
+G8 ML & \texttt{ml-service} & \texttt{5000} \\
+\end{tabular}
+\end{center}
+
+\subsection{Simulation environnement distribue}
+
+\optionalfigure{diagrams/g10_08_deploiement_docker.png}{0.85}{Deploiement Docker G10}
+
+La simulation d'un environnement distribue consiste a lancer G3, G8 et G10 sur le meme reseau Docker, puis a envoyer les requetes uniquement vers G10. La Gateway applique la securite et route ensuite vers le service cible.
+
+\section{Securite}
+
+\subsection{Contrat JWT}
+
+G10 attend un JWT emis par le service d'authentification. Le token est envoye par le client dans :
 
 \begin{lstlisting}[style=codeStyle]
 Authorization: Bearer <JWT_EMIS_PAR_G3>
@@ -208,133 +726,152 @@ Claims minimaux :
 }
 \end{lstlisting}
 
-G10 verifie la signature, l'expiration, le \texttt{sub} et au moins un role dans \texttt{roles} ou \texttt{role}. Il ne consulte pas une table locale des utilisateurs.
-
-\section{Routes REST}
-
 \begin{center}
-\begin{longtable}{>{\bfseries}p{2.2cm} p{6.7cm} p{4cm}}
+\begin{tabular}{>{\bfseries}p{3cm} p{8.5cm}}
 \rowcolor{navyblue}
-\color{white}\textbf{Groupe} & \color{white}\textbf{Prefixes via G10} & \color{white}\textbf{Securite} \\
-\endfirsthead
-\rowcolor{navyblue}
-\color{white}\textbf{Groupe} & \color{white}\textbf{Prefixes via G10} & \color{white}\textbf{Securite} \\
-\endhead
-G1 & \texttt{/api/v1/tickets/**}, \texttt{/api/v1/admin/**} & JWT, admin pour admin \\
+\color{white}\textbf{Claim} & \color{white}\textbf{Role} \\
+\hline
+\texttt{sub} & Email ou identifiant principal de l'utilisateur. \\
 \rowcolor{lightgray}
-G2 & \texttt{/api/abonnements/**}, \texttt{/api/plans/**} & JWT, admin pour admin \\
-G3 & \texttt{/auth/**}, \texttt{/api/users/**}, \texttt{/api/profiles/**} & public/auth, JWT, admin pour roles/desactivation \\
+\texttt{roles} & Liste des roles autorisant les routes protegees. \\
+\texttt{userId} & Identifiant fonctionnel de l'utilisateur. \\
 \rowcolor{lightgray}
-G4 & \texttt{/api/g4/**}, \texttt{/api/v1/operator/status} & JWT \\
-G5 & \texttt{/api/notifications/**} & JWT \\
+\texttt{iat} & Date de creation du token. \\
+\texttt{exp} & Date d'expiration du token. \\
 \rowcolor{lightgray}
-G6 & \texttt{/api/payments/**}, \texttt{/api/refunds/**} & JWT \\
-G7 & \texttt{/api/suivi-vehicules/**} & JWT \\
-\rowcolor{lightgray}
-G8 Analytics & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**} & JWT, admin/agent analytics \\
-\rowcolor{lightgray}
-G8 ML & \texttt{/predict/peak-hours}, \texttt{/predict/incidents} & JWT, admin/agent \\
-G9 & \texttt{/api/incidents/**}, \texttt{/api/rapports/**} & JWT \\
-\end{longtable}
+\texttt{jti} & Identifiant optionnel du token pour la tracabilite. \\
+\end{tabular}
 \end{center}
 
-\section{Base de donnees}
-
-\optionalfigure{diagrams/g10_04_modele_base_donnees.png}{0.9}{Source de verite des donnees utilisateurs}
+G10 verifie la signature, l'expiration, le \texttt{sub} et au moins un role dans \texttt{roles} ou \texttt{role}. Il ne stocke pas localement les utilisateurs, les mots de passe ou les tokens.
 
 \begin{calloutdanger}
-G10 n'a pas de base utilisateurs. Toute modification d'un email, role ou permission doit passer par G3.
+G10 ne doit pas maintenir de copie locale des comptes, roles ou permissions. Toute modification d'identite doit rester conforme a la separation definie en section 1.4.
 \end{calloutdanger}
 
-\section{Diagrammes de sequence}
+\subsection{Spring Security WebFlux}
 
-\subsection{Inscription et verification email}
-
-\optionalfigure{diagrams/g10_05_sequence_inscription_email.png}{0.95}{Inscription routee vers G3 et notification via G5}
-
-\subsection{Login et emission JWT}
-
-\optionalfigure{diagrams/g10_06_sequence_login_jwt.png}{0.95}{Login via G10, JWT emis par G3}
-
-\subsection{Routage d'une requete}
-
-\optionalfigure{diagrams/g10_07_sequence_routage_gateway.png}{0.95}{Routage Gateway avec JWT emis par G3}
-
-\section{Implementation}
-
-\subsection{Couches}
+La configuration \texttt{SecurityConfig} desactive CSRF pour l'API REST, declare les routes publiques, applique les regles RBAC, puis ajoute le filtre \texttt{JwtAuthFilter}. Lorsqu'un token est valide, le filtre construit une authentification Spring Security avec les roles extraits du JWT.
 
 \begin{itemize}
-  \item \textbf{config} : securite, Swagger ;
-  \item \textbf{filter} : validation JWT et headers Gateway ;
-  \item \textbf{service} : service JWT de validation ;
-  \item \textbf{error} : erreurs structurees ;
-  \item \textbf{controller} : fallback Gateway uniquement.
+  \item \texttt{/auth/login}, Swagger et Actuator sont publics ;
+  \item \texttt{POST /api/users} est public pour permettre l'inscription ;
+  \item les routes d'administration utilisateurs exigent \texttt{ROLE\_ADMIN} ;
+  \item les analytics et le ML de G8 exigent \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR} ou \texttt{ROLE\_STAFF} ;
+  \item les autres routes \texttt{/api/**} exigent un JWT valide.
 \end{itemize}
 
-\subsection{Technologies}
+\subsection{Controle d'acces par roles}
+
+\begin{center}
+\begin{tabular}{>{\bfseries}p{3cm} p{8.8cm}}
+\rowcolor{navyblue}
+\color{white}\textbf{Role} & \color{white}\textbf{Acces via G10} \\
+\hline
+\texttt{ROLE\_USER} & Acces aux routes authentifiees generales, hors administration et analytics reserves. \\
+\rowcolor{lightgray}
+\texttt{ROLE\_AGENT} & Role compatible avec certains services metiers si leurs routes l'acceptent ; non retenu pour G8 analytics. \\
+\texttt{ROLE\_ADMIN} & Acces aux routes admin, gestion utilisateurs, analytics et ML. \\
+\rowcolor{lightgray}
+\texttt{ROLE\_OPERATOR} & Acces aux routes operationnelles, analytics G8 et ML G8. \\
+\texttt{ROLE\_STAFF} & Acces aux routes staff, analytics G8 et ML G8. \\
+\end{tabular}
+\end{center}
+
+\subsection{Headers de securite propages}
 
 \begin{center}
 \begin{tabular}{>{\bfseries}p{4cm} p{8cm}}
 \rowcolor{navyblue}
-\color{white}\textbf{Technologie} & \color{white}\textbf{Role} \\
+\color{white}\textbf{Header} & \color{white}\textbf{Utilisation} \\
 \hline
-Spring Boot & Application principale \\
+\texttt{X-User-Id} & Identifiant utilisateur extrait du JWT. \\
 \rowcolor{lightgray}
-Spring Cloud Gateway & Routage API Gateway \\
-Spring Security WebFlux & Controle d'acces reactive \\
+\texttt{X-User-Email} & Email extrait du \texttt{sub}. \\
+\texttt{X-Roles} & Roles separes par virgule. \\
 \rowcolor{lightgray}
-JJWT & Validation JWT \\
-SLF4J + Logback & Logs Gateway \\
-\rowcolor{lightgray}
-Docker & Conteneurisation \\
-Swagger/OpenAPI & Documentation interactive \\
+\texttt{X-Correlation-Id} & Identifiant de tracabilite conserve ou genere automatiquement. \\
 \end{tabular}
 \end{center}
 
-\section{Docker}
-
-\optionalfigure{diagrams/g10_08_deploiement_docker.png}{0.85}{Deploiement Docker G10}
-
 \begin{lstlisting}[style=codeStyle]
-cd api-gateway
-docker compose up -d --build
+String userId = request.getHeader("X-User-Id");
+String email = request.getHeader("X-User-Email");
+String roles = request.getHeader("X-Roles");
+String correlationId = request.getHeader("X-Correlation-Id");
 \end{lstlisting}
 
-\section{Tests}
+\subsection{Gestion des erreurs de securite}
+
+\textbf{401 Unauthorized} : le client n'est pas authentifie ou le JWT est invalide.
 
 \begin{lstlisting}[style=codeStyle]
-.\mvnw.cmd clean test
+{
+  "status": 401,
+  "error": "Unauthorized",
+  "code": "INVALID_TOKEN",
+  "message": "JWT invalide ou expire"
+}
 \end{lstlisting}
 
-Les tests automatises couvrent la validation des erreurs de securite et la conformite des routes Gateway. Les tests Postman se trouvent dans \texttt{src/main/resources/test.http}.
+\textbf{403 Forbidden} : le JWT est valide, mais le role ne permet pas d'acceder a la route.
+
+\begin{lstlisting}[style=codeStyle]
+{
+  "status": 403,
+  "error": "Forbidden",
+  "code": "FORBIDDEN",
+  "message": "Acces refuse pour ce role"
+}
+\end{lstlisting}
 
 \section{Etat d'avancement}
 
-\subsection{Finalise}
+\subsection{Fonctionnalites finalisees}
 
 \begin{itemize}
   \item Gateway fonctionnelle ;
   \item validation JWT stateless ;
-  \item separation G3/G10 corrigee ;
-  \item suppression de la base utilisateurs G10 ;
+  \item separation G3/G10 corrigee conformement a la section 1.4 ;
   \item routes G1-G9 ;
+  \item documentation Swagger/OpenAPI ;
+  \item collection Postman d'integration G10/G3/G8 ;
+  \item protection des endpoints par Spring Security ;
+  \item controle d'acces par roles \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR} et \texttt{ROLE\_STAFF} pour G8 ;
+  \item propagation des headers \texttt{X-User-Id}, \texttt{X-User-Email}, \texttt{X-Roles} et \texttt{X-Correlation-Id} ;
   \item logs et correlation id ;
-  \item Docker Compose sans MySQL G10 ;
+  \item Docker Compose ;
   \item tests Maven.
+\end{itemize}
+
+\subsection{Fonctionnalites en cours}
+
+\begin{itemize}
+  \item validation progressive des routes definitives avec les autres groupes ;
+  \item enrichissement des captures Postman et des captures de logs pour le rendu final ;
+  \item harmonisation finale des contrats d'erreur avec les microservices metiers.
+\end{itemize}
+
+\subsection{Difficultes rencontrees}
+
+\begin{itemize}
+  \item clarification de la responsabilite JWT entre le service utilisateur et la Gateway ;
+  \item alignement des roles utilises pour G8 : choix de \texttt{ROLE\_OPERATOR} et \texttt{ROLE\_STAFF} ;
+  \item configuration du reseau Docker commun \texttt{sgitu-network} pour permettre la communication inter-services ;
+  \item verification du routage entre services developpes par des groupes differents.
 \end{itemize}
 
 \subsection{A verifier avec les autres groupes}
 
 \begin{itemize}
-  \item format exact du JWT emis par G3 ;
-  \item secret ou cle publique de verification JWT ;
-  \item endpoints definitifs de G3 pour auth/admin users ;
+  \item stabilite du format JWT utilise par les services ;
+  \item maintien du secret ou de la cle publique de verification JWT ;
+  \item endpoints definitifs des autres groupes ;
   \item disponibilite des microservices cibles dans le meme reseau Docker.
 \end{itemize}
 
 \section{Conclusion}
 
-La version adaptee respecte mieux les principes microservices. G3 reste proprietaire de l'identite, tandis que G10 assure la securite transverse, le routage et l'observabilite. Cette separation evite la duplication des utilisateurs, les incoherences de roles et le couplage entre bases de donnees.
+Le microservice G10 fournit une API Gateway securisee, documentee, testable et conteneurisee pour le projet SGITU. Il centralise les controles transverses, applique la securite JWT, propage les headers utiles et route les requetes vers les microservices metiers. L'etat actuel permet une demonstration avec Swagger, Postman, Docker Compose et les logs de tracabilite.
 
 \end{document}

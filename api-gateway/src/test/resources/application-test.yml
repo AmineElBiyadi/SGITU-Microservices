@@ -7,7 +7,7 @@ spring:
       enabled: true
 
 jwt:
-  secret: G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS
+  secret: SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!
   expiration: 3600000
   refresh-expiration: 604800000
 

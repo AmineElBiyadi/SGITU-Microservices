@@ -96,6 +96,12 @@ public class SwaggerConfig {
                         .name("G3 - Auth routee")
                         .description("Authentification deleguee au service G3 Utilisateurs."),
                 new Tag()
+                        .name("G3 - Utilisateurs via Gateway")
+                        .description("Gestion des comptes, profils et roles G3 routee par G10."),
+                new Tag()
+                        .name("G3 - Administration via Gateway")
+                        .description("Operations admin G3 protegees par ROLE_ADMIN au niveau Gateway."),
+                new Tag()
                         .name("G8 - Ingestion via Gateway")
                         .description("Reception d'evenements metier destines aux calculs analytiques G8."),
                 new Tag()
@@ -127,6 +133,13 @@ public class SwaggerConfig {
                 .addSchemas("ApiError", apiErrorSchema())
                 .addSchemas("HealthResponse", healthSchema())
                 .addSchemas("LoginRequest", loginRequestSchema())
+                .addSchemas("UserRegistrationRequest", userRegistrationRequestSchema())
+                .addSchemas("UserUpdateRequest", userUpdateRequestSchema())
+                .addSchemas("PasswordChangeRequest", passwordChangeRequestSchema())
+                .addSchemas("RoleUpdateRequest", roleUpdateRequestSchema())
+                .addSchemas("UserExistsResponse", userExistsResponseSchema())
+                .addSchemas("UserResponse", userResponseSchema())
+                .addSchemas("Profile", profileSchema())
                 .addSchemas("LoginResponse", loginResponseSchema())
                 .addSchemas("BatchIngestionResponse", batchIngestionResponseSchema())
                 .addSchemas("IncomingEvent", incomingEventSchema())
@@ -143,7 +156,21 @@ public class SwaggerConfig {
         return new Paths()
                 .addPathItem("/actuator/health", healthPath())
                 .addPathItem("/auth/login", loginPath())
-                .addPathItem("/auth/register", registerPath())
+                .addPathItem("/api/users", registerPath())
+                .addPathItem("/api/users/{id}", userByIdPath())
+                .addPathItem("/api/users/{id}/exists", userExistsPath())
+                .addPathItem("/api/users/{id}/password", changePasswordPath())
+                .addPathItem("/api/users/{id}/roles", updateRolesPath())
+                .addPathItem("/api/users/{id}/deactivate", userStatusPath(
+                        "deactivate",
+                        "Deactivate user",
+                        "Desactive un compte utilisateur. Acces : ROLE_ADMIN.",
+                        false))
+                .addPathItem("/api/users/{id}/activate", userStatusPath(
+                        "activate",
+                        "Activate user",
+                        "Reactive un compte utilisateur. Acces : ROLE_ADMIN.",
+                        true))
                 .addPathItem("/api/v1/ingestion/tickets", ingestionPath("tickets", "Ingest tickets"))
                 .addPathItem("/api/v1/ingestion/incidents", ingestionPath("incidents", "Ingest incidents"))
                 .addPathItem("/api/v1/ingestion/payments", ingestionPath("payments", "Ingest payments"))
@@ -221,34 +248,206 @@ public class SwaggerConfig {
                                 ref("LoginResponse"),
                                 "loginResponse",
                                 map(
-                                        "accessToken", "eyJhbGciOiJIUzI1NiJ9...",
-                                        "refreshToken", "eyJhbGciOiJIUzI1NiJ9...",
-                                        "tokenType", "Bearer")))
+                                        "token", "eyJhbGciOiJIUzI1NiJ9...",
+                                        "userId", 1,
+                                        "email", "admin.g10@sgitu.ma",
+                                        "roles", List.of("ROLE_ADMIN"))))
                         .addApiResponse("401", errorResponse("Identifiants invalides", "UNAUTHORIZED", 401)));
 
         return new PathItem().post(operation);
     }
 
     private PathItem registerPath() {
-        Operation operation = publicOperation(
+        Operation createOperation = publicOperation(
                 "G3 - Auth routee",
                 "registerViaGateway",
-                "Register route vers G3",
-                "Route publique de creation de compte, traitee par le service G3."
+                "Create user route vers G3",
+                """
+                        Route publique de creation de compte, traitee par le service G3.
+                        Dans G3, l'inscription est exposee sur `POST /api/users`.
+                        """
         ).requestBody(jsonRequest(
                 "Informations de creation de compte",
-                ref("LoginRequest"),
+                ref("UserRegistrationRequest"),
                 "registerRequest",
-                map("email", "new.user@sgitu.ma", "password", "Password123")))
+                map("email", "new.user@sgitu.ma", "password", "Password123", "role", "ROLE_PASSENGER")))
                 .responses(new ApiResponses()
                         .addApiResponse("201", jsonResponse(
                                 "Compte cree par G3",
-                                new MapSchema(),
+                                ref("UserResponse"),
                                 "registerResponse",
-                                map("message", "Compte cree avec succes")))
+                                userExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
                         .addApiResponse("409", errorResponse("Compte deja existant", "CONFLICT", 409)));
 
-        return new PathItem().post(operation);
+        Operation listOperation = securedOperation(
+                "G3 - Administration via Gateway",
+                "listUsersViaGateway",
+                "List users",
+                """
+                        Liste les utilisateurs G3, avec filtre optionnel par role.
+                        Acces : ROLE_ADMIN.
+                        """
+        ).addParametersItem(new Parameter()
+                .name("role")
+                .in("query")
+                .required(false)
+                .description("Filtre optionnel par role, par exemple ROLE_PASSENGER ou ROLE_OPERATOR.")
+                .schema(new StringSchema().example("ROLE_PASSENGER")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Liste utilisateurs",
+                                arrayOf(ref("UserResponse")),
+                                "users",
+                                List.of(userExample())))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem()
+                .post(createOperation)
+                .get(listOperation);
+    }
+
+    private PathItem userByIdPath() {
+        Operation getOperation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "getUserByIdViaGateway",
+                "Get user by id",
+                "Retourne le profil complet d'un utilisateur G3. Acces : JWT valide."
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Utilisateur trouve", ref("UserResponse"), "user", userExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation updateOperation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "updateUserViaGateway",
+                "Update user profile",
+                "Met a jour l'email et/ou le profil utilisateur. Acces : JWT valide."
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .requestBody(jsonRequest(
+                        "Nouvelles informations utilisateur",
+                        ref("UserUpdateRequest"),
+                        "updateUser",
+                        userUpdateExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Utilisateur mis a jour", ref("UserResponse"), "user", userExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("409", errorResponse("Email deja utilise", "CONFLICT", 409))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation deleteOperation = securedOperation(
+                "G3 - Administration via Gateway",
+                "deleteUserViaGateway",
+                "Delete user",
+                "Supprime definitivement un utilisateur. Acces : ROLE_ADMIN."
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("204", noContentResponse("Utilisateur supprime"))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem()
+                .get(getOperation)
+                .put(updateOperation)
+                .delete(deleteOperation);
+    }
+
+    private PathItem userExistsPath() {
+        Operation operation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "userExistsViaGateway",
+                "Check user existence",
+                "Verifie si un utilisateur existe sans charger son profil complet. Acces : JWT valide."
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Resultat existence",
+                                ref("UserExistsResponse"),
+                                "exists",
+                                map("exists", true)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem changePasswordPath() {
+        Operation operation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "changePasswordViaGateway",
+                "Change user password",
+                "Change le mot de passe utilisateur. Le corps accepte `newPassword` ou `password`. Acces : JWT valide."
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .requestBody(jsonRequest(
+                        "Nouveau mot de passe",
+                        ref("PasswordChangeRequest"),
+                        "passwordChange",
+                        map("newPassword", "NewPassword123")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", noContentResponse("Mot de passe modifie"))
+                        .addApiResponse("400", errorResponse("Nouveau mot de passe manquant ou invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().put(operation);
+    }
+
+    private PathItem updateRolesPath() {
+        Operation operation = securedOperation(
+                "G3 - Administration via Gateway",
+                "updateUserRolesViaGateway",
+                "Update user roles",
+                """
+                        Remplace les roles de l'utilisateur.
+                        Roles valides : ROLE_PASSENGER, ROLE_STUDENT, ROLE_DRIVER,
+                        ROLE_STAFF, ROLE_OPERATOR, ROLE_TECHNICIAN, ROLE_ADMIN.
+                        Acces : ROLE_ADMIN.
+                        """
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .requestBody(jsonRequest(
+                        "Nouveaux roles",
+                        ref("RoleUpdateRequest"),
+                        "roles",
+                        map("roles", List.of("ROLE_OPERATOR", "ROLE_STAFF"))))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Roles mis a jour", ref("UserResponse"), "user", userExample()))
+                        .addApiResponse("400", errorResponse("Liste de roles invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().put(operation);
+    }
+
+    private PathItem userStatusPath(String action, String summary, String description, boolean active) {
+        Operation operation = securedOperation(
+                "G3 - Administration via Gateway",
+                action + "UserViaGateway",
+                summary,
+                description
+        ).addParametersItem(pathParameter("id", "Identifiant utilisateur G3", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Statut utilisateur modifie",
+                                ref("UserResponse"),
+                                "user",
+                                userExample(active)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().put(operation);
     }
 
     private PathItem ingestionPath(String source, String summary) {
@@ -261,7 +460,7 @@ public class SwaggerConfig {
                         Elle recoit un tableau d'evenements JSON. Chaque evenement doit
                         contenir au minimum un `timestamp`.
 
-                        Acces : JWT valide. Les roles USER, AGENT et ADMIN peuvent envoyer
+                        Acces : JWT valide. Tout utilisateur authentifie peut envoyer
                         des evenements d'ingestion.
                         """
         ).requestBody(jsonRequest(
@@ -302,7 +501,7 @@ public class SwaggerConfig {
                 "G8 - Analytics via Gateway",
                 "getG8" + capitalize(operationSuffix) + "ViaGateway",
                 summary,
-                description + "\n\nAcces : ROLE_ADMIN ou ROLE_AGENT."
+                description + "\n\nAcces : ROLE_ADMIN, ROLE_OPERATOR ou ROLE_STAFF."
         ).addParametersItem(periodQueryParameter())
                 .responses(new ApiResponses()
                         .addApiResponse("200", jsonResponse(
@@ -322,7 +521,7 @@ public class SwaggerConfig {
                 "G8 - Reports via Gateway",
                 "generateG8ReportViaGateway",
                 "Generate analytics report",
-                "Genere un rapport G8 pour une periode et une liste de types de snapshots. Acces : ROLE_ADMIN ou ROLE_AGENT."
+                "Genere un rapport G8 pour une periode et une liste de types de snapshots. Acces : ROLE_ADMIN, ROLE_OPERATOR ou ROLE_STAFF."
         ).requestBody(jsonRequest(
                 "Parametres du rapport",
                 ref("ReportRequest"),
@@ -348,7 +547,7 @@ public class SwaggerConfig {
                 "G8 - Reports via Gateway",
                 "getG8ReportByIdViaGateway",
                 "Get analytics report by id",
-                "Retourne un rapport G8 deja genere. Acces : ROLE_ADMIN ou ROLE_AGENT."
+                "Retourne un rapport G8 deja genere. Acces : ROLE_ADMIN, ROLE_OPERATOR ou ROLE_STAFF."
         ).addParametersItem(pathParameter("id", "Identifiant MongoDB du rapport", "000000000000000000000000"))
                 .responses(new ApiResponses()
                         .addApiResponse("200", jsonResponse(
@@ -369,7 +568,7 @@ public class SwaggerConfig {
                 "G8 - ML via Gateway",
                 "predictPeakHoursViaGateway",
                 "Predict peak hours",
-                "Route Gateway vers G8 ML (`ml-service:5000`). Acces : ROLE_ADMIN ou ROLE_AGENT."
+                "Route Gateway vers G8 ML (`ml-service:5000`). Acces : ROLE_ADMIN, ROLE_OPERATOR ou ROLE_STAFF."
         ).requestBody(jsonRequest(
                 "Donnees horaires de validation",
                 ref("PeakHoursPredictionRequest"),
@@ -401,7 +600,7 @@ public class SwaggerConfig {
                 "G8 - ML via Gateway",
                 "predictIncidentsViaGateway",
                 "Predict incident risk zones",
-                "Route Gateway vers G8 ML (`ml-service:5000`). Acces : ROLE_ADMIN ou ROLE_AGENT."
+                "Route Gateway vers G8 ML (`ml-service:5000`). Acces : ROLE_ADMIN, ROLE_OPERATOR ou ROLE_STAFF."
         ).requestBody(jsonRequest(
                 "Donnees incidents par zone",
                 ref("IncidentPredictionRequest"),
@@ -482,6 +681,12 @@ public class SwaggerConfig {
                 .content(jsonContent(schema, exampleName, exampleValue));
     }
 
+    private ApiResponse noContentResponse(String description) {
+        return new ApiResponse()
+                .description(description)
+                .addHeaderObject(CORRELATION_ID, correlationResponseHeader());
+    }
+
     private ApiResponse errorResponse(String description, String code, int status) {
         return jsonResponse(
                 description,
@@ -535,12 +740,76 @@ public class SwaggerConfig {
         return schema;
     }
 
+    private Schema<?> userRegistrationRequestSchema() {
+        Schema<?> profile = new ObjectSchema();
+        profile.addProperty("firstName", new StringSchema().example("Nouveau"));
+        profile.addProperty("lastName", new StringSchema().example("Utilisateur"));
+        profile.addProperty("phone", new StringSchema().example("+212600000000"));
+        profile.addProperty("address", new StringSchema().example("Casablanca"));
+        profile.addProperty("birthDate", new StringSchema().format("date").example("2000-01-01"));
+
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("email", new StringSchema().format("email").example("new.user@sgitu.ma"));
+        schema.addProperty("password", new StringSchema().format("password").example("Password123"));
+        schema.addProperty("role", new StringSchema().example("ROLE_PASSENGER"));
+        schema.addProperty("profile", profile);
+        return schema;
+    }
+
+    private Schema<?> userUpdateRequestSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("email", new StringSchema().format("email").example("updated.user@sgitu.ma"));
+        schema.addProperty("password", new StringSchema().format("password").example("OptionalPassword123"));
+        schema.addProperty("profile", ref("Profile"));
+        return schema;
+    }
+
+    private Schema<?> passwordChangeRequestSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("newPassword", new StringSchema().format("password").example("NewPassword123"));
+        return schema;
+    }
+
+    private Schema<?> roleUpdateRequestSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("roles", arrayOf(new StringSchema().example("ROLE_OPERATOR")));
+        return schema;
+    }
+
+    private Schema<?> userExistsResponseSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("exists", new Schema<Boolean>().type("boolean").example(true));
+        return schema;
+    }
+
+    private Schema<?> profileSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("firstName", new StringSchema().example("Nouveau"));
+        schema.addProperty("lastName", new StringSchema().example("Utilisateur"));
+        schema.addProperty("phone", new StringSchema().example("+212600000000"));
+        schema.addProperty("address", new StringSchema().example("Casablanca"));
+        schema.addProperty("birthDate", new StringSchema().format("date").example("2000-01-01"));
+        return schema;
+    }
+
+    private Schema<?> userResponseSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("id", new IntegerSchema().example(1));
+        schema.addProperty("email", new StringSchema().format("email").example("new.user@sgitu.ma"));
+        schema.addProperty("active", new Schema<Boolean>().type("boolean").example(true));
+        schema.addProperty("roles", arrayOf(new StringSchema().example("ROLE_PASSENGER")));
+        schema.addProperty("profile", ref("Profile"));
+        schema.addProperty("createdAt", new StringSchema().format("date-time").example("2026-05-08T10:00:00"));
+        return schema;
+    }
+
     private Schema<?> loginResponseSchema() {
         Schema<?> schema = new ObjectSchema()
-                .description("Reponse typique du service G3. Le format exact reste proprietaire de G3.");
-        schema.addProperty("accessToken", new StringSchema().example("eyJhbGciOiJIUzI1NiJ9..."));
-        schema.addProperty("refreshToken", new StringSchema().example("eyJhbGciOiJIUzI1NiJ9..."));
-        schema.addProperty("tokenType", new StringSchema().example("Bearer"));
+                .description("Reponse retournee par G3 apres authentification.");
+        schema.addProperty("token", new StringSchema().example("eyJhbGciOiJIUzI1NiJ9..."));
+        schema.addProperty("userId", new IntegerSchema().example(1));
+        schema.addProperty("email", new StringSchema().format("email").example("admin.g10@sgitu.ma"));
+        schema.addProperty("roles", arrayOf(new StringSchema().example("ROLE_ADMIN")));
         return schema;
     }
 
@@ -696,6 +965,36 @@ public class SwaggerConfig {
                     "timestamp", "2026-05-08T10:00:00Z",
                     "scanType", "NFC"));
         };
+    }
+
+    private Map<String, Object> userExample() {
+        return userExample(true);
+    }
+
+    private Map<String, Object> userExample(boolean active) {
+        return map(
+                "id", 1,
+                "email", "new.user@sgitu.ma",
+                "active", active,
+                "roles", List.of("ROLE_PASSENGER"),
+                "profile", map(
+                        "firstName", "Nouveau",
+                        "lastName", "Utilisateur",
+                        "phone", "+212600000000",
+                        "address", "Casablanca",
+                        "birthDate", "2000-01-01"),
+                "createdAt", "2026-05-08T10:00:00");
+    }
+
+    private Map<String, Object> userUpdateExample() {
+        return map(
+                "email", "updated.user@sgitu.ma",
+                "profile", map(
+                        "firstName", "Updated",
+                        "lastName", "Utilisateur",
+                        "phone", "+212611111111",
+                        "address", "Rabat",
+                        "birthDate", "2000-01-01"));
     }
 
     private Map<String, Object> statSnapshotExample() {

@@ -8,7 +8,8 @@
     { "key": "baseUrl", "value": "http://localhost:8080" },
     { "key": "userToken", "value": "COLLER_JWT_G3_ROLE_USER" },
     { "key": "adminToken", "value": "COLLER_JWT_G3_ROLE_ADMIN" },
-    { "key": "agentToken", "value": "COLLER_JWT_G3_ROLE_AGENT" }
+    { "key": "operatorToken", "value": "COLLER_JWT_G3_ROLE_OPERATOR" },
+    { "key": "staffToken", "value": "COLLER_JWT_G3_ROLE_STAFF" }
   ],
   "item": [
     {
@@ -123,11 +124,11 @@
       }
     },
     {
-      "name": "G8 Predict peak hours - Agent",
+      "name": "G8 Predict peak hours - Operator",
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{agentToken}}" },
+          { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
           { "key": "Content-Type", "value": "application/json" },
           { "key": "X-Correlation-Id", "value": "postman-g8-predict" }
         ],

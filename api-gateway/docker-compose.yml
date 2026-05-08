@@ -7,8 +7,7 @@
 
 networks:
   sgitu-network:
-    name: sgitu-network
-    driver: bridge
+    external: true
 
 services:
   api-gateway:
@@ -22,7 +21,7 @@ services:
       - ./logs:/app/logs
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS}
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
       G8_ANALYTICS_URI: ${G8_ANALYTICS_URI:-http://g8-analytics:8088}

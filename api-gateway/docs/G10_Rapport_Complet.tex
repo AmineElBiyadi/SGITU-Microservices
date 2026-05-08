@@ -264,8 +264,8 @@ G4 & \texttt{/api/g4/**}, \texttt{/api/v1/operator/status} & \texttt{coordinatio
 G5 & \texttt{/api/notifications/**} & \texttt{notification-service:8085} & JWT \\
 G6 & \texttt{/api/payments/**}, \texttt{/api/refunds/**}, \texttt{/api/payment-accounts/**}, \texttt{/api/invoices/**} & \texttt{payment-service:8086} & JWT \\
 G7 & \texttt{/api/suivi-vehicules/**} & \texttt{g7-suivi-vehicules:8087} & JWT \\
-G8 Analytics & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**} & \texttt{g8-analytics:8088} & JWT, admin/agent analytics \\
-G8 ML & \texttt{/predict/peak-hours}, \texttt{/predict/incidents} & \texttt{ml-service:5000} & JWT, admin/agent \\
+G8 Analytics & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**} & \texttt{g8-analytics:8088} & JWT, admin/operator/staff analytics \\
+G8 ML & \texttt{/predict/peak-hours}, \texttt{/predict/incidents} & \texttt{ml-service:5000} & JWT, admin/operator/staff \\
 G9 & \texttt{/api/incidents/**}, \texttt{/api/rapports/**} & \texttt{service-gestion-incidents:8089} & JWT \\
 \bottomrule
 \end{longtable}
@@ -279,7 +279,7 @@ Ces endpoints sont exposes par G10 mais routes vers G3. G10 ne verifie pas le mo
 \textbf{Methode} & \textbf{Endpoint via G10} & \textbf{Responsable reel} & \textbf{Acces} \\
 \midrule
 POST & \texttt{/auth/login} & G3 & Public \\
-POST & \texttt{/auth/register} & G3 & Public \\
+POST & \texttt{/api/users} & G3 & Public, creation de compte \\
 POST & \texttt{/auth/refresh} & G3 & Public \\
 GET & \texttt{/auth/verify-email} & G3 & Public \\
 POST & \texttt{/auth/forgot-password} & G3 & Public \\
@@ -316,7 +316,7 @@ Exemple de reponse attendue de G3 :
 \toprule
 \textbf{Methode} & \textbf{Endpoint via G10} & \textbf{Description} & \textbf{Acces} \\
 \midrule
-GET & \texttt{/api/users} & Liste des utilisateurs & JWT \\
+GET & \texttt{/api/users} & Liste des utilisateurs & ROLE\_ADMIN \\
 GET & \texttt{/api/users/\{id\}} & Detail utilisateur & JWT \\
 PUT & \texttt{/api/users/\{id\}} & Mise a jour profil & JWT \\
 PUT & \texttt{/api/users/\{id\}/roles} & Modification des roles & ROLE\_ADMIN \\
@@ -607,14 +607,18 @@ G10 accepte aussi l'ancien format suivant pour faciliter l'integration :
 \toprule
 \textbf{Route} & \textbf{Regle de securite} \\
 \midrule
-\texttt{/auth/login}, \texttt{/auth/register}, \texttt{/auth/refresh} & Public, route vers G3. \\
+\texttt{/auth/login}, \texttt{/auth/refresh} & Public, route vers G3. \\
+\texttt{POST /api/users} & Public, creation de compte routee vers G3. \\
 \texttt{/auth/verify-email}, \texttt{/auth/forgot-password}, \texttt{/auth/reset-password} & Public, route vers G3. \\
+\texttt{GET /api/users} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/users/*/roles} & \texttt{ROLE\_ADMIN}. \\
+\texttt{/api/users/*/activate} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/users/*/deactivate} & \texttt{ROLE\_ADMIN}. \\
+\texttt{DELETE /api/users/*} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/abonnements/admin/**} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/v1/admin/**} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/v1/ticket-types/**} & \texttt{ROLE\_ADMIN}. \\
-\texttt{/api/v1/analytics/**}, \texttt{/predict/**} & \texttt{ROLE\_ADMIN} ou \texttt{ROLE\_AGENT}. \\
+\texttt{/api/v1/analytics/**}, \texttt{/predict/**} & \texttt{ROLE\_ADMIN}, \texttt{ROLE\_OPERATOR} ou \texttt{ROLE\_STAFF}. \\
 \texttt{/api/**} & JWT valide obligatoire. \\
 \bottomrule
 \end{longtable}

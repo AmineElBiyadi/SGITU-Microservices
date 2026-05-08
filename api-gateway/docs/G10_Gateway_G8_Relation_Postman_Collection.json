@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "g10-gateway-g8-relation-collection",
     "name": "G10 - Gateway vers G8 Analytics - Tests complets",
-    "description": "Collection Postman dediee a la validation de la relation Client -> G10 API Gateway -> G8 Analytics/ML. Elle couvre les preconditions, la securite JWT/RBAC, les endpoints d'ingestion, les endpoints analytics, les rapports, le ML et les cas d'erreur. Par defaut, les JWT de test sont generes automatiquement avec le secret local de developpement de G10. Pour utiliser de vrais JWT G3, mettre autoGenerateTokens=false et renseigner adminToken, agentToken et userToken.",
+    "description": "Collection Postman dediee a la validation de la relation Client -> G10 API Gateway -> G8 Analytics/ML. Elle couvre les preconditions, la securite JWT/RBAC, les endpoints d'ingestion, les endpoints analytics, les rapports, le ML et les cas d'erreur. Par defaut, les JWT de test sont generes automatiquement avec le secret local partage avec G3. Pour utiliser de vrais JWT G3, mettre autoGenerateTokens=false et renseigner adminToken, operatorToken, staffToken et userToken.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -55,7 +55,8 @@
           "  }",
           "",
           "  pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
-          "  pm.collectionVariables.set('agentToken', makeJwt('agent.g10@sgitu.ma', '2', ['ROLE_AGENT'], 3600));",
+          "  pm.collectionVariables.set('operatorToken', makeJwt('operator.g10@sgitu.ma', '2', ['ROLE_OPERATOR'], 3600));",
+          "  pm.collectionVariables.set('staffToken', makeJwt('staff.g10@sgitu.ma', '5', ['ROLE_STAFF'], 3600));",
           "  pm.collectionVariables.set('userToken', makeJwt('user.g10@sgitu.ma', '3', ['ROLE_USER'], 3600));",
           "  pm.collectionVariables.set('expiredToken', makeJwt('expired.g10@sgitu.ma', '4', ['ROLE_ADMIN'], -60));",
           "}"
@@ -84,7 +85,7 @@
     },
     {
       "key": "jwtSecret",
-      "value": "G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS",
+      "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!",
       "type": "string"
     },
     {
@@ -99,7 +100,12 @@
       "type": "string"
     },
     {
-      "key": "agentToken",
+      "key": "operatorToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staffToken",
       "value": "",
       "type": "string"
     },
@@ -465,7 +471,7 @@
           }
         },
         {
-          "name": "01.6 - 200 analytics avec ROLE_AGENT",
+          "name": "01.6 - 200 analytics avec ROLE_OPERATOR",
           "event": [
             {
               "listen": "test",
@@ -474,7 +480,7 @@
                 "exec": [
                   "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('Gateway routed to G8', function () {",
-                  "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g8-agent-analytics');",
+                  "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g8-operator-analytics');",
                   "  pm.expect(pm.response.json()).to.be.an('array');",
                   "});"
                 ]
@@ -486,11 +492,11 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{agentToken}}"
+                "value": "Bearer {{operatorToken}}"
               },
               {
                 "key": "X-Correlation-Id",
-                "value": "g10-g8-agent-analytics"
+                "value": "g10-g8-operator-analytics"
               }
             ],
             "url": {
@@ -505,7 +511,51 @@
                 "dashboard"
               ]
             },
-            "description": "ROLE_AGENT peut acceder aux analytics via la Gateway."
+            "description": "ROLE_OPERATOR peut acceder aux analytics via la Gateway."
+          }
+        },
+        {
+          "name": "01.7 - 200 analytics avec ROLE_STAFF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Gateway routed to G8', function () {",
+                  "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g8-staff-analytics');",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "g10-g8-staff-analytics"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "dashboard"
+              ]
+            },
+            "description": "ROLE_STAFF peut acceder aux analytics via la Gateway."
           }
         }
       ]
@@ -1270,7 +1320,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{agentToken}}"
+                "value": "Bearer {{operatorToken}}"
               },
               {
                 "key": "Content-Type",
@@ -1300,7 +1350,7 @@
                 "peak-hours"
               ]
             },
-            "description": "Teste le routage Gateway vers le service ML G8. ROLE_AGENT est autorise."
+            "description": "Teste le routage Gateway vers le service ML G8. ROLE_OPERATOR est autorise."
           }
         },
         {
@@ -1571,7 +1621,7 @@
                 "peak-hours"
               ]
             },
-            "description": "Le service ML est protege comme les analytics: seuls ROLE_ADMIN et ROLE_AGENT sont autorises."
+            "description": "Le service ML est protege comme les analytics: seuls ROLE_ADMIN, ROLE_OPERATOR et ROLE_STAFF sont autorises."
           }
         }
       ]

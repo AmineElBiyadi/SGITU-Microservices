@@ -86,7 +86,7 @@ spring:
             - RewritePath=/api/(?<segment>.*), /$\{segment}
 
 jwt:
-  secret: ${JWT_SECRET:G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS}
+  secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
   expiration: ${JWT_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 

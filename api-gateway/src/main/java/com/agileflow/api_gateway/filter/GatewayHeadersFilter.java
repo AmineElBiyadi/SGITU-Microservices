@@ -49,13 +49,17 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
                 .header(CORRELATION_ID_HEADER, correlationId);
 
         if (authentication != null && authentication.isAuthenticated()) {
-            requestBuilder.header("X-User-Email", authentication.getName());
             requestBuilder.header("X-Roles", extractRoles(authentication));
 
-            if (authentication.getPrincipal() instanceof JwtPrincipal principal
-                    && principal.userId() != null
-                    && !principal.userId().isBlank()) {
-                requestBuilder.header("X-User-Id", principal.userId());
+            if (authentication.getPrincipal() instanceof JwtPrincipal principal) {
+                if (principal.email() != null && !principal.email().isBlank()) {
+                    requestBuilder.header("X-User-Email", principal.email());
+                }
+                if (principal.userId() != null && !principal.userId().isBlank()) {
+                    requestBuilder.header("X-User-Id", principal.userId());
+                }
+            } else {
+                requestBuilder.header("X-User-Email", authentication.getName());
             }
         }
 

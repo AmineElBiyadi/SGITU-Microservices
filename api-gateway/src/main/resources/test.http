@@ -7,7 +7,8 @@
 @baseUrl = http://localhost:8080
 @userToken = COLLER_ACCESS_TOKEN_G3_ROLE_USER
 @adminToken = COLLER_ACCESS_TOKEN_G3_ROLE_ADMIN
-@agentToken = COLLER_ACCESS_TOKEN_G3_ROLE_AGENT
+@operatorToken = COLLER_ACCESS_TOKEN_G3_ROLE_OPERATOR
+@staffToken = COLLER_ACCESS_TOKEN_G3_ROLE_STAFF
 
 
 ### Health G10
@@ -29,14 +30,14 @@ Content-Type: application/json
 }
 
 
-### Auth G3 routee par G10 - register
-POST {{baseUrl}}/auth/register
+### G3 route par G10 - creation de compte
+POST {{baseUrl}}/api/users
 Content-Type: application/json
 
 {
   "email": "new.user@sgitu.ma",
   "password": "Password123",
-  "role": "ROLE_USER"
+  "role": "ROLE_PASSENGER"
 }
 
 
@@ -189,15 +190,15 @@ X-Correlation-Id: test-g8-ingestion-tickets
 ]
 
 
-### Routage G8 Analytics - dashboard admin/agent
+### Routage G8 Analytics - dashboard admin/operator/staff
 GET {{baseUrl}}/api/v1/analytics/dashboard
 Authorization: Bearer {{adminToken}}
 X-Correlation-Id: test-g8-dashboard
 
 
-### Routage G8 ML - prediction peak hours admin/agent
+### Routage G8 ML - prediction peak hours admin/operator/staff
 POST {{baseUrl}}/predict/peak-hours
-Authorization: Bearer {{agentToken}}
+Authorization: Bearer {{operatorToken}}
 Content-Type: application/json
 X-Correlation-Id: test-g8-predict-peak-hours
 

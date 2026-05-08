@@ -66,13 +66,13 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 
 | Methode | Path | Responsable |
 | --- | --- | --- |
-| POST | `/auth/register` | G3 |
+| POST | `/api/users` | G3 |
 | POST | `/auth/login` | G3 |
 | POST | `/auth/refresh` | G3 |
 | POST | `/auth/forgot-password` | G3 |
 | POST | `/auth/reset-password` | G3 |
 | GET | `/auth/verify-email?token=...` | G3 |
-| GET | `/api/users` | G3, JWT requis |
+| GET | `/api/users` | G3, protege par G10 avec `ROLE_ADMIN` |
 | PUT | `/api/users/{id}/roles` | G3, protege par G10 avec `ROLE_ADMIN` |
 | PUT | `/api/users/{id}/deactivate` | G3, protege par G10 avec `ROLE_ADMIN` |
 
@@ -87,8 +87,8 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | G5 Notifications | `/api/notifications/**` | `notification-service` | 8085 | JWT, retry admin selon endpoint |
 | G6 Paiement | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**`, `/api/test-cards`, `/api/health` | `payment-service` | 8086 | JWT |
 | G7 Suivi vehicules | `/api/suivi-vehicules/**` | `g7-suivi-vehicules` | 8087 | JWT |
-| G8 Ingestion/Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` | `g8-analytics` | 8088 | JWT, admin/agent pour analytics |
-| G8 ML Predictions | `/predict/peak-hours`, `/predict/incidents` | `ml-service` | 5000 | JWT, admin/agent |
+| G8 Ingestion/Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` | `g8-analytics` | 8088 | JWT, admin/operator/staff pour analytics |
+| G8 ML Predictions | `/predict/peak-hours`, `/predict/incidents` | `ml-service` | 5000 | JWT, admin/operator/staff |
 | G9 Incidents | `/api/incidents/**`, `/api/rapports/**` | `service-gestion-incidents` | 8089 | JWT |
 
 ## 7. Codes d'erreur G10
