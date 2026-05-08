@@ -377,7 +377,7 @@
 							},
 							{
 								"key": "X-User-Role",
-								"value": "VOYAGEUR"
+								"value": "SUPERVISEUR_INCIDENTS"
 							}
 						],
 						"body": {
