@@ -124,6 +124,23 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
+    void swaggerDocumentsGatewaySecurityAndG8Contract() {
+        webTestClient.get()
+                .uri("/v3/api-docs")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.info.title").isEqualTo("SGITU - API Gateway G10")
+                .jsonPath("$.components.securitySchemes.bearerAuth.type").isEqualTo("http")
+                .jsonPath("$.components.securitySchemes.bearerAuth.scheme").isEqualTo("bearer")
+                .jsonPath("$.paths['/api/v1/ingestion/payments'].post.summary").isEqualTo("Ingest payments")
+                .jsonPath("$.paths['/api/v1/analytics/dashboard'].get.summary").isEqualTo("Get complete analytics dashboard")
+                .jsonPath("$.paths['/api/v1/analytics/reports/generate'].post.summary").isEqualTo("Generate analytics report")
+                .jsonPath("$.paths['/predict/peak-hours'].post.summary").isEqualTo("Predict peak hours")
+                .jsonPath("$.paths['/predict/incidents'].post.summary").isEqualTo("Predict incident risk zones");
+    }
+
+    @Test
     void g3AuthRouteOwnsAuthPrefixAndRewritesToUserServiceApiContext() {
         var route = routeDefinitionLocator.getRouteDefinitions()
                 .filter(routeDefinition -> "g3-auth".equals(routeDefinition.getId()))
