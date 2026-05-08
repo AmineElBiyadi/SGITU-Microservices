@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final HeaderAuthFilter headerAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -26,20 +26,26 @@ public class SecurityConfig {
                 // Documentation et Actuator (Public)
                 .requestMatchers("/api/auth/test/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/**").permitAll()
                 
-                // Gestion des véhicules (Admin uniquement)
-                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/suivi-vehicules/vehicules/**").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_AGENT")
+                // Gestion des véhicules (Admin G7 uniquement)
+                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN_G7")
                 
-                // Positions (Accessibles par les Agents et Admins)
-                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/positions/**").hasAnyAuthority("ROLE_AGENT", "ROLE_ADMIN")
-                .requestMatchers("/api/suivi-vehicules/positions/**").authenticated()
+                // Envoi de positions et alertes (Driver et Admin G7)
+                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/positions/**").hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/alerts/**").hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")
+                
+                // Modification des alertes (Annulation/Validation par l'opérateur)
+                .requestMatchers(HttpMethod.PUT, "/api/suivi-vehicules/alerts/**").hasAnyAuthority("ROLE_OPERATOR", "ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.PATCH, "/api/suivi-vehicules/alerts/**").hasAnyAuthority("ROLE_OPERATOR", "ROLE_ADMIN_G7")
+                
+                // Consultation (Admin G7 et Operateur)
+                .requestMatchers(HttpMethod.GET, "/api/suivi-vehicules/**").hasAnyAuthority("ROLE_ADMIN_G7", "ROLE_OPERATOR")
                 
                 // Tout le reste authentifié
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(headerAuthFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
     }

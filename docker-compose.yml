@@ -80,8 +80,45 @@ services:
   # ---------------------------------------------------------------
 
   # ---------------------------------------------------------------
-  #  G7 — (ajoutez votre service ici)
+  #  G7 — Suivi des Véhicules
   # ---------------------------------------------------------------
+  g7-service:
+    build:
+      context: ./service-suivi-vehicule
+      dockerfile: Dockerfile
+    image: service-suivi-vehicule:1.0.0
+    container_name: g7-service
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db-g7:5432/g7_vehicules
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      db-g7:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+
+  db-g7:
+    image: postgres:15-alpine
+    container_name: db-g7
+    ports:
+      - "5437:5432" 
+    environment:
+      POSTGRES_DB: g7_vehicules
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - g7_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d g7_vehicules"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sgitu-network
+
 
   # ---------------------------------------------------------------
   #  G8 — (ajoutez votre service ici)
@@ -101,3 +138,4 @@ networks:
 
 volumes:
   g3_users_data:
+  g7_db_data:
