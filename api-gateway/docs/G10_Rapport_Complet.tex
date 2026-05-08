@@ -264,7 +264,8 @@ G4 & \texttt{/api/g4/**}, \texttt{/api/v1/operator/status} & \texttt{coordinatio
 G5 & \texttt{/api/notifications/**} & \texttt{notification-service:8085} & JWT \\
 G6 & \texttt{/api/payments/**}, \texttt{/api/refunds/**}, \texttt{/api/payment-accounts/**}, \texttt{/api/invoices/**} & \texttt{payment-service:8086} & JWT \\
 G7 & \texttt{/api/suivi-vehicules/**} & \texttt{g7-suivi-vehicules:8087} & JWT \\
-G8 & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**}, \texttt{/predict/**} & \texttt{analytics-service:8088} & JWT, admin/agent \\
+G8 Analytics & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**} & \texttt{g8-analytics:8088} & JWT, admin/agent analytics \\
+G8 ML & \texttt{/predict/peak-hours}, \texttt{/predict/incidents} & \texttt{ml-service:5000} & JWT, admin/agent \\
 G9 & \texttt{/api/incidents/**}, \texttt{/api/rapports/**} & \texttt{service-gestion-incidents:8089} & JWT \\
 \bottomrule
 \end{longtable}
@@ -563,7 +564,8 @@ G10 route vers les services internes en utilisant leurs noms Docker :
   \item \texttt{notification-service:8085} ;
   \item \texttt{payment-service:8086} ;
   \item \texttt{g7-suivi-vehicules:8087} ;
-  \item \texttt{analytics-service:8088} ;
+  \item \texttt{g8-analytics:8088} ;
+  \item \texttt{ml-service:5000} ;
   \item \texttt{service-gestion-incidents:8089}.
 \end{itemize}
 

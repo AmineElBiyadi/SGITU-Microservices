@@ -87,7 +87,8 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | G5 Notifications | `/api/notifications/**` | `notification-service` | 8085 | JWT, retry admin selon endpoint |
 | G6 Paiement | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**`, `/api/test-cards`, `/api/health` | `payment-service` | 8086 | JWT |
 | G7 Suivi vehicules | `/api/suivi-vehicules/**` | `g7-suivi-vehicules` | 8087 | JWT |
-| G8 Analyse & donnees | `/api/v1/ingestion/**`, `/api/v1/analytics/**`, `/predict/**` | `analytics-service` | 8088 | JWT, admin/agent pour analytics et predict |
+| G8 Ingestion/Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` | `g8-analytics` | 8088 | JWT, admin/agent pour analytics |
+| G8 ML Predictions | `/predict/peak-hours`, `/predict/incidents` | `ml-service` | 5000 | JWT, admin/agent |
 | G9 Incidents | `/api/incidents/**`, `/api/rapports/**` | `service-gestion-incidents` | 8089 | JWT |
 
 ## 7. Codes d'erreur G10

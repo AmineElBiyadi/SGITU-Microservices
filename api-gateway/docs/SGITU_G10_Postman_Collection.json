@@ -96,6 +96,22 @@
       }
     },
     {
+      "name": "G8 Ingestion tickets via G10",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{userToken}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Correlation-Id", "value": "postman-g8-ingestion" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"ticketId\": \"TCK-1\",\n    \"userId\": \"1\",\n    \"timestamp\": \"2026-05-07T10:00:00Z\",\n    \"status\": \"validated\",\n    \"amount\": 6.0,\n    \"line\": \"L1\",\n    \"zone\": \"Centre\"\n  }\n]"
+        },
+        "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+      }
+    },
+    {
       "name": "G8 Analytics dashboard - Admin",
       "request": {
         "method": "GET",
@@ -117,7 +133,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"horizonHours\": 24\n}"
+          "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 },\n    { \"hour\": 17, \"validationCount\": 180 },\n    { \"hour\": 18, \"validationCount\": 160 }\n  ]\n}"
         },
         "url": "{{baseUrl}}/predict/peak-hours"
       }

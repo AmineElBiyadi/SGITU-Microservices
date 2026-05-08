@@ -12,8 +12,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install dependencies inside the venv (no root warning, no pip notice)
 COPY requirements.txt .
-RUN pip install --upgrade pip --quiet && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=120 --retries=10 -r requirements.txt
 
 COPY . .
 

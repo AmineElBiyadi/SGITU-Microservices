@@ -25,6 +25,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-G10_SECRET_KEY_SGITU_2025_SUPER_SECURE_KEY_32CHARS}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      G8_ANALYTICS_URI: ${G8_ANALYTICS_URI:-http://g8-analytics:8088}
+      G8_ML_URI: ${G8_ML_URI:-http://ml-service:5000}
     networks:
       - sgitu-network
     restart: unless-stopped

@@ -69,9 +69,14 @@ spring:
             - Path=/api/suivi-vehicules/**
 
         - id: g8-analytics
-          uri: http://analytics-service:8088
+          uri: ${G8_ANALYTICS_URI:http://g8-analytics:8088}
           predicates:
-            - Path=/api/v1/ingestion/**,/api/v1/analytics/**,/predict/peak-hours,/predict/incidents
+            - Path=/api/v1/ingestion/**,/api/v1/analytics/**
+
+        - id: g8-ml-predictions
+          uri: ${G8_ML_URI:http://ml-service:5000}
+          predicates:
+            - Path=/predict/peak-hours,/predict/incidents
 
         - id: g9-incidents
           uri: http://service-gestion-incidents:8089

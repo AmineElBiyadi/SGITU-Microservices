@@ -176,12 +176,17 @@ Authorization: Bearer {{userToken}}
 Content-Type: application/json
 X-Correlation-Id: test-g8-ingestion-tickets
 
-{
-  "ticketId": 1,
-  "userId": 1,
-  "eventType": "TICKET_CREATED",
-  "amount": 6.0
-}
+[
+  {
+    "ticketId": "TCK-1",
+    "userId": "1",
+    "timestamp": "2026-05-07T10:00:00Z",
+    "status": "validated",
+    "amount": 6.0,
+    "line": "L1",
+    "zone": "Centre"
+  }
+]
 
 
 ### Routage G8 Analytics - dashboard admin/agent
@@ -197,7 +202,11 @@ Content-Type: application/json
 X-Correlation-Id: test-g8-predict-peak-hours
 
 {
-  "horizonHours": 24
+  "data": [
+    { "hour": 8, "validationCount": 120 },
+    { "hour": 17, "validationCount": 180 },
+    { "hour": 18, "validationCount": 160 }
+  ]
 }
 
 

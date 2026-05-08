@@ -95,7 +95,8 @@ Note integration : G10 expose `/auth/**`, mais transmet vers `/api/auth/**` dans
 | G5 | `/api/notifications/**` |
 | G6 | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**` |
 | G7 | `/api/suivi-vehicules/**` |
-| G8 | `/api/v1/ingestion/**`, `/api/v1/analytics/**`, `/predict/**` |
+| G8 Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` |
+| G8 ML | `/predict/peak-hours`, `/predict/incidents` |
 | G9 | `/api/incidents/**`, `/api/rapports/**` |
 
 ## 6. Securite

@@ -115,7 +115,10 @@ class ApiGatewayApplicationTests {
         webTestClient.post()
                 .uri("/predict/peak-hours")
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
-                .bodyValue(Map.of("horizonHours", 24))
+                .bodyValue(Map.of("data", List.of(
+                        Map.of("hour", 8, "validationCount", 120),
+                        Map.of("hour", 17, "validationCount", 180)
+                )))
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -273,23 +276,44 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
-    void g8RouteUsesApiV1AnalyticsContractPrefixesWithoutRewrite() {
+    void g8AnalyticsRouteUsesApiV1ContractPrefixesWithoutRewrite() {
         var route = routeDefinitionLocator.getRouteDefinitions()
                 .filter(routeDefinition -> "g8-analytics".equals(routeDefinition.getId()))
                 .blockFirst();
 
         assertThat(route).isNotNull();
+        assertThat(route.getUri().toString()).contains("g8-analytics:8088");
         assertThat(route.getFilters()).isEmpty();
         assertThat(route.getPredicates()).anySatisfy(predicate -> {
             assertThat(predicate.getArgs().values())
                     .contains(
                             "/api/v1/ingestion/**",
-                            "/api/v1/analytics/**",
+                            "/api/v1/analytics/**"
+                    )
+                    .noneMatch(value -> value.equals("/api/analytics/**")
+                            || value.equals("/api/reports/**")
+                            || value.equals("/predict/peak-hours")
+                            || value.equals("/predict/incidents"));
+        });
+    }
+
+    @Test
+    void g8MlRouteUsesPredictionPrefixesWithoutRewrite() {
+        var route = routeDefinitionLocator.getRouteDefinitions()
+                .filter(routeDefinition -> "g8-ml-predictions".equals(routeDefinition.getId()))
+                .blockFirst();
+
+        assertThat(route).isNotNull();
+        assertThat(route.getUri().toString()).contains("ml-service:5000");
+        assertThat(route.getFilters()).isEmpty();
+        assertThat(route.getPredicates()).anySatisfy(predicate -> {
+            assertThat(predicate.getArgs().values())
+                    .contains(
                             "/predict/peak-hours",
                             "/predict/incidents"
                     )
-                    .noneMatch(value -> value.equals("/api/analytics/**")
-                            || value.equals("/api/reports/**"));
+                    .noneMatch(value -> value.equals("/api/v1/ingestion/**")
+                            || value.equals("/api/v1/analytics/**"));
         });
     }
 
