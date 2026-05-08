@@ -25,7 +25,7 @@ public class HeaderAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String userId = req.getHeader("X-User-Id");
-        String rolesHeader = req.getHeader("X-User-Roles");
+        String rolesHeader = req.getHeader("X-Roles");
 
         if (userId == null || rolesHeader == null) {
             // Allow the request to continue, Spring Security will handle authorization
