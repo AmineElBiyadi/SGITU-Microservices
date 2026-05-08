@@ -14,8 +14,9 @@ spring:
 
 application:
   config:
-    utilisateur-service-url: http://service-utilisateur:8081
-    paiement-service-url: http://service-paiement:8083
+    utilisateur-service-url: ${UTILISATEUR_SERVICE_URL}
+    paiement-service-url: ${PAIEMENT_SERVICE_URL}
+    analyse-service-url: ${ANALYSE_SERVICE_URL}
   topics:
       souscription: abonnement.souscription
       rappel: abonnement.rappel
