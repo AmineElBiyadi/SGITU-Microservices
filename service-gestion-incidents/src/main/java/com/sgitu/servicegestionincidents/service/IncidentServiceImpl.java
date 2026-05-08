@@ -4,7 +4,6 @@ import com.sgitu.servicegestionincidents.dto.request.SignalementRequestDTO;
 import com.sgitu.servicegestionincidents.dto.response.*;
 import com.sgitu.servicegestionincidents.exception.IllegalStateTransitionException;
 import com.sgitu.servicegestionincidents.exception.IncidentNotFoundException;
-import com.sgitu.servicegestionincidents.exception.InvalidRequestException;
 import com.sgitu.servicegestionincidents.messaging.event.IncidentAnalytiqueEvent;
 import com.sgitu.servicegestionincidents.messaging.event.IncidentTransportEvent;
 import com.sgitu.servicegestionincidents.messaging.producer.AnalytiqueProducer;
@@ -50,9 +49,9 @@ public class IncidentServiceImpl implements IncidentService {
     // Dual duplicate detection + default gravity per type + source tracking
     // ============================================================
     @Override
-    public SignalementResponseDTO signalerIncident(SignalementRequestDTO request) {
+    public SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId) {
         log.info("Nouveau signalement reçu - Type: {}, DeclarantId: {}, Role: {}",
-                request.getType(), request.getDeclarantId(), request.getRole());
+                request.getType(), declarantId, request.getRole());
 
         // Determine source based on role
         String source = determinerSource(request.getRole());
@@ -61,11 +60,11 @@ public class IncidentServiceImpl implements IncidentService {
         Optional<Incident> doublon = detecterDoublon(request);
 
         if (doublon.isPresent()) {
-            return traiterDoublon(doublon.get(), request, source);
+            return traiterDoublon(doublon.get(), request, source, declarantId);
         }
 
         // --- NO DUPLICATE: CREATE NEW INCIDENT ---
-        return creerNouvelIncident(request, source);
+        return creerNouvelIncident(request, source, declarantId);
     }
 
     // ============================================================
@@ -400,14 +399,15 @@ public class IncidentServiceImpl implements IncidentService {
      * Traite un doublon : enrichit l'incident existant avec une action de
      * confirmation.
      */
-    private SignalementResponseDTO traiterDoublon(Incident existing, SignalementRequestDTO request, String source) {
+    private SignalementResponseDTO traiterDoublon(Incident existing, SignalementRequestDTO request, String source,
+            Long declarantId) {
         String description = String.format("Signalement supplémentaire reçu de %s (déclarant %d)",
-                source, request.getDeclarantId());
+                source, declarantId);
 
         Action action = Action.builder()
                 .type(TypeAction.COMMENTAIRE)
                 .description(description)
-                .auteurId(request.getDeclarantId())
+                .auteurId(declarantId)
                 .dateAction(LocalDateTime.now())
                 .build();
         existing.addAction(action);
@@ -429,7 +429,7 @@ public class IncidentServiceImpl implements IncidentService {
     /**
      * Crée un nouvel incident à partir du signalement.
      */
-    private SignalementResponseDTO creerNouvelIncident(SignalementRequestDTO request, String source) {
+    private SignalementResponseDTO creerNouvelIncident(SignalementRequestDTO request, String source, Long declarantId) {
         // Gravité par défaut basée sur le type d'incident
         NiveauGravite gravite = request.getType().getGraviteParDefaut();
 
@@ -447,7 +447,7 @@ public class IncidentServiceImpl implements IncidentService {
                 .dateIncident(request.getDateIncident())
                 .statut(StatutIncident.NOUVEAU)
                 .gravite(gravite)
-                .declarantId(request.getDeclarantId())
+                .declarantId(declarantId)
                 .vehiculeId(request.getVehiculeId())
                 .source(source)
                 .localisation(localisation)
@@ -471,8 +471,8 @@ public class IncidentServiceImpl implements IncidentService {
         Action actionCreation = Action.builder()
                 .type(TypeAction.CREATION)
                 .description(String.format("Incident signalé par %s (source: %s) — Gravité par défaut: %s",
-                        request.getDeclarantId(), source, gravite))
-                .auteurId(request.getDeclarantId())
+                        declarantId, source, gravite))
+                .auteurId(declarantId)
                 .dateAction(LocalDateTime.now())
                 .nouveauStatut(StatutIncident.NOUVEAU)
                 .build();

@@ -1,15 +1,35 @@
 {
 	"info": {
+		"_postman_id": "870a4a79-171e-4504-9d33-95e761c7a2a3",
 		"name": "SGITU-Gestion-Incidents",
-		"description": "Collection pour tester les APIs du service de gestion des incidents.",
+		"description": "Collection pour tester les APIs du service de gestion des incidents en suivant le cycle de vie logique.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "Incidents",
+			"name": "1. Cycle de vie de l'Incident",
 			"item": [
 				{
-					"name": "Signaler un incident",
+					"name": "1.1 Signaler un incident",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 or 201\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"if (jsonData.incidentId) {",
+									"    pm.collectionVariables.set(\"incidentId\", jsonData.incidentId);",
+									"    console.log(\"ID de l'incident sauvegardé : \" + jsonData.incidentId);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -40,10 +60,11 @@
 								"signaler"
 							]
 						}
-					}
+					},
+					"response": []
 				},
 				{
-					"name": "Consulter un incident",
+					"name": "1.2 Consulter l'incident créé",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -57,18 +78,235 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/1",
+							"raw": "{{baseUrl}}/{{incidentId}}",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"1"
+								"{{incidentId}}"
 							]
 						}
-					}
+					},
+					"response": []
 				},
 				{
-					"name": "Consulter le suivi (historique)",
+					"name": "1.3 Passer en ANALYSE",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "2"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "AGENT_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"statut\": \"ANALYSE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/statut",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"statut"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.4 Affecter un responsable",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"responsableId\": 42\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/affecter",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"affecter"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.5 Démarrer le traitement (EN_TRAITEMENT)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "2"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "AGENT_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"statut\": \"EN_TRAITEMENT\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/statut",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"statut"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.6 Escalader l'incident",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motif\": \"Dégâts matériels importants nécessitant l'intervention de la police.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/escalader",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"escalader"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.7 Marquer comme Résolu (RESOLU)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "2"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "AGENT_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"statut\": \"RESOLU\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/statut",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"statut"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.8 Clôturer un incident",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motif\": \"Incident résolu, bus réparé et remis en service.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/cloturer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"cloturer"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "1.9 Consulter le suivi (historique)",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -82,19 +320,25 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/1/suivi",
+							"raw": "{{baseUrl}}/{{incidentId}}/suivi",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"1",
+								"{{incidentId}}",
 								"suivi"
 							]
 						}
-					}
-				},
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Listage et Filtres",
+			"item": [
 				{
-					"name": "Filtrer les incidents",
+					"name": "2.1 Filtrer par statut NOUVEAU",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -119,12 +363,54 @@
 								}
 							]
 						}
-					}
+					},
+					"response": []
 				},
 				{
-					"name": "Clôturer un incident",
+					"name": "2.2 Annuler un incident (Fausse alerte)",
 					"request": {
 						"method": "PUT",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "1"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "VOYAGEUR"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motif\": \"C'était une erreur de manipulation, pas d'incident réel.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/{{incidentId}}/annuler",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{incidentId}}",
+								"annuler"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Rapports",
+			"item": [
+				{
+					"name": "3.1 Générer un rapport mensuel",
+					"request": {
+						"method": "GET",
 						"header": [
 							{
 								"key": "X-User-Id",
@@ -135,31 +421,28 @@
 								"value": "SUPERVISEUR_INCIDENTS"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"motif\": \"Incident résolu, bus réparé et remis en service.\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
 						"url": {
-							"raw": "{{baseUrl}}/1/cloturer",
+							"raw": "{{baseUrl}}/rapports?periode=mois",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"1",
-								"cloturer"
+								"rapports"
+							],
+							"query": [
+								{
+									"key": "periode",
+									"value": "mois"
+								}
 							]
 						}
-					}
+					},
+					"response": []
 				},
 				{
-					"name": "Escalader un incident",
+					"name": "3.2 Consulter le tableau de bord",
 					"request": {
-						"method": "PUT",
+						"method": "GET",
 						"header": [
 							{
 								"key": "X-User-Id",
@@ -170,96 +453,18 @@
 								"value": "SUPERVISEUR_INCIDENTS"
 							}
 						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"motif\": \"Dégâts matériels importants nécessitant l'intervention de la police.\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
 						"url": {
-							"raw": "{{baseUrl}}/1/escalader",
+							"raw": "{{baseUrl}}/rapports/tableau-bord",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"1",
-								"escalader"
+								"rapports",
+								"tableau-bord"
 							]
 						}
-					}
-				},
-				{
-					"name": "Affecter un responsable",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "X-User-Id",
-								"value": "3"
-							},
-							{
-								"key": "X-User-Role",
-								"value": "SUPERVISEUR_INCIDENTS"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"responsableId\": 42\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/1/affecter",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"1",
-								"affecter"
-							]
-						}
-					}
-				},
-				{
-					"name": "Mettre à jour le statut",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "X-User-Id",
-								"value": "2"
-							},
-							{
-								"key": "X-User-Role",
-								"value": "AGENT_INCIDENTS"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"statut\": \"EN_TRAITEMENT\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseUrl}}/1/statut",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"1",
-								"statut"
-							]
-						}
-					}
+					},
+					"response": []
 				}
 			]
 		}
@@ -268,6 +473,11 @@
 		{
 			"key": "baseUrl",
 			"value": "http://localhost:8089/api/incidents",
+			"type": "string"
+		},
+		{
+			"key": "incidentId",
+			"value": "1",
 			"type": "string"
 		}
 	]
