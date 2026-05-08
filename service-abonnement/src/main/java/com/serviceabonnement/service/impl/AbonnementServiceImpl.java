@@ -231,7 +231,7 @@ public class AbonnementServiceImpl implements AbonnementService {
         eventPublisher.publishSuspensionEffectuee(
                 userClient.getUserById(abonnement.getUserId()),
                 abonnement.getPlan().getNomPlan(),
-                "ADMIN", // adminId par défaut
+                "ROLE_ADMIN_G2", // adminId par défaut
                 motif,
                 LocalDateTime.now()
         );
@@ -249,23 +249,32 @@ public class AbonnementServiceImpl implements AbonnementService {
                 "L'abonnement est déjà annulé ou en cours d'annulation : " + abonnement.getStatut());
         }
         
-        Double montantRemboursement = calculerRemboursement(abonnement);
+        // Calcul des jours restants avant la fin de l'abonnement
+        long joursRestants = java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), abonnement.getDateFin());
+        Double montantRemboursement = 0.0;
+
+        if (joursRestants >= 3) {
+            montantRemboursement = calculerRemboursement(abonnement);
+        } else {
+            log.info("Annulation de l'abonnement {} sans remboursement car il reste moins de 3 jours ({} jours restants)", abonnementId, joursRestants);
+        }
         
         abonnement.setStatut(StatutAbonnement.ANNULATION_EN_COURS);
         abonnement.setDateDemandeAnnulation(LocalDateTime.now());
         abonnementRepository.save(abonnement);
 
-        // Appel G6 pour le remboursement
-        com.serviceabonnement.dto.external.RefundRequestDTO refundRequest = com.serviceabonnement.dto.external.RefundRequestDTO.builder()
-                .transactionId(abonnement.getPaiementId())
-                .montantRemboursement(montantRemboursement)
-                .motif("Annulation utilisateur")
-                .build();
-
-        paiementClient.rembourser(refundRequest);
+        // Appel G6 pour le remboursement uniquement si le montant est supérieur à 0
+        if (montantRemboursement > 0) {
+            com.serviceabonnement.dto.external.RefundRequestDTO refundRequest = com.serviceabonnement.dto.external.RefundRequestDTO.builder()
+                    .transactionId(abonnement.getPaiementId())
+                    .montantRemboursement(montantRemboursement)
+                    .motif("Annulation utilisateur - Franchise de 3 jours respectée")
+                    .build();
+            paiementClient.rembourser(refundRequest);
+        }
 
         eventPublisher.publishAnnulationEffectuee(
-                userClient.getUserById(abonnementId),
+                userClient.getUserById(abonnement.getUserId()),
                 abonnement,
                 montantRemboursement,
                 abonnement.getPaiementId()
@@ -438,8 +447,8 @@ public class AbonnementServiceImpl implements AbonnementService {
         try {
             // 1. Vérification Admin (G3) - On ne suit pas les admins
             UserDTO user = userClient.getUserById(abonnement.getUserId());
-            if (user != null && user.getRoles() != null && user.getRoles().contains("ADMIN")) {
-                log.info("Analyse ignorée pour l'utilisateur admin {}", abonnement.getUserId());
+            if (user != null && user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN_G2")) {
+                log.info("Analyse ignorée pour l'utilisateur admin_g2 {}", abonnement.getUserId());
                 return;
             }
 
@@ -473,8 +482,8 @@ public class AbonnementServiceImpl implements AbonnementService {
             case ANNUEL -> "YEARLY";
         };
         String c = switch (categorie) {
-            case ETUDIANT -> "STUDENT";
-            case NORMAL -> "NORMAL";
+            case ROLE_STUDENT -> "STUDENT";
+            case ROLE_PASSENGER -> "PASSENGER";
         };
         return d + "_" + c;
     }

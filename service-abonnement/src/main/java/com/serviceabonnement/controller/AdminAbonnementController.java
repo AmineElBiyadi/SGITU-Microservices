@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/abonnements/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Admin — Abonnements", description = "Opérations administratives sur les abonnements (ADMIN uniquement)")
+@PreAuthorize("hasRole('ADMIN_G2')")
+@Tag(name = "Admin — Abonnements", description = "Opérations administratives sur les abonnements (ADMIN_G2 uniquement)")
 public class AdminAbonnementController {
 
     private final AbonnementService abonnementService;
@@ -28,7 +28,7 @@ public class AdminAbonnementController {
             @ApiResponse(responseCode = "200", description = "Abonnement suspendu"),
             @ApiResponse(responseCode = "400", description = "Paramètre manquant",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
-            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN requis",
+            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN_G2 requis",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "Abonnement non trouvé",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
@@ -48,7 +48,7 @@ public class AdminAbonnementController {
             @ApiResponse(responseCode = "200", description = "Annulation effectuée"),
             @ApiResponse(responseCode = "400", description = "Paramètre manquant",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
-            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN requis",
+            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN_G2 requis",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "Abonnement non trouvé",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
@@ -66,7 +66,7 @@ public class AdminAbonnementController {
     @Operation(summary = "Forcer le renouvellement d'un abonnement")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Renouvellement forcé initié"),
-            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN requis",
+            @ApiResponse(responseCode = "403", description = "Accès refusé — rôle ADMIN_G2 requis",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "404", description = "Abonnement non trouvé",
                     content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
