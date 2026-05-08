@@ -22,7 +22,22 @@ public class NotificationEventDTO {
     private String eventType;
 
     /**
-     * Metadata containing user details (userId, email, username, timestamp).
+     * ID of the user.
      */
-    private Map<String, String> metadata;
+    private String userId;
+
+    /**
+     * Email of the user.
+     */
+    private String email;
+
+    /**
+     * Full name or username of the user.
+     */
+    private String username;
+
+    /**
+     * ISO-8601 timestamp of the event.
+     */
+    private String timestamp;
 }

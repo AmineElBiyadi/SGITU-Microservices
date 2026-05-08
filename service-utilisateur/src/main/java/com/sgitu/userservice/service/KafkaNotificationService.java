@@ -35,9 +35,18 @@ public class KafkaNotificationService {
     @Async
     public void sendNotification(String eventType, User user) {
         try {
+            String username = "User";
+            if (user.getProfile() != null) {
+                username = user.getProfile().getFirstName() + " " + user.getProfile().getLastName();
+            }
+
             NotificationEventDTO event = NotificationEventDTO.builder()
                     .eventType(eventType)
-                    .metadata(buildMetadata(user))
+                    .userId(String.valueOf(user.getId()))
+                    .email(user.getEmail())
+                    .username(username.trim())
+                    .timestamp(ZonedDateTime.now(ZoneId.of("UTC"))
+                            .format(DateTimeFormatter.ISO_INSTANT))
                     .build();
 
             String jsonPayload = objectMapper.writeValueAsString(event);
@@ -46,22 +55,5 @@ public class KafkaNotificationService {
         } catch (Exception e) {
             log.error("Error sending Kafka notification: {}", e.getMessage());
         }
-    }
-
-    private Map<String, String> buildMetadata(User user) {
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("userId", String.valueOf(user.getId()));
-        metadata.put("email", user.getEmail());
-        
-        String username = "User";
-        if (user.getProfile() != null) {
-            username = user.getProfile().getFirstName() + " " + user.getProfile().getLastName();
-        }
-        metadata.put("username", username.trim());
-        
-        metadata.put("timestamp", ZonedDateTime.now(ZoneId.of("UTC"))
-                .format(DateTimeFormatter.ISO_INSTANT));
-                
-        return metadata;
     }
 }
