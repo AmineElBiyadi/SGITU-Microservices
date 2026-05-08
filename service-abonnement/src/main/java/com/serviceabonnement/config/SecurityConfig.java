@@ -30,8 +30,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/plans/**").permitAll()
                         .requestMatchers("/plans/**").hasRole("ADMIN")
                         
-                        // Abonnements: Authenticated
-                        .requestMatchers("/abonnements/admin/**").hasRole("ADMIN")
+                        // Abonnements
+                        .requestMatchers("/api/abonnements/**").authenticated()
                         .requestMatchers("/abonnements/**").authenticated()
                         
                         .requestMatchers("/actuator/**").permitAll()
@@ -42,7 +42,7 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

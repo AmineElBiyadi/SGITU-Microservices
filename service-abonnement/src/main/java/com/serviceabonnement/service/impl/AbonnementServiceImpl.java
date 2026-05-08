@@ -3,21 +3,19 @@ package com.serviceabonnement.service.impl;
 import com.serviceabonnement.client.AnalyseClient;
 import com.serviceabonnement.client.PaiementClient;
 import com.serviceabonnement.client.UtilisateurServiceClient;
-import com.serviceabonnement.dto.AbonnementEvent;
 import com.serviceabonnement.dto.external.PaymentRequestDTO;
 import com.serviceabonnement.dto.external.PaymentResponseDTO;
 import com.serviceabonnement.dto.external.UserDTO;
 import com.serviceabonnement.entity.Abonnement;
 import com.serviceabonnement.entity.PlanAbonnement;
 import com.serviceabonnement.enums.StatutAbonnement;
-import com.serviceabonnement.enums.TypeNotification;
 import com.serviceabonnement.exception.AbonnementNotFoundException;
 import com.serviceabonnement.exception.AbonnementStatutInvalideException;
 import com.serviceabonnement.exception.PaiementServiceException;
 import com.serviceabonnement.exception.PlanNotFoundException;
 import com.serviceabonnement.exception.RegleMetierException;
 import com.serviceabonnement.exception.UtilisateurNotFoundException;
-import com.serviceabonnement.producer.AbonnementProducer;
+import com.serviceabonnement.producer.SubscriptionEventPublisher;
 import com.serviceabonnement.repository.AbonnementRepository;
 import com.serviceabonnement.repository.AnalytiqueTraceRepository;
 import com.serviceabonnement.repository.PlanAbonnementRepository;
@@ -49,7 +47,7 @@ public class AbonnementServiceImpl implements AbonnementService {
     private final UtilisateurServiceClient userClient;
     private final PaiementClient paiementClient;
     private final AnalyseClient analyseClient;
-    private final AbonnementProducer eventProducer;
+    private final SubscriptionEventPublisher eventPublisher;
     private final AnalytiqueTraceRepository analytiqueTraceRepository;
 
     @Override
@@ -100,12 +98,7 @@ public class AbonnementServiceImpl implements AbonnementService {
 
         } catch (Exception e) {
             log.error("Échec de l'initiation du paiement pour l'abonnement {}", abonnement.getId());
-            eventProducer.sendSouscriptionEvent(AbonnementEvent.builder()
-                    .abonnementId(abonnement.getId())
-                    .userId(userId)
-                    .type(TypeNotification.ECHEC_SOUSCRIPTION)
-                    .motif("Erreur service paiement")
-                    .build());
+            eventPublisher.publishEchecSouscription(user, plan.getNomPlan(), "Erreur service paiement");
             throw new PaiementServiceException("Impossible d'initier le paiement", e);
         }
 
@@ -178,12 +171,11 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .build();
         renouvellementRepository.save(renouvellement);
 
-        eventProducer.sendRenouvellementEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.RENOUVELLEMENT_EFFECTUE)
-                .motif("Renouvellement manuel par admin")
-                .build());
+        eventPublisher.publishRenouvellementEffectue(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement,
+                "MANUEL"
+        );
     }
 
     @Override
@@ -214,11 +206,14 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .build();
         desactivationRepository.save(desactivation);
 
-        eventProducer.sendDesactivationEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.DESACTIVATION_EFFECTUEE)
-                .build());
+        eventPublisher.publishDesactivationEffectuee(
+                userClient.getUserById(abonnement.getUserId()),
+                plan.getNomPlan(),
+                LocalDateTime.now(),
+                LocalDateTime.now().plusDays(jours),
+                1, // Valeur exemple pour nbUsees
+                plan.getMaxPeriodeDesactivation()
+        );
     }
 
     @Override
@@ -233,12 +228,13 @@ public class AbonnementServiceImpl implements AbonnementService {
         abonnement.setStatut(StatutAbonnement.SUSPENDU);
         abonnementRepository.save(abonnement);
 
-        eventProducer.sendSuspensionEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.SUSPENSION_EFFECTUEE)
-                .motif(motif)
-                .build());
+        eventPublisher.publishSuspensionEffectuee(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement.getPlan().getNomPlan(),
+                "ADMIN", // adminId par défaut
+                motif,
+                LocalDateTime.now()
+        );
     }
 
     @Override
@@ -268,11 +264,12 @@ public class AbonnementServiceImpl implements AbonnementService {
 
         paiementClient.rembourser(refundRequest);
 
-        eventProducer.sendAnnulationEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.ANNULATION_EFFECTUEE)
-                .build());
+        eventPublisher.publishAnnulationEffectuee(
+                userClient.getUserById(abonnementId),
+                abonnement,
+                montantRemboursement,
+                abonnement.getPaiementId()
+        );
     }
 
     private Double calculerRemboursement(Abonnement abonnement) {
@@ -316,12 +313,11 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .build();
         renouvellementRepository.save(renouvellement);
 
-        eventProducer.sendRenouvellementEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.RENOUVELLEMENT_EFFECTUE)
-                .motif("Renouvellement manuel par l'utilisateur")
-                .build());
+        eventPublisher.publishRenouvellementEffectue(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement,
+                "MANUEL"
+        );
 
         return abonnement;
     }
@@ -354,11 +350,11 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .build();
         renouvellementRepository.save(renouvellement);
         
-        eventProducer.sendRenouvellementEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.RENOUVELLEMENT_EFFECTUE)
-                .build());
+        eventPublisher.publishRenouvellementEffectue(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement,
+                "AUTOMATIQUE"
+        );
 
         return abonnement;
     }
@@ -371,12 +367,12 @@ public class AbonnementServiceImpl implements AbonnementService {
         abonnement.setDateAnnulation(LocalDateTime.now());
         abonnementRepository.save(abonnement);
 
-        eventProducer.sendAnnulationEvent(AbonnementEvent.builder()
-                .abonnementId(abonnementId)
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.ANNULATION_ADMIN_EFFECTUE)
-                .motif(motif)
-                .build());
+        eventPublisher.publishAnnulationEffectuee(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement,
+                0.0, // Pas de remboursement automatique sur annulation admin forcée ici
+                null
+        );
     }
 
     @Override
@@ -406,11 +402,10 @@ public class AbonnementServiceImpl implements AbonnementService {
         // Envoi au système d'analyse (REST)
         sendToAnalyse(abonnement, "SOUSCRIPTION_CONFIRMEE", abonnement.getPrixPaye());
 
-        eventProducer.sendSouscriptionEvent(AbonnementEvent.builder()
-                .abonnementId(abonnement.getId())
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.CONFIRMATION_SOUSCRIPTION)
-                .build());
+        eventPublisher.publishConfirmationSouscription(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement
+        );
     }
 
     @Override
@@ -431,11 +426,12 @@ public class AbonnementServiceImpl implements AbonnementService {
         // Envoi au système d'analyse (REST)
         sendToAnalyse(abonnement, "ANNULATION_CONFIRMEE", 0.0); // Ou montant remboursé si besoin
 
-        eventProducer.sendAnnulationEvent(AbonnementEvent.builder()
-                .abonnementId(abonnement.getId())
-                .userId(abonnement.getUserId())
-                .type(TypeNotification.REUSSITE_REMBOURSEMENT)
-                .build());
+        eventPublisher.publishAnnulationEffectuee(
+                userClient.getUserById(abonnement.getUserId()),
+                abonnement,
+                0.0, // Montant à ajuster selon le cas métier
+                transactionId
+        );
     }
 
     private void sendToAnalyse(Abonnement abonnement, String action, Double amount) {
