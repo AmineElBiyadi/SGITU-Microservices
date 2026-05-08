@@ -16,7 +16,7 @@ public class IncidentAnalytiqueEvent implements Serializable {
 
     private String reference;
     
-    private String source;          // USER, IOT
+    private String source;          // CONDUCTEUR, VOYAGEUR, IOT
     private String type;            // PANNE_VEHICULE, RETARD, ACCIDENT, etc.
     private String gravite;         // FAIBLE, MOYEN, ELEVE, CRITIQUE
     private String statut;          // CLOTURE, ANNULE

@@ -70,8 +70,9 @@ public class IncidentController {
     @Operation(summary = "Clôturer un incident")
     public ResponseEntity<Void> cloturerIncident(
             @PathVariable Long id,
-            @Valid @RequestBody ClotureRequestDTO request) {
-        incidentService.cloturerIncident(id, request.getMotif());
+            @Valid @RequestBody ClotureRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId) {
+        incidentService.cloturerIncident(id, request.getMotif(), userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -80,8 +81,9 @@ public class IncidentController {
     @Operation(summary = "Escalader un incident critique")
     public ResponseEntity<Void> escaladerIncident(
             @PathVariable Long id,
-            @Valid @RequestBody EscaladeRequestDTO request) {
-        incidentService.escaladerIncident(id, request.getMotif());
+            @Valid @RequestBody EscaladeRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId) {
+        incidentService.escaladerIncident(id, request.getMotif(), userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -90,8 +92,9 @@ public class IncidentController {
     @Operation(summary = "Affecter un responsable")
     public ResponseEntity<Void> affecterResponsable(
             @PathVariable Long id,
-            @Valid @RequestBody AffectationRequestDTO request) {
-        incidentService.affecterResponsable(id, request.getResponsableId());
+            @Valid @RequestBody AffectationRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId) {
+        incidentService.affecterResponsable(id, request.getResponsableId(), userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -100,17 +103,20 @@ public class IncidentController {
     @Operation(summary = "Mettre à jour le statut")
     public ResponseEntity<Void> mettreAJourStatut(
             @PathVariable Long id,
-            @Valid @RequestBody StatutUpdateRequestDTO request) {
-        incidentService.mettreAJourStatut(id, request.getStatut());
+            @Valid @RequestBody StatutUpdateRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId) {
+        incidentService.mettreAJourStatut(id, request.getStatut(), userId);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/annuler")
+    @PreAuthorize("hasRole('SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Annuler un incident (fausse alerte)")
     public ResponseEntity<Void> annulerIncident(
             @PathVariable Long id,
-            @Valid @RequestBody AnnulationRequestDTO request) {
-        incidentService.annulerIncident(id, request.getMotif());
+            @Valid @RequestBody AnnulationRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId) {
+        incidentService.annulerIncident(id, request.getMotif(), userId);
         return ResponseEntity.noContent().build();
     }
 }
