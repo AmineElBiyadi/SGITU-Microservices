@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,14 +25,18 @@ public class IncidentController {
     private final IncidentService incidentService;
 
     @PostMapping("/signaler")
+    @PreAuthorize("hasAnyRole('VOYAGEUR', 'CONDUCTEUR', 'SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Signaler un nouvel incident")
     public ResponseEntity<SignalementResponseDTO> signalerIncident(
-            @Valid @RequestBody SignalementRequestDTO request) {
-        SignalementResponseDTO response = incidentService.signalerIncident(request);
+            @Valid @RequestBody SignalementRequestDTO request,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Role") String userRole) {
+        SignalementResponseDTO response = incidentService.signalerIncident(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('VOYAGEUR', 'CONDUCTEUR', 'AGENT_INCIDENTS', 'SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Consulter un incident par ID")
     public ResponseEntity<IncidentResponseDTO> consulterIncident(@PathVariable Long id) {
         IncidentResponseDTO incident = incidentService.consulterIncident(id);
@@ -39,6 +44,7 @@ public class IncidentController {
     }
 
     @GetMapping("/{id}/suivi")
+    @PreAuthorize("hasAnyRole('AGENT_INCIDENTS', 'SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Consulter l'historique d'un incident")
     public ResponseEntity<List<ActionDTO>> consulterSuivi(@PathVariable Long id) {
         List<ActionDTO> historique = incidentService.consulterSuivi(id);
@@ -46,6 +52,7 @@ public class IncidentController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('AGENT_INCIDENTS', 'SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Filtrer les incidents")
     public ResponseEntity<List<IncidentResponseDTO>> filtrerIncidents(
             @RequestParam(required = false) StatutIncident statut,
@@ -59,6 +66,7 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}/cloturer")
+    @PreAuthorize("hasRole('SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Clôturer un incident")
     public ResponseEntity<Void> cloturerIncident(
             @PathVariable Long id,
@@ -68,6 +76,7 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}/escalader")
+    @PreAuthorize("hasRole('SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Escalader un incident critique")
     public ResponseEntity<Void> escaladerIncident(
             @PathVariable Long id,
@@ -77,6 +86,7 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}/affecter")
+    @PreAuthorize("hasRole('SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Affecter un responsable")
     public ResponseEntity<Void> affecterResponsable(
             @PathVariable Long id,
@@ -86,6 +96,7 @@ public class IncidentController {
     }
 
     @PutMapping("/{id}/statut")
+    @PreAuthorize("hasAnyRole('AGENT_INCIDENTS', 'SUPERVISEUR_INCIDENTS')")
     @Operation(summary = "Mettre à jour le statut")
     public ResponseEntity<Void> mettreAJourStatut(
             @PathVariable Long id,
