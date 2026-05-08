@@ -17,4 +17,5 @@ public interface IncidentService {
     void escaladerIncident(Long id, String motif);
     void affecterResponsable(Long id, Long responsableId);
     void mettreAJourStatut(Long id, StatutIncident statut);
+    void annulerIncident(Long id, String motif);
 }

@@ -15,8 +15,18 @@ public class AnalytiqueProducer {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void envoyerDonneesAnalytique(IncidentAnalytiqueEvent event) {
-        log.info("Publication données analytique pour incident {}", event.getReference());
-        kafkaTemplate.send(MessagingConstants.ANALYTIQUE_OUT_TOPIC, event);
-        log.info("Données analytique publiées avec succès");
+        try {
+            log.info("Publication données analytique pour incident {}", event.getReference());
+            kafkaTemplate.send(MessagingConstants.ANALYTIQUE_OUT_TOPIC, event)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            log.warn("Échec envoi analytique G8 (Kafka indisponible): {}", ex.getMessage());
+                        } else {
+                            log.info("Données analytique publiées avec succès");
+                        }
+                    });
+        } catch (Exception e) {
+            log.warn("Kafka indisponible — Données analytique G8 non envoyées: {}", e.getMessage());
+        }
     }
 }

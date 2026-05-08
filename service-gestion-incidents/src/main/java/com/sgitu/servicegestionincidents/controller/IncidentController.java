@@ -93,4 +93,13 @@ public class IncidentController {
         incidentService.mettreAJourStatut(id, request.getStatut());
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}/annuler")
+    @Operation(summary = "Annuler un incident (fausse alerte)")
+    public ResponseEntity<Void> annulerIncident(
+            @PathVariable Long id,
+            @Valid @RequestBody AnnulationRequestDTO request) {
+        incidentService.annulerIncident(id, request.getMotif());
+        return ResponseEntity.noContent().build();
+    }
 }
