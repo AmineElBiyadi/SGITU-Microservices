@@ -1,0 +1,11 @@
+# IDEs
+.idea/
+.vscode/
+
+# Environment variables (secrets)
+.env
+
+# Operating System Files and Logs
+.DS_Store
+Thumbs.db
+*.log
