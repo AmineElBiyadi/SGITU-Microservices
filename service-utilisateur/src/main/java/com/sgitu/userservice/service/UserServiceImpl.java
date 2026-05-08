@@ -89,6 +89,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Long> getDriverIds() {
+        return userRepository.findIdsByRolesName("ROLE_DRIVER");
+    }
+
+    @Override
     public UserResponseDTO updateUser(Long id, UserRequestDTO request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
