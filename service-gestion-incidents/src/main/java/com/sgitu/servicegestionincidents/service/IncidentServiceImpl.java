@@ -8,6 +8,9 @@ import com.sgitu.servicegestionincidents.model.entity.Action;
 import com.sgitu.servicegestionincidents.model.entity.Incident;
 import com.sgitu.servicegestionincidents.repository.ActionRepository;
 import com.sgitu.servicegestionincidents.repository.IncidentRepository;
+import com.sgitu.servicegestionincidents.repository.LocalisationRepository;
+import com.sgitu.servicegestionincidents.repository.PreuveRepository;
+import com.sgitu.servicegestionincidents.model.entity.Localisation;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Service
 @RequiredArgsConstructor
@@ -30,12 +34,73 @@ public class IncidentServiceImpl implements IncidentService {
 
     private final IncidentRepository incidentRepository;
     private final ActionRepository actionRepository;
+    private final LocalisationRepository localisationRepository;
+    private final PreuveRepository preuveRepository;
+    private final NotificationService notificationService;
     private final ModelMapper modelMapper;
 
     @Override
     public SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId) {
-        // TODO
-        return null;
+        log.info("Signalement d'un nouvel incident par l'utilisateur {}", declarantId);
+
+        // 1. Création de la localisation
+        Localisation localisation = Localisation.builder()
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .build();
+        localisation = localisationRepository.save(localisation);
+
+        // 2. Création de l'incident
+        Incident incident = Incident.builder()
+                .reference("INC-" + System.currentTimeMillis())
+                .type(request.getType())
+                .description(request.getDescription())
+                .dateIncident(request.getDateIncident())
+                .dateSignalement(LocalDateTime.now())
+                .statut(StatutIncident.NOUVEAU)
+                .gravite(com.sgitu.servicegestionincidents.model.enums.NiveauGravite.MOYEN) // Par défaut
+                .declarantId(declarantId)
+                .vehiculeId(request.getVehiculeId())
+                .source("USER")
+                .localisation(localisation)
+                .build();
+
+        // 3. Gestion des preuves
+        if (request.getPreuves() != null && !request.getPreuves().isEmpty()) {
+            for (com.sgitu.servicegestionincidents.dto.request.PreuveDTO preuveDTO : request.getPreuves()) {
+                com.sgitu.servicegestionincidents.model.entity.Preuve preuve = com.sgitu.servicegestionincidents.model.entity.Preuve.builder()
+                        .incident(incident)
+                        .type(preuveDTO.getType())
+                        .description(preuveDTO.getDescription())
+                        .fichier(preuveDTO.getFichierBase64())
+                        .dateAjout(LocalDateTime.now())
+                        .build();
+                incident.addPreuve(preuve);
+            }
+        }
+
+        // 4. Sauvegarde de l'incident (cascade sur preuves)
+        incident = incidentRepository.save(incident);
+
+        // 5. Création de l'action initiale
+        Action actionInitiale = Action.builder()
+                .incident(incident)
+                .type(com.sgitu.servicegestionincidents.model.enums.TypeAction.CREATION)
+                .dateAction(LocalDateTime.now())
+                .auteurId(declarantId)
+                .description("Signalement initial de l'incident")
+                .nouveauStatut(StatutIncident.NOUVEAU)
+                .build();
+        actionRepository.save(actionInitiale);
+
+        // 6. Envoi de la notification
+        try {
+            notificationService.envoyerConfirmation(incident);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de la notification: {}", e.getMessage());
+        }
+
+        return modelMapper.map(incident, SignalementResponseDTO.class);
     }
 
     @Override
@@ -108,21 +173,101 @@ public class IncidentServiceImpl implements IncidentService {
 
     @Override
     public void cloturerIncident(Long id, String motif) {
-        // TODO
+        log.info("Clôture de l'incident ID: {}", id);
+        Incident incident = incidentRepository.findById(id)
+                .orElseThrow(() -> new IncidentNotFoundException("Incident non trouvé"));
+
+        StatutIncident ancienStatut = incident.getStatut();
+        incident.setStatut(StatutIncident.CLOTURE);
+        incidentRepository.save(incident);
+
+        Action action = Action.builder()
+                .incident(incident)
+                .type(com.sgitu.servicegestionincidents.model.enums.TypeAction.CLOTURE)
+                .dateAction(LocalDateTime.now())
+                .auteurId(getCurrentUserId())
+                .description("Clôture: " + motif)
+                .ancienStatut(ancienStatut)
+                .nouveauStatut(StatutIncident.CLOTURE)
+                .build();
+        actionRepository.save(action);
     }
 
     @Override
     public void escaladerIncident(Long id, String motif) {
-        // TODO
+        log.info("Escalade de l'incident ID: {}", id);
+        Incident incident = incidentRepository.findById(id)
+                .orElseThrow(() -> new IncidentNotFoundException("Incident non trouvé"));
+
+        StatutIncident ancienStatut = incident.getStatut();
+        incident.setStatut(StatutIncident.ESCALADE);
+        incidentRepository.save(incident);
+
+        Action action = Action.builder()
+                .incident(incident)
+                .type(com.sgitu.servicegestionincidents.model.enums.TypeAction.ESCALADE)
+                .dateAction(LocalDateTime.now())
+                .auteurId(getCurrentUserId())
+                .description("Escalade: " + motif)
+                .ancienStatut(ancienStatut)
+                .nouveauStatut(StatutIncident.ESCALADE)
+                .build();
+        actionRepository.save(action);
+
+        notificationService.envoyerEscalade(incident, motif);
     }
 
     @Override
     public void affecterResponsable(Long id, Long responsableId) {
-        // TODO
+        log.info("Affectation du responsable {} à l'incident ID: {}", responsableId, id);
+        Incident incident = incidentRepository.findById(id)
+                .orElseThrow(() -> new IncidentNotFoundException("Incident non trouvé"));
+
+        incident.setResponsableId(responsableId);
+        incident.setStatut(StatutIncident.ASSIGNE);
+        incidentRepository.save(incident);
+
+        Action action = Action.builder()
+                .incident(incident)
+                .type(com.sgitu.servicegestionincidents.model.enums.TypeAction.ASSIGNATION)
+                .dateAction(LocalDateTime.now())
+                .auteurId(getCurrentUserId())
+                .description("Assignation au responsable ID: " + responsableId)
+                .nouveauStatut(StatutIncident.ASSIGNE)
+                .build();
+        actionRepository.save(action);
     }
 
     @Override
     public void mettreAJourStatut(Long id, StatutIncident statut) {
-        // TODO
+        log.info("Mise à jour du statut de l'incident ID: {} vers {}", id, statut);
+        Incident incident = incidentRepository.findById(id)
+                .orElseThrow(() -> new IncidentNotFoundException("Incident non trouvé"));
+
+        StatutIncident ancienStatut = incident.getStatut();
+        incident.setStatut(statut);
+        incidentRepository.save(incident);
+
+        Action action = Action.builder()
+                .incident(incident)
+                .type(com.sgitu.servicegestionincidents.model.enums.TypeAction.CHANGEMENT_STATUT)
+                .dateAction(LocalDateTime.now())
+                .auteurId(getCurrentUserId())
+                .description("Changement de statut de " + ancienStatut + " à " + statut)
+                .ancienStatut(ancienStatut)
+                .nouveauStatut(statut)
+                .build();
+        actionRepository.save(action);
+
+        notificationService.envoyerChangementStatut(incident, ancienStatut.name());
+    }
+
+    private Long getCurrentUserId() {
+        try {
+            String principal = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            return Long.valueOf(principal);
+        } catch (Exception e) {
+            return 0L; // ID par défaut si non authentifié (dev mode)
+        }
     }
 }

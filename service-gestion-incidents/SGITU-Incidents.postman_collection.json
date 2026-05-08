@@ -12,10 +12,19 @@
 					"name": "Signaler un incident",
 					"request": {
 						"method": "POST",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "1"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "VOYAGEUR"
+							}
+						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"type\": \"ACCIDENT\",\n  \"description\": \"Accident léger entre deux bus à la station centrale.\",\n  \"dateIncident\": \"2024-05-08T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"declarantId\": 1,\n  \"vehiculeId\": \"BUS-123\",\n  \"preuves\": [\n    {\n      \"type\": \"PHOTO\",\n      \"fichierBase64\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\",\n      \"description\": \"Vue d'ensemble de l'accident\"\n    }\n  ]\n}",
+							"raw": "{\n  \"type\": \"ACCIDENT\",\n  \"description\": \"Accident léger entre deux bus à la station centrale.\",\n  \"dateIncident\": \"2024-05-08T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"vehiculeId\": \"BUS-123\",\n  \"preuves\": [\n    {\n      \"type\": \"PHOTO\",\n      \"fichierBase64\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\",\n      \"description\": \"Vue d'ensemble de l'accident\"\n    }\n  ]\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -37,7 +46,16 @@
 					"name": "Consulter un incident",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "1"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "VOYAGEUR"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/1",
 							"host": [
@@ -53,7 +71,16 @@
 					"name": "Consulter le suivi (historique)",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "2"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "AGENT_INCIDENTS"
+							}
+						],
 						"url": {
 							"raw": "{{baseUrl}}/1/suivi",
 							"host": [
@@ -70,9 +97,18 @@
 					"name": "Filtrer les incidents",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}?statut=NOUVEAU&declarantId=1",
+							"raw": "{{baseUrl}}?statut=NOUVEAU",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -80,10 +116,6 @@
 								{
 									"key": "statut",
 									"value": "NOUVEAU"
-								},
-								{
-									"key": "declarantId",
-									"value": "1"
 								}
 							]
 						}
@@ -93,7 +125,16 @@
 					"name": "Clôturer un incident",
 					"request": {
 						"method": "PUT",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"motif\": \"Incident résolu, bus réparé et remis en service.\"\n}",
@@ -119,7 +160,16 @@
 					"name": "Escalader un incident",
 					"request": {
 						"method": "PUT",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"motif\": \"Dégâts matériels importants nécessitant l'intervention de la police.\"\n}",
@@ -145,7 +195,16 @@
 					"name": "Affecter un responsable",
 					"request": {
 						"method": "PUT",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "3"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "SUPERVISEUR_INCIDENTS"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"responsableId\": 42\n}",
@@ -171,7 +230,16 @@
 					"name": "Mettre à jour le statut",
 					"request": {
 						"method": "PUT",
-						"header": [],
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "2"
+							},
+							{
+								"key": "X-User-Role",
+								"value": "AGENT_INCIDENTS"
+							}
+						],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n  \"statut\": \"EN_TRAITEMENT\"\n}",
@@ -189,50 +257,6 @@
 							"path": [
 								"1",
 								"statut"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Rapports",
-			"item": [
-				{
-					"name": "Générer un rapport",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/rapports?periode=mois",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"rapports"
-							],
-							"query": [
-								{
-									"key": "periode",
-									"value": "mois"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Tableau de bord",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/rapports/tableau-bord",
-							"host": [
-								"{{baseUrl}}"
-							],
-							"path": [
-								"rapports",
-								"tableau-bord"
 							]
 						}
 					}
