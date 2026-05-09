@@ -103,6 +103,26 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
+    // ── GET /users/drivers/ids — Lister les IDs des chauffeurs (Inter-service / Authentifié) ──
+
+    @Operation(
+        summary = "Récupérer la liste des IDs de tous les chauffeurs",
+        description = "Retourne uniquement les identifiants numériques des utilisateurs ayant le rôle ROLE_DRIVER.",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Liste des IDs retournée avec succès",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                array = @ArraySchema(schema = @Schema(type = "integer", format = "int64", example = "1")))),
+        @ApiResponse(responseCode = "401", description = "Token JWT absent ou invalide",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponseDTO.class)))
+    })
+    @GetMapping("/drivers/ids")
+    public ResponseEntity<List<Long>> getDriverIds() {
+        return ResponseEntity.ok(userService.getDriverIds());
+    }
+
     // ── GET /users/{id} — Récupérer un profil (Authentifié) ──
 
     @Operation(

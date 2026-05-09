@@ -56,6 +56,7 @@ public class SecurityConfig {
 
                 // Existence check -- any authenticated service
                 .requestMatchers(HttpMethod.GET, "/users/*/exists").authenticated()
+                .requestMatchers(HttpMethod.GET, "/users/drivers/ids").authenticated()
 
                 // Admin endpoints
                 .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
