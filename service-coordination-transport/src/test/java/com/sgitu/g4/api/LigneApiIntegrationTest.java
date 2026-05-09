@@ -41,7 +41,7 @@ class LigneApiIntegrationTest {
 	}
 
 	@Test
-	@WithMockUser(username = "gestionnaire.reseau", roles = { "G4_DISPATCHER" })
+	@WithMockUser(username = "gestionnaire.reseau", roles = { "G4_OPERATOR" })
 	void creationLigne_nominal() throws Exception {
 		LigneRequest req = new LigneRequest();
 		req.setCode("INT-L1");

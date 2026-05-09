@@ -50,7 +50,7 @@
 							"raw": "{\n  \"username\": \"gestionnaire.reseau\",\n  \"password\": \"password\"\n}"
 						},
 						"url": "{{baseUrl}}/api/auth/login",
-						"description": "Comptes démo : gestionnaire.reseau, gestionnaire.flotte, admin.technique, operateur, g10.integration — mot de passe : password"
+						"description": "Comptes démo (mot de passe : password) : gestionnaire.reseau = G4_OPERATOR (réseau), gestionnaire.flotte = G4_DISPATCHER (flotte), admin.technique = G4_ADMIN (supervision + tout), g10.integration = gateway."
 					}
 				}
 			]
