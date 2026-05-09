@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +75,15 @@ public class Ticket {
     @Field("metadata")
     private Map<String, Object> metadata;
 
+    @Field("parent_ticket_id")
+    private String parentTicketId;
+
+    @Field("transferred_from_user_id")
+    private String transferredFromUserId;
+
+    @Field("transfer_reason")
+    private String transferReason;
+
     @Field("expires_at")
     private Instant expiresAt;
 
@@ -89,24 +99,37 @@ public class Ticket {
     @Field("cancelled_at")
     private Instant cancelledAt;
 
+    @Field("deleted_at")
+    private Instant deletedAt;
+
+
+
     @Field("transferred_at")
     private Instant transferredAt;
 
-    @CreatedDate
+
     @Field("issued_at")
     private Instant issuedAt;
+
+    @CreatedDate
+    @Field("created_at")
+    private Instant createdAt;
 
     @LastModifiedDate
     @Field("updated_at")
     private Instant updatedAt;
 
 
-
+    public void transferPendingTo(String newHolderId, String reason) {
+        this.transferHistory.add(
+                new TransferRecord(holderId, newHolderId, Instant.now(), reason)
+        );
+        this.status   = TicketStatus.TRANSFER_PENDING;
+    }
     public void transferTo(String newHolderId, String reason) {
         this.transferHistory.add(
-                new TransferRecord(id, newHolderId, Instant.now(), reason)
+                new TransferRecord(holderId, newHolderId, Instant.now(), reason)
         );
-        this.holderId = newHolderId;
         this.status   = TicketStatus.TRANSFERRED;
     }
 
@@ -118,5 +141,56 @@ public class Ticket {
     public boolean isActive()  {
         return (status == TicketStatus.ISSUED || status == TicketStatus.TRANSFERRED)
                 && !isExpired();
+    }
+
+
+    public Map<String, Object> copyMetadata() {
+
+        return this.getMetadata() != null
+                ? new HashMap<>(this.getMetadata())
+                : new HashMap<>();
+    }
+
+
+    public Ticket copyTo() {
+        return Ticket.builder()
+                .tripId(this.tripId)
+                .price(this.price)
+                .currency(this.currency)
+                .ticketType(this.ticketType)
+                .ticketClass(this.ticketClass)
+                .holderId(this.holderId)
+                .tokenValue(this.tokenValue)
+                .identityMethod(this.identityMethod)
+                .status(this.status)
+                .transferHistory(new ArrayList<>(this.transferHistory))
+                .metadata(this.metadata != null ? new HashMap<>(this.metadata) : null)
+                .expiresAt(this.expiresAt)
+                .flaggedAt(this.flaggedAt)
+                .redeemedAt(this.redeemedAt)
+                .refundedAt(this.refundedAt)
+                .cancelledAt(this.cancelledAt)
+                .deletedAt(this.deletedAt)
+                .transferredAt(this.transferredAt)
+                .build();
+    }
+
+
+    public Ticket copyAsNew() {
+        return Ticket.builder()
+                .tripId(this.tripId)
+                .price(this.price)
+                .currency(this.currency)
+                .ticketType(this.ticketType)
+                .ticketClass(this.ticketClass)
+                .holderId(this.holderId)
+                .identityMethod(this.identityMethod)
+                .metadata(this.metadata != null ? new HashMap<>(this.metadata) : null)
+                .expiresAt(this.expiresAt)
+                // status resets to ISSUED (Builder.Default)
+                // tokenValue excluded — caller must assign a fresh one
+                // transferHistory excluded — starts fresh
+                // all *_at timestamps excluded — set by lifecycle/auditing
+                .build();
     }
 }

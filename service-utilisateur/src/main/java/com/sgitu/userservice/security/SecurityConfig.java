@@ -1,17 +1,19 @@
 package com.sgitu.userservice.security;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -19,10 +21,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
-    private final InternalKeyFilter internalKeyFilter;
-
-    @Value("${internal.key}")
-    private String internalKey;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -32,10 +30,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) ->
+                    res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                .accessDeniedHandler((req, res, e) ->
+                    res.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
+            )
             .authorizeHttpRequests(auth -> auth
-                // Public — inscription
+                // Public -- login (G3 issues the JWT)
+                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+
+                // Public -- account creation (called by G10 on registration)
                 .requestMatchers(HttpMethod.POST, "/users").permitAll()
 
                 // Swagger / OpenAPI
@@ -46,23 +54,21 @@ public class SecurityConfig {
                     "/v3/api-docs.yaml"
                 ).permitAll()
 
-                // Endpoint interne G10 — protégé par X-Internal-Key (InternalKeyFilter)
-                .requestMatchers("/users/internal/**").hasRole("INTERNAL")
-
-                // Vérification d'existence — authentifié
+                // Existence check -- any authenticated service
                 .requestMatchers(HttpMethod.GET, "/users/*/exists").authenticated()
+                .requestMatchers(HttpMethod.GET, "/users/drivers/ids").authenticated()
 
                 // Admin endpoints
                 .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/roles").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/deactivate").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/users/*/activate").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/users/*").hasRole("ADMIN")
 
-                // Tout le reste — authentifié
+                // Everything else -- authenticated
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(internalKeyFilter, JwtFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

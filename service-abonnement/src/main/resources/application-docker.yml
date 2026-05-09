@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:mysql://db-abonnement:3306/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+application:
+  config:
+    utilisateur-service-url: ${UTILISATEUR_SERVICE_URL}
+    paiement-service-url: ${PAIEMENT_SERVICE_URL}
+    analyse-service-url: ${ANALYSE_SERVICE_URL}
+  topics:
+      souscription: abonnement.souscription
+      rappel: abonnement.rappel
+      renouvellement: abonnement.renouvellement
+      annulation: abonnement.annulation
+      suspension: abonnement.suspension
+      desactivation: abonnement.desactivation
+      modification: abonnement.modification
+
