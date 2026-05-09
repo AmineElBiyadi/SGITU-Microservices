@@ -40,6 +40,10 @@ public class Incident {
     @Column(nullable = false)
     private LocalDateTime dateIncident;
 
+    private LocalDateTime dateLimiteResolution;
+
+    private LocalDateTime dateResolution;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutIncident statut;
@@ -52,14 +56,23 @@ public class Incident {
     private Long declarantId;
 
     private Long responsableId;
+    
+    private String vehiculeId;
+
+    // Référence parent pour les accidents multi-véhicules (Task 1.7)
+    private String incidentParentRef;
+
+    // Flag pour savoir si G4 (Transport) a déjà été notifié (pour le edge-case REJETE)
+    @Builder.Default
+    private boolean transportNotifie = false;
+
+    @Column(nullable = false)
+    private String source; // "USER", "IOT"
 
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "localisation_id", nullable = false)
     private Localisation localisation;
 
-    @ManyToOne
-    @JoinColumn(name = "categorie_id")
-    private CategorieIncident categorie;
 
     @OneToMany(mappedBy = "incident", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -81,8 +94,15 @@ public class Incident {
     }
 
     public boolean isEscaladable() {
-        return this.gravite == NiveauGravite.CRITIQUE &&
+        return (this.statut == StatutIncident.ASSIGNE ||
+                this.statut == StatutIncident.EN_TRAITEMENT) &&
                 this.statut != StatutIncident.ESCALADE;
+    }
+
+    public boolean isAnnulable() {
+        return this.statut == StatutIncident.NOUVEAU ||
+                this.statut == StatutIncident.ANALYSE ||
+                this.statut == StatutIncident.ASSIGNE;
     }
 
     public void addPreuve(Preuve preuve) {
