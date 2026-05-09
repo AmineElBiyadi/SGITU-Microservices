@@ -56,10 +56,10 @@ public class G5NotificationService {
             // headers.setBearerAuth(jwt);
 
             HttpEntity<G5NotificationRequest> entity = new HttpEntity<>(request, headers);
-            
+
             restTemplate.postForEntity(g5Url, entity, String.class);
-            
-            log.info("[G5Notification] Notification PUSH envoyée pour véhicule {} (Alerte: {})", 
+
+            log.info("[G5Notification] Notification PUSH envoyée pour véhicule {} (Alerte: {})",
                     alert.getVehiculeId(), alert.getTypeAlert());
 
         } catch (Exception e) {
@@ -80,13 +80,20 @@ public class G5NotificationService {
 
     private String genererMessageConducteur(Alert alert) {
         switch (alert.getTypeAlert()) {
-            case TEMPERATURE_CRITIQUE: return "Température moteur critique, arrêtez le véhicule";
-            case CARBURANT_CRITIQUE: return "Niveau carburant très bas, faites le plein";
-            case VITESSE_EXCESSIVE: return "Vitesse excessive, réduisez la vitesse";
-            case FREINAGE_BRUSQUE: return "Freinage brusque détecté, soyez prudent";
-            case IMMOBILISATION: return "Arrêt anormal détecté, vérifiez la situation";
-            case DEVIATION_ITINERAIRE: return "Déviation d'itinéraire détectée";
-            default: return "Alerte de sécurité détectée sur votre véhicule";
+            case TEMPERATURE_CRITIQUE:
+                return "Température moteur critique, arrêtez le véhicule";
+            case CARBURANT_CRITIQUE:
+                return "Niveau carburant très bas, faites le plein";
+            case VITESSE_EXCESSIVE:
+                return "Vitesse excessive, réduisez la vitesse";
+            case FREINAGE_BRUSQUE:
+                return "Freinage brusque détecté, soyez prudent";
+            case IMMOBILISATION:
+                return "Arrêt anormal détecté, vérifiez la situation";
+            case DEVIATION_ITINERAIRE:
+                return "Déviation d'itinéraire détectée";
+            default:
+                return "Alerte de sécurité détectée sur votre véhicule";
         }
     }
 }

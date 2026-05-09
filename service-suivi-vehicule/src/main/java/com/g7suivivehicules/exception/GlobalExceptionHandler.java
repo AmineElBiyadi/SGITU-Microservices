@@ -23,13 +23,13 @@ public class GlobalExceptionHandler {
         response.put("timestamp", LocalDateTime.now());
         response.put("status", 400);
         response.put("error", "Bad Request");
-        
+
         // Prendre la première erreur de validation
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getDefaultMessage())
                 .orElse("Champ obligatoire manquant ou invalide");
-                
+
         response.put("message", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
@@ -63,7 +63,8 @@ public class GlobalExceptionHandler {
         response.put("timestamp", LocalDateTime.now());
         response.put("status", 409);
         response.put("error", "Conflict");
-        response.put("message", "Conflit de données : Immatriculation déjà existante ou violation de contrainte unique");
+        response.put("message",
+                "Conflit de données : Immatriculation déjà existante ou violation de contrainte unique");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
