@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -14,10 +15,22 @@ import java.time.LocalDateTime;
 @Builder
 public class NotificationEvent implements Serializable {
 
-    private Long destinataireId;
-    private String sujet;
-    private String message;
-    private String canal;          // EMAIL, SMS, IN-APP, PUSH
-    private String referenceIncident;
-    private LocalDateTime dateEvenement;
+    private String notificationId;
+    private String sourceService;
+    private String eventType;
+    private String channel;
+    private String priority;
+    private Recipient recipient;
+    private Map<String, Object> metadata;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class Recipient implements Serializable {
+        private String userId;
+        private String email;
+        private String phone;
+        private String deviceToken;
+    }
 }
