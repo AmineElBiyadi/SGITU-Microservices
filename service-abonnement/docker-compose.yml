@@ -35,6 +35,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
+      - UTILISATEUR_SERVICE_URL=${UTILISATEUR_SERVICE_URL}
+      - PAIEMENT_SERVICE_URL=${PAIEMENT_SERVICE_URL}
+      - ANALYSE_SERVICE_URL=${ANALYSE_SERVICE_URL}
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
