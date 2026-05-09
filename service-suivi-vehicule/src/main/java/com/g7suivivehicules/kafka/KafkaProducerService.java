@@ -116,7 +116,7 @@ public class KafkaProducerService {
                 typeG9 = "RETARD";
                 break;
             case DEVIATION_ITINERAIRE:
-                typeG9 = "AUTRE"; 
+                typeG9 = "AUTRE";
                 break;
             case VITESSE_EXCESSIVE:
             default:
@@ -147,7 +147,7 @@ public class KafkaProducerService {
                 .description(alert.getMessage())
                 .latitude(alert.getLatitude())
                 .longitude(alert.getLongitude())
-                .vehiculeId(alert.getVehiculeId().toString()) 
+                .vehiculeId(alert.getVehiculeId().toString())
                 .dateDetection(alert.getTimestampDebut().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")))
                 .build();
 
