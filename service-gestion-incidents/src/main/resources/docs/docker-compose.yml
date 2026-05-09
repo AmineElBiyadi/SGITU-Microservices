@@ -35,8 +35,8 @@ services:
 
   gestion-incidents:
     build:
-      context: ./service-gestion-incidents
-      dockerfile: Dockerfile
+      context: ../../../..
+      dockerfile: ../../../Dockerfile
     container_name: service-gestion-incidents
     ports:
       - "8089:8089"
