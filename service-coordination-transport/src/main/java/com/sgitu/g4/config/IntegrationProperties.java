@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "sgitu.integration")
 public class IntegrationProperties {
 
-	private String g3BaseUrl = "http://localhost:8083";
+	/** URL billetterie (G1). */
+	private String g1BaseUrl = "http://localhost:8083";
 	private String g5BaseUrl = "http://localhost:8085";
 	private String g7BaseUrl = "http://localhost:8087";
 	private String g9BaseUrl = "http://localhost:8089";
@@ -19,5 +20,5 @@ public class IntegrationProperties {
 	private int connectTimeoutMs = 3000;
 	private int readTimeoutMs = 5000;
 	private String g5NotificationPath = "/api/notifications/send";
-	private String g3MissionLifecyclePath = "/api/internal/missions/events";
+	private String g1MissionLifecyclePath = "/api/internal/missions/events";
 }

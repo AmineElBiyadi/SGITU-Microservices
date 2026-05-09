@@ -45,6 +45,7 @@ public class Horaire {
 	@Column(nullable = false)
 	private LocalTime heurePassage;
 
+	/** 1 = lundi … 7 = dimanche (ISO-8601). Null = tous les jours. */
 	private Integer jourSemaine;
 
 	private LocalDate validFrom;

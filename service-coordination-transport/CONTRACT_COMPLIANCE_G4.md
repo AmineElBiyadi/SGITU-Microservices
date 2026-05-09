@@ -4,6 +4,16 @@ Projet: SGITU
 Service: G4 Coordination des Transports  
 Statut global: Conforme (avec preconditions d'environnement Kafka/Gateway)
 
+### Numérotation des groupes (référence projet)
+
+| Groupe | Domaine | Rappel |
+|--------|---------|--------|
+| **G1** | Billetterie & gestion commerciale | **Consommateur** des messages Kafka `missions-lifecycle` (cycle de vie mission). |
+| **G3** | Gestion des utilisateurs | Source des **driver id** / `chauffeurId` ; **pas** le destinataire du topic billetterie. |
+| **G4** | Coordination des transports | **Producteur** Kafka vers G1 pour le cycle de vie mission. |
+
+Le code utilise **G1** pour la billetterie côté Kafka (`G1BilletterieClient`, `G1MissionLifecycleMessage`, `SGITU_G1_*`). Les variables **`SGITU_G3_*`** restent en **secours** dans `application.yml` (G3 = utilisateurs / conducteurs, pas billetterie). Le croisement avec la billetterie repose sur **`missionDetails.missionId`** (`M-{id}`) dans le topic `missions-lifecycle`. Bases existantes avec d’anciennes colonnes `reference_g1` / `reference_g3` sur `missions` : exécuter `src/main/resources/db/postgresql-drop-missions-reference-billetterie.sql`.
+
 ## 1) Contrat endpoints G4 (via G10)
 
 | Domaine | Endpoint | Implémentation | Statut |
@@ -84,15 +94,18 @@ Le **groupe 3** assure la **gestion des utilisateurs** (comptes, profils, rôles
 | Appel via Gateway G10 | `G5NotificationClient` utilise `g10GatewayUrl` + `g5NotificationPath` | Conforme |
 | JWT requis | `SecurityConfig` protège l'endpoint (non public) | Conforme |
 
-## 3) Contrat G4 ↔ G3 (Billetterie)
+## 3) Contrat G4 ↔ G1 (Billetterie) — Kafka `missions-lifecycle`
+
+**Partie métier : G4 (producteur) → G1 (consommateur billetterie).**  
+Tout document d’interface doit désigner **G1** pour les actions commerciales (vente, validation, remboursement). Si un texte écrit « G3 notifié pour la billetterie » ou « tableau des actions G3 » pour ce flux, c’est une **erreur de relecture** : remplacer par **G1**.
 
 | Exigence | Implémentation | Statut |
 |---|---|---|
-| Echange asynchrone Kafka | `G3BilletterieClient` (Kafka producer) | Conforme |
+| Echange asynchrone Kafka | `G1BilletterieClient` (producteur → G1) | Conforme |
 | Topic `missions-lifecycle` | `sgitu.kafka.topic-mission-lifecycle` | Conforme |
 | Clé de partition `missionId` | key = `mission.getId()` | Conforme |
-| Payload structuré (`notificationId`, `eventType`, `metadata.reason`, `missionDetails`, `metadata.variables`) | `G3MissionLifecycleMessage` | Conforme |
-| `missionDetails` : `missionId`, `status`, `horaire`, `trajet` | `MissionService.publishG3Lifecycle` | Conforme |
+| Payload structuré (`notificationId`, `eventType`, `metadata.reason`, `missionDetails`, `metadata.variables`) | `G1MissionLifecycleMessage` | Conforme |
+| `missionDetails` : `missionId`, `status`, `horaire`, `trajet` | `MissionService.publishG1BilletterieLifecycle` | Conforme |
 | `metadata.variables` : uniquement `vehiculeId` (pas `chauffeurId`) | `Map.of("vehiculeId", mission.getVehiculeId())` | Conforme |
 | Publication sur transitions mission | `MissionService` (create/update/cloturer/annuler) | Conforme |
 
@@ -123,7 +136,8 @@ Pour une conformité runtime complete en integration:
 - `SPRING_KAFKA_BOOTSTRAP_SERVERS=<broker:9092>`
 - `SGITU_G10_URL=<url_gateway>`
 - `SGITU_G9_INCIDENT_TOPIC=incident.transport.topic` (optionnel, valeur par défaut deja conforme)
-- `SGITU_G3_MISSION_TOPIC=missions-lifecycle` (optionnel, valeur par défaut deja conforme)
+- `SGITU_G1_MISSION_TOPIC=missions-lifecycle` (optionnel ; secours : `SGITU_G3_MISSION_TOPIC`)
+- `SGITU_G1_URL` (billetterie) ; secours : `SGITU_G3_URL`
 - `SGITU_G7_POSITIONS_TOPIC=vehicule-positions` (optionnel, valeur par défaut deja conforme)
 
 ## 7) Verification technique locale

@@ -450,17 +450,16 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       SGITU_G9_INCIDENT_TOPIC: "${SGITU_G9_INCIDENT_TOPIC:-incident.transport.topic}"
       SGITU_G7_POSITIONS_TOPIC: "${SGITU_G7_POSITIONS_TOPIC:-vehicule-positions}"
-      SGITU_G3_MISSION_TOPIC: "${SGITU_G3_MISSION_TOPIC:-missions-lifecycle}"
+      SGITU_G1_MISSION_TOPIC: "${SGITU_G1_MISSION_TOPIC:-missions-lifecycle}"
       SGITU_G9_CONSUMER_GROUP: "${SGITU_G9_CONSUMER_GROUP:-g4-coordination-g9}"
       SGITU_G7_CONSUMER_GROUP: "${SGITU_G7_CONSUMER_GROUP:-g4-coordination-g7}"
       SGITU_G10_URL: "${SGITU_G10_URL:-http://g10-gateway:8080}"
       SGITU_G5_URL: "${SGITU_G5_URL:-http://g5-notifications:8085}"
-      # Legacy env name kept by code; endpoint now points to Group 1 billetterie.
-      SGITU_G3_URL: "${SGITU_G3_URL:-http://g1-billetterie:8081}"
+      SGITU_G1_URL: "${SGITU_G1_URL:-http://g1-billetterie:8081}"
       SGITU_G7_URL: "${SGITU_G7_URL:-http://g7-tracking:8087}"
       SGITU_G9_URL: "${SGITU_G9_URL:-http://g9-incidents:8089}"
       SGITU_INTEGRATION_G5_NOTIFICATION_PATH: "${SGITU_INTEGRATION_G5_NOTIFICATION_PATH:-/api/notifications/send}"
-      SGITU_INTEGRATION_G3_MISSION_LIFECYCLE_PATH: "${SGITU_INTEGRATION_G3_MISSION_LIFECYCLE_PATH:-/api/internal/missions/events}"
+      SGITU_G1_MISSION_LIFECYCLE_PATH: "${SGITU_G1_MISSION_LIFECYCLE_PATH:-/api/internal/missions/events}"
     depends_on:
       postgres:
         condition: service_healthy

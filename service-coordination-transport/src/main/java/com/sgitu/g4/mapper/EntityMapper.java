@@ -136,7 +136,6 @@ public final class EntityMapper {
 				.plannedStart(e.getPlannedStart())
 				.actualStart(e.getActualStart())
 				.endedAt(e.getEndedAt())
-				.referenceG3(e.getReferenceG3())
 				.notes(e.getNotes())
 				.createdAt(e.getCreatedAt())
 				.updatedAt(e.getUpdatedAt())

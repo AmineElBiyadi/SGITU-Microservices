@@ -224,7 +224,7 @@
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"trajetId\": 1,\n  \"affectationId\": 1,\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\",\n  \"referenceG3\": \"BIL-G3-1001\",\n  \"notes\": \"Mission régulière\"\n}"
+							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"trajetId\": 1,\n  \"affectationId\": 1,\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\",\n  \"notes\": \"Mission régulière\"\n}"
 						},
 						"url": "{{baseUrl}}/api/g4/missions"
 					}
@@ -312,7 +312,7 @@
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": { "mode": "raw", "raw": "{\n  \"missionId\": 1,\n  \"motif\": \"Annulation opérationnelle\",\n  \"notifierG3\": true\n}" },
+						"body": { "mode": "raw", "raw": "{\n  \"missionId\": 1,\n  \"motif\": \"Annulation opérationnelle\",\n  \"notifierG1\": true\n}" },
 						"url": "{{baseUrl}}/api/g4/events/cancel-mission"
 					}
 				}

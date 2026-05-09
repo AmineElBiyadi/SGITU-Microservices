@@ -35,9 +35,6 @@ public class MissionRequest {
 	private Instant actualStart;
 	private Instant endedAt;
 
-	@Size(max = 128)
-	private String referenceG3;
-
 	@Size(max = 2000)
 	private String notes;
 }

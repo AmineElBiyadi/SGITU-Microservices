@@ -5,9 +5,10 @@ import lombok.Data;
 
 import java.util.Map;
 
+/** Payload Kafka cycle de vie mission — consommateur métier : G1 (billetterie). */
 @Data
 @Builder
-public class G3MissionLifecycleMessage {
+public class G1MissionLifecycleMessage {
 
 	private String notificationId;
 	private String eventType;

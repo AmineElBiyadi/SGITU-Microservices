@@ -61,9 +61,6 @@ public class Mission {
 	private Instant actualStart;
 	private Instant endedAt;
 
-	@Column(length = 128)
-	private String referenceG3;
-
 	@Column(length = 2000)
 	private String notes;
 

@@ -24,7 +24,6 @@ public class MissionResponse {
 	private Instant plannedStart;
 	private Instant actualStart;
 	private Instant endedAt;
-	private String referenceG3;
 	private String notes;
 	private Instant createdAt;
 	private Instant updatedAt;

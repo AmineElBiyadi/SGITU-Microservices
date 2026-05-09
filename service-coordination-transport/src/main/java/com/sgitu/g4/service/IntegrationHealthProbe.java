@@ -16,7 +16,7 @@ public class IntegrationHealthProbe {
 
 	public Map<String, String> probeAll() {
 		Map<String, String> map = new LinkedHashMap<>();
-		map.put("G3_BILLETTERIE", ping(integrationProperties.getG3BaseUrl()));
+		map.put("G1_BILLETTERIE", ping(integrationProperties.getG1BaseUrl()));
 		map.put("G5_NOTIFICATIONS", ping(integrationProperties.getG5BaseUrl()));
 		map.put("G7_FLOTTE", ping(integrationProperties.getG7BaseUrl()));
 		map.put("G9_INCIDENTS", ping(integrationProperties.getG9BaseUrl()));

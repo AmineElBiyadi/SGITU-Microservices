@@ -1,5 +1,6 @@
 package com.sgitu.g4.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -12,5 +13,6 @@ public class CancelMissionEventRequest {
 
 	@Size(max = 2000)
 	private String motif;
-	private boolean notifierG3;
+	@JsonAlias("notifierG3")
+	private boolean notifierG1;
 }

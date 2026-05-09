@@ -3,7 +3,7 @@ package com.sgitu.g4.service;
 import com.sgitu.g4.dto.MissionRequest;
 import com.sgitu.g4.dto.MissionResponse;
 import com.sgitu.g4.dto.MissionStatusResponse;
-import com.sgitu.g4.dto.G3MissionLifecycleMessage;
+import com.sgitu.g4.dto.G1MissionLifecycleMessage;
 import com.sgitu.g4.entity.AffectationVehiculeLigne;
 import com.sgitu.g4.entity.Ligne;
 import com.sgitu.g4.entity.Mission;
@@ -12,7 +12,7 @@ import com.sgitu.g4.entity.Trajet;
 import com.sgitu.g4.exception.BadRequestException;
 import com.sgitu.g4.exception.ForbiddenOperationException;
 import com.sgitu.g4.exception.ResourceNotFoundException;
-import com.sgitu.g4.integration.G3BilletterieClient;
+import com.sgitu.g4.integration.G1BilletterieClient;
 import com.sgitu.g4.integration.G7VehicleClient;
 import com.sgitu.g4.mapper.EntityMapper;
 import com.sgitu.g4.repository.AffectationRepository;
@@ -40,7 +40,7 @@ public class MissionService {
 	private final LigneRepository ligneRepository;
 	private final TrajetRepository trajetRepository;
 	private final AffectationRepository affectationRepository;
-	private final G3BilletterieClient g3BilletterieClient;
+	private final G1BilletterieClient g1BilletterieClient;
 	private final G7VehicleClient g7VehicleClient;
 	private final SupervisionLogService supervisionLogService;
 
@@ -60,12 +60,11 @@ public class MissionService {
 				.plannedStart(request.getPlannedStart())
 				.actualStart(request.getActualStart())
 				.endedAt(request.getEndedAt())
-				.referenceG3(request.getReferenceG3())
 				.notes(request.getNotes())
 				.build();
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("INFO", "MISSION", "Créée id=" + saved.getId());
-		publishG3Lifecycle(saved, "MISSION_PLANIFIED", "DEBUT_MISSION");
+		publishG1BilletterieLifecycle(saved, "MISSION_PLANIFIED", "DEBUT_MISSION");
 		return EntityMapper.toDto(saved);
 	}
 
@@ -111,11 +110,10 @@ public class MissionService {
 		mission.setPlannedStart(request.getPlannedStart());
 		mission.setActualStart(request.getActualStart());
 		mission.setEndedAt(request.getEndedAt());
-		mission.setReferenceG3(request.getReferenceG3());
 		mission.setNotes(request.getNotes());
 		Mission saved = missionRepository.save(mission);
 		if (oldStatus != StatutMission.EN_COURS && saved.getStatut() == StatutMission.EN_COURS) {
-			publishG3Lifecycle(saved, "ON_GOING", "TRAJET_EN_COURS");
+			publishG1BilletterieLifecycle(saved, "ON_GOING", "TRAJET_EN_COURS");
 		}
 		return EntityMapper.toDto(saved);
 	}
@@ -130,7 +128,7 @@ public class MissionService {
 		mission.setEndedAt(Instant.now());
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("INFO", "MISSION", "Clôturée id=" + id);
-		publishG3Lifecycle(saved, "MISSION_CLOSED", "FIN_MISSION");
+		publishG1BilletterieLifecycle(saved, "MISSION_CLOSED", "FIN_MISSION");
 		return EntityMapper.toDto(saved);
 	}
 
@@ -140,7 +138,7 @@ public class MissionService {
 	}
 
 	@Transactional
-	public MissionResponse annuler(Long id, boolean notifierG3) {
+	public MissionResponse annuler(Long id, boolean notifierG1) {
 		Mission mission = missionRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Mission introuvable : " + id));
 		if (mission.getStatut() == StatutMission.CLOTUREE) {
 			throw new BadRequestException("Mission déjà clôturée");
@@ -149,21 +147,21 @@ public class MissionService {
 		mission.setEndedAt(Instant.now());
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("WARN", "MISSION", "Annulée id=" + id);
-		if (notifierG3) {
-			publishG3Lifecycle(saved, "MISSION_CANCELLED", "ANNULATION");
+		if (notifierG1) {
+			publishG1BilletterieLifecycle(saved, "MISSION_CANCELLED", "ANNULATION");
 		}
 		return EntityMapper.toDto(saved);
 	}
 
-	private void publishG3Lifecycle(Mission mission, String eventType, String reason) {
-		G3MissionLifecycleMessage msg = G3MissionLifecycleMessage.builder()
+	private void publishG1BilletterieLifecycle(Mission mission, String eventType, String reason) {
+		G1MissionLifecycleMessage msg = G1MissionLifecycleMessage.builder()
 				.notificationId(UUID.randomUUID().toString())
 				.eventType(eventType)
-				.metadata(G3MissionLifecycleMessage.Metadata.builder()
+				.metadata(G1MissionLifecycleMessage.Metadata.builder()
 						.reason(reason)
-						.missionDetails(G3MissionLifecycleMessage.MissionDetails.builder()
+						.missionDetails(G1MissionLifecycleMessage.MissionDetails.builder()
 								.missionId("M-" + mission.getId())
-								.status(mapG3Status(mission.getStatut()))
+								.status(mapBilletterieLifecycleStatus(mission.getStatut()))
 								.horaire(Map.of(
 										"depart", formatInstant(mission.getPlannedStart()),
 										"arrivee", formatInstant(mission.getEndedAt())))
@@ -174,10 +172,10 @@ public class MissionService {
 						.variables(Map.of("vehiculeId", mission.getVehiculeId()))
 						.build())
 				.build();
-		g3BilletterieClient.publishMissionLifecycleEvent(String.valueOf(mission.getId()), msg);
+		g1BilletterieClient.publishMissionLifecycleEvent(String.valueOf(mission.getId()), msg);
 	}
 
-	private String mapG3Status(StatutMission statut) {
+	private String mapBilletterieLifecycleStatus(StatutMission statut) {
 		return switch (statut) {
 			case PLANIFIEE -> "PLANIFIED";
 			case EN_COURS -> "ON_GOING";

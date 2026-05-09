@@ -144,11 +144,11 @@ public class CoordinationEventService {
 		if (mission.getStatut() == StatutMission.CLOTUREE) {
 			throw new BadRequestException("Mission déjà clôturée");
 		}
-		missionService.annuler(mission.getId(), request.isNotifierG3());
+		missionService.annuler(mission.getId(), request.isNotifierG1());
 		Mission refreshed = missionRepository.findById(request.getMissionId()).orElseThrow();
 		Map<String, Object> p = new LinkedHashMap<>();
 		p.put("motif", request.getMotif());
-		p.put("notifierG3", request.isNotifierG3());
+		p.put("notifierG1", request.isNotifierG1());
 		CoordinationEventEntity entity = CoordinationEventEntity.builder()
 				.type(CoordinationEventType.ANNULATION_MISSION)
 				.status(CoordinationEventStatus.TRAITE)
