@@ -15,6 +15,9 @@ public class AffectationRequest {
 	@Size(max = 64)
 	private String vehiculeId;
 
+	@Size(max = 64)
+	private String chauffeurId;
+
 	@NotNull
 	private Long ligneId;
 

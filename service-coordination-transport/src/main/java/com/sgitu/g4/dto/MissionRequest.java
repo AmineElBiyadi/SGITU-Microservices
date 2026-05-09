@@ -15,6 +15,9 @@ public class MissionRequest {
 	@Size(max = 64)
 	private String vehiculeId;
 
+	@Size(max = 64)
+	private String chauffeurId;
+
 	@NotNull
 	private Long ligneId;
 	private Long trajetId;

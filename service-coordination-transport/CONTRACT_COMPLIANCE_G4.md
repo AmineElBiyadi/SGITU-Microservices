@@ -61,6 +61,17 @@ Statut global: Conforme (avec preconditions d'environnement Kafka/Gateway)
 | Supervision | `GET /api/v1/operator/status` | `OperatorStatusController` | Conforme |
 | Supervision | `GET /api/g4/logs` | `G4SupervisionController` | Conforme |
 
+## 1 bis) Périmètre conducteurs (G3 — gestion des utilisateurs)
+
+Le **groupe 3** assure la **gestion des utilisateurs** (comptes, profils, rôles). C’est ce périmètre qui est la **source de vérité** pour l’identifiant conducteur côté SI : G4 reçoit typiquement cet id via l’UI ou les intégrations (souvent le même identifiant que celui exposé dans le JWT / annuaire utilisateurs). Dans l’API G4 le champ JSON s’appelle **`chauffeurId`** ; il correspond au **driver id** métier fourni par G3, sans duplication de la fiche utilisateur dans G4.
+
+| Règle | Implémentation | Statut |
+|---|---|---|
+| Pas de CRUD conducteur dans G4 (fiches chauffeur = domaine G3) | Aucun contrôleur / service métier « chauffeur » | Conforme |
+| Référence optionnelle `chauffeurId` sur mission | `MissionRequest` / `MissionResponse` + entité `Mission` | Conforme |
+| Référence optionnelle `chauffeurId` sur affectation opérationnelle | `AffectationRequest` / `AffectationResponse` + entité `AffectationVehiculeLigne` | Conforme |
+| G4 ne vérifie pas l’existence du conducteur chez G3 (ID opaque côté coordination) | Pas d’intégration client « annuaire conducteurs » dans ce service | Conforme |
+
 ## 2) Contrat G4 ↔ G5 (Notifications)
 
 | Exigence | Implémentation | Statut |
@@ -78,7 +89,9 @@ Statut global: Conforme (avec preconditions d'environnement Kafka/Gateway)
 | Echange asynchrone Kafka | `G3BilletterieClient` (Kafka producer) | Conforme |
 | Topic `missions-lifecycle` | `sgitu.kafka.topic-mission-lifecycle` | Conforme |
 | Clé de partition `missionId` | key = `mission.getId()` | Conforme |
-| Payload structuré (`notificationId`, `eventType`, `metadata.reason`, `missionDetails`, `variables`) | `G3MissionLifecycleMessage` | Conforme |
+| Payload structuré (`notificationId`, `eventType`, `metadata.reason`, `missionDetails`, `metadata.variables`) | `G3MissionLifecycleMessage` | Conforme |
+| `missionDetails` : `missionId`, `status`, `horaire`, `trajet` | `MissionService.publishG3Lifecycle` | Conforme |
+| `metadata.variables` : uniquement `vehiculeId` (pas `chauffeurId`) | `Map.of("vehiculeId", mission.getVehiculeId())` | Conforme |
 | Publication sur transitions mission | `MissionService` (create/update/cloturer/annuler) | Conforme |
 
 ## 4) Contrat G4 ↔ G7 (Suivi)

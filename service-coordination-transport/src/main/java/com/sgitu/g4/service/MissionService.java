@@ -22,6 +22,7 @@ import com.sgitu.g4.repository.TrajetRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -51,6 +52,7 @@ public class MissionService {
 		AffectationVehiculeLigne affectation = resolveAffectation(request.getAffectationId(), ligne);
 		Mission mission = Mission.builder()
 				.vehiculeId(request.getVehiculeId().trim())
+				.chauffeurId(trimToNull(request.getChauffeurId()))
 				.ligne(ligne)
 				.trajet(trajet)
 				.affectation(affectation)
@@ -101,6 +103,7 @@ public class MissionService {
 		Ligne ligne = ligneRepository.findById(request.getLigneId())
 				.orElseThrow(() -> new ResourceNotFoundException("Ligne introuvable : " + request.getLigneId()));
 		mission.setVehiculeId(request.getVehiculeId().trim());
+		mission.setChauffeurId(trimToNull(request.getChauffeurId()));
 		mission.setLigne(ligne);
 		mission.setTrajet(resolveTrajet(request.getTrajetId(), ligne));
 		mission.setAffectation(resolveAffectation(request.getAffectationId(), ligne));
@@ -212,5 +215,9 @@ public class MissionService {
 			throw new BadRequestException("Affectation hors ligne");
 		}
 		return aff;
+	}
+
+	private static String trimToNull(String value) {
+		return StringUtils.hasText(value) ? value.trim() : null;
 	}
 }

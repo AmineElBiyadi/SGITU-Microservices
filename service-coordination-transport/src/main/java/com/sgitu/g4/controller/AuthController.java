@@ -38,7 +38,7 @@ public class AuthController {
 				.map(GrantedAuthority::getAuthority)
 				.map(a -> a.startsWith("ROLE_") ? a.substring("ROLE_".length()) : a)
 				.findFirst()
-				.orElse("OPERATEUR");
+				.orElse("G4_OPERATOR");
 		return ResponseEntity.ok(TokenResponse.builder()
 				.token(token)
 				.type("Bearer")

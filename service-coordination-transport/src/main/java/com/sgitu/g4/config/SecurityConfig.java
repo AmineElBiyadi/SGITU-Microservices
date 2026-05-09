@@ -42,6 +42,14 @@ public class SecurityConfig {
 								"/swagger-ui/index.html"
 						).permitAll()
 						.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/g4/**", "/api/v1/operator/status")
+						.hasAnyRole("G4_OPERATOR", "G4_DISPATCHER", "G4_ADMIN")
+						.requestMatchers(HttpMethod.POST, "/api/g4/**", "/api/notifications/send")
+						.hasAnyRole("G4_DISPATCHER", "G4_ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/g4/**")
+						.hasAnyRole("G4_DISPATCHER", "G4_ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/g4/**")
+						.hasAnyRole("G4_DISPATCHER", "G4_ADMIN")
 						.anyRequest().authenticated()
 				)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -56,12 +64,12 @@ public class SecurityConfig {
 	@Bean
 	UserDetailsService userDetailsService(PasswordEncoder encoder) {
 		return new InMemoryUserDetailsManager(
-				User.withUsername("gestionnaire.reseau").password(encoder.encode("password")).roles("GESTIONNAIRE_RESEAU").build(),
-				User.withUsername("gestionnaire.flotte").password(encoder.encode("password")).roles("GESTIONNAIRE_FLOTTE").build(),
-				User.withUsername("admin.technique").password(encoder.encode("password")).roles("ADMIN_TECHNIQUE").build(),
-				User.withUsername("operateur").password(encoder.encode("password")).roles("OPERATEUR").build(),
+				User.withUsername("gestionnaire.reseau").password(encoder.encode("password")).roles("G4_DISPATCHER").build(),
+				User.withUsername("gestionnaire.flotte").password(encoder.encode("password")).roles("G4_DISPATCHER").build(),
+				User.withUsername("admin.technique").password(encoder.encode("password")).roles("G4_ADMIN").build(),
+				User.withUsername("operateur").password(encoder.encode("password")).roles("G4_OPERATOR").build(),
 				User.withUsername("g10.integration").password(encoder.encode("password"))
-						.roles("GATEWAY_G10", "GESTIONNAIRE_RESEAU", "GESTIONNAIRE_FLOTTE", "OPERATEUR").build()
+						.roles("GATEWAY_G10", "G4_ADMIN").build()
 		);
 	}
 

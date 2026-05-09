@@ -37,6 +37,10 @@ public class Mission {
 	@Column(nullable = false, length = 64)
 	private String vehiculeId;
 
+	/** Identifiant conducteur fourni par G3 (gestion des utilisateurs / driver id) ; G4 ne stocke que cette référence opaque. */
+	@Column(length = 64)
+	private String chauffeurId;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "ligne_id")
 	private Ligne ligne;

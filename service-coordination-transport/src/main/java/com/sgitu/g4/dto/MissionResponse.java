@@ -16,6 +16,7 @@ public class MissionResponse {
 
 	private Long id;
 	private String vehiculeId;
+	private String chauffeurId;
 	private Long ligneId;
 	private Long trajetId;
 	private Long affectationId;

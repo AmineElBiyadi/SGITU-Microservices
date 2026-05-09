@@ -16,6 +16,7 @@ public class AffectationResponse {
 
 	private Long id;
 	private String vehiculeId;
+	private String chauffeurId;
 	private Long ligneId;
 	private Instant dateDebut;
 	private Instant dateFin;

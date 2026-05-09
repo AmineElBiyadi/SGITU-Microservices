@@ -12,6 +12,7 @@ import com.sgitu.g4.repository.LigneRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ public class AffectationService {
 		validateDates(request);
 		AffectationVehiculeLigne entity = AffectationVehiculeLigne.builder()
 				.vehiculeId(request.getVehiculeId().trim())
+				.chauffeurId(trimToNull(request.getChauffeurId()))
 				.ligne(ligne)
 				.dateDebut(request.getDateDebut())
 				.dateFin(request.getDateFin())
@@ -85,5 +87,9 @@ public class AffectationService {
 		if (request.getDateFin() != null && request.getDateFin().isBefore(request.getDateDebut())) {
 			throw new BadRequestException("dateFin invalide");
 		}
+	}
+
+	private static String trimToNull(String value) {
+		return StringUtils.hasText(value) ? value.trim() : null;
 	}
 }
