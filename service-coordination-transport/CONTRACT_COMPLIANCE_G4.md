@@ -72,6 +72,8 @@ Le **groupe 3** assure la **gestion des utilisateurs** (comptes, profils, rôles
 | Référence optionnelle `chauffeurId` sur affectation opérationnelle | `AffectationRequest` / `AffectationResponse` + entité `AffectationVehiculeLigne` | Conforme |
 | G4 ne vérifie pas l’existence du conducteur chez G3 (ID opaque côté coordination) | Pas d’intégration client « annuaire conducteurs » dans ce service | Conforme |
 
+**Intégration recommandée (éviter les incohérences)** : le client (UI, mobile, autre MS) interroge G3 sur `GET {BASE_URL_G3}/api/users/drivers/ids` (ou équivalent documenté par G3), choisit un identifiant dans la liste, puis transmet **exactement** cette valeur dans `chauffeurId` lors des appels G4 (`POST`/`PUT` missions ou affectations). G4 n’appelle pas G3 à l’enregistrement : cela évite une dépendance runtime forte et les échecs si G3 est momentanément indisponible. Une validation stricte « id existe chez G3 » pourrait être ajoutée plus tard en option (feature flag), au prix de latence et de disponibilité couplée à G3.
+
 ## 2) Contrat G4 ↔ G5 (Notifications)
 
 | Exigence | Implémentation | Statut |
