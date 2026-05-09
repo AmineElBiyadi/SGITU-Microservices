@@ -14,6 +14,8 @@ public interface UserService {
 
     List<UserResponseDTO> getUsersByRole(String roleName);
 
+    List<Long> getDriverIds();
+
     UserResponseDTO updateUser(Long id, UserRequestDTO request);
 
     void changePassword(Long id, String newPassword);
@@ -22,9 +24,9 @@ public interface UserService {
 
     UserResponseDTO deactivateUser(Long id);
 
+    UserResponseDTO activateUser(Long id);
+
     void deleteUser(Long id);
 
     boolean userExists(Long id);
-
-    CredentialsResponseDTO getCredentialsByEmail(String email);
 }
