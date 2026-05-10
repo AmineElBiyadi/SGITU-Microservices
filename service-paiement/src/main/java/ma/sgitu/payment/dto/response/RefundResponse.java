@@ -8,24 +8,20 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * DTO de réponse pour moyens de paiement enregistrés
- */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PaymentAccountResponse {
+public class RefundResponse {
 
-    private Long id;
+    private Long refundId;
+    private String refundToken;
+    private Long paymentId;
     private Long userId;
-    private String paymentMethod;
-    private String paymentToken;
-    private String maskedIdentifier;
-    private String provider;
-    private BigDecimal balance;
+    private BigDecimal amountRefunded;
     private String status;
-    private Integer expiryMonth;
-    private Integer expiryYear;
+    private String reason;
+    private String failureReason;
+    private String message;
     private LocalDateTime createdAt;
 }

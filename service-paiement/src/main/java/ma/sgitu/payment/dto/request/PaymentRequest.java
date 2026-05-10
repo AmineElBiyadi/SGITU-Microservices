@@ -1,7 +1,6 @@
 package ma.sgitu.payment.dto.request;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 import ma.sgitu.payment.enums.PaymentMethod;
 import ma.sgitu.payment.enums.SourceType;
@@ -29,4 +28,10 @@ public class PaymentRequest {
 
     @NotNull(message = "savedPaymentToken est obligatoire")
     private String savedPaymentToken;
+
+    @NotBlank(message = "Email obligatoire pour notifications")
+    @Email(message = "Format email invalide")
+    private String email;
+
+    private String description;
 }
