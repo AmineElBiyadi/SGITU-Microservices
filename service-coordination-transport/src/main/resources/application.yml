@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: g4-coordination-transport
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sgitu_g4}
+    username: ${SPRING_DATASOURCE_USERNAME:g4}
+    password: ${SPRING_DATASOURCE_PASSWORD:g4}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+server:
+  port: ${SERVER_PORT:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+sgitu:
+  jwt:
+    secret: ${SGITU_JWT_SECRET:SGlUVS1HNC1KV1QtU0VDUkVOLURFVl8xMjhCaXRzX19VU0VfRU5WX1ZBUiMjIw==}
+    expiration-ms: ${SGITU_JWT_EXPIRATION_MS:86400000}
+  integration:
+    # Billetterie = G1. Les variables SGITU_G3_* restent acceptées (rétrocompat).
+    g1-base-url: ${SGITU_G1_URL:${SGITU_G3_URL:http://localhost:8083}}
+    g5-base-url: ${SGITU_G5_URL:http://localhost:8085}
+    g7-base-url: ${SGITU_G7_URL:http://localhost:8087}
+    g9-base-url: ${SGITU_G9_URL:http://localhost:8089}
+    g10-gateway-url: ${SGITU_G10_URL:http://localhost:8080}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 5000
+    g5-notification-path: /api/notifications/send
+    g1-mission-lifecycle-path: ${SGITU_G1_MISSION_LIFECYCLE_PATH:${SGITU_INTEGRATION_G3_MISSION_LIFECYCLE_PATH:/api/internal/missions/events}}
+  kafka:
+    enabled: ${SGITU_KAFKA_ENABLED:false}
+    topic-coordination: ${SGITU_KAFKA_TOPIC:sgitu.g4.coordination.events}
+    topic-incident-inbound: ${SGITU_G9_INCIDENT_TOPIC:incident.transport.topic}
+    g9-consumer-group-id: ${SGITU_G9_CONSUMER_GROUP:g4-coordination-g9}
+    topic-mission-lifecycle: ${SGITU_G1_MISSION_TOPIC:${SGITU_G3_MISSION_TOPIC:missions-lifecycle}}
+    topic-vehicule-positions: ${SGITU_G7_POSITIONS_TOPIC:vehicule-positions}
+    g7-consumer-group-id: ${SGITU_G7_CONSUMER_GROUP:g4-coordination-g7}
+
+app:
+  supervision:
+    log-buffer-size: 500
+
+logging:
+  level:
+    root: INFO
+    com.sgitu.g4: INFO
+
+info:
+  app:
+    version: 0.0.1-SNAPSHOT
+    component: G4-Coordination-Transport
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://postgres:5432/sgitu_g4
+    username: g4
+    password: g4
