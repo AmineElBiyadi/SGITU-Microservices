@@ -1,8 +1,3 @@
-# =============================================================
-# SGITU — Docker Compose G6 Paiement
-# MySQL + payment-service + phpMyAdmin
-# =============================================================
-
 version: '3.9'
 
 networks:
@@ -14,13 +9,10 @@ volumes:
 
 services:
 
-  # ───────────────────────────────────────────────────────────
-  #  BASE DE DONNÉES MySQL
-  # ───────────────────────────────────────────────────────────
-  mysql-payment:
+  payment-db:
     image: mysql:8.0
-    container_name: sgitu-mysql-payment
-    hostname: mysql-payment
+    container_name: payment-db
+    hostname: payment-db
     networks:
       - sgitu-network
     ports:
@@ -40,29 +32,23 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # ───────────────────────────────────────────────────────────
-  #  PHPMYADMIN
-  # ───────────────────────────────────────────────────────────
   phpmyadmin-payment:
     image: phpmyadmin:latest
-    container_name: sgitu-phpmyadmin-payment
+    container_name: phpmyadmin-payment
     networks:
       - sgitu-network
     ports:
       - "8896:80"
     environment:
-      PMA_HOST: mysql-payment
+      PMA_HOST: payment-db
       PMA_PORT: 3306
       PMA_USER: root
       PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
     depends_on:
-      mysql-payment:
+      payment-db:
         condition: service_healthy
     restart: unless-stopped
 
-  # ───────────────────────────────────────────────────────────
-  #  MICROSERVICE G6 PAIEMENT
-  # ───────────────────────────────────────────────────────────
   payment-service:
     build:
       context: .
@@ -75,32 +61,20 @@ services:
     ports:
       - "8086:8086"
     environment:
-      # Base de données
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-payment:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: sgitu
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
-
-      # Hibernate
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_SQL_INIT_MODE: always
-
-      # JWT
       JWT_SECRET: ${JWT_SECRET:-SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: 86400000
-
-      # G5 Notifications
       NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8085}
-
-      # Profil
       SPRING_PROFILES_ACTIVE: docker
-
-      # Port
       SERVER_PORT: 8086
-
     restart: on-failure
     depends_on:
-      mysql-payment:
+      payment-db:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]

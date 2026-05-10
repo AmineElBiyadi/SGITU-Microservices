@@ -3,6 +3,7 @@ package ma.sgitu.payment.controller;
 import lombok.RequiredArgsConstructor;
 import ma.sgitu.payment.dto.request.AddCardRequest;
 import ma.sgitu.payment.dto.request.AddMobileMoneyRequest;
+import ma.sgitu.payment.dto.request.VerifyOtpRequest;
 import ma.sgitu.payment.dto.response.PaymentAccountResponse;
 import ma.sgitu.payment.service.PaymentAccountService;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +19,6 @@ public class PaymentAccountController {
 
     private final PaymentAccountService paymentAccountService;
 
-    // ✅ Ajouter carte
     @PostMapping("/card")
     public ResponseEntity<PaymentAccountResponse> addCard(
             @Valid @RequestBody AddCardRequest request) {
@@ -27,7 +27,6 @@ public class PaymentAccountController {
         return ResponseEntity.status(201).body(response);
     }
 
-    // ✅ Ajouter Mobile Money
     @PostMapping("/mobile-money")
     public ResponseEntity<PaymentAccountResponse> addMobileMoney(
             @Valid @RequestBody AddMobileMoneyRequest request) {
@@ -36,7 +35,16 @@ public class PaymentAccountController {
         return ResponseEntity.status(201).body(response);
     }
 
-    // ✅ Lister par user
+    @PostMapping("/{paymentAccountId}/verify-otp")
+    public ResponseEntity<PaymentAccountResponse> verifyOtp(
+            @PathVariable Long paymentAccountId,
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        request.setPaymentAccountId(paymentAccountId);
+        PaymentAccountResponse response = paymentAccountService.verifyOtp(request);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<PaymentAccountResponse>> getByUserId(
             @PathVariable Long userId) {
@@ -44,7 +52,6 @@ public class PaymentAccountController {
         return ResponseEntity.ok(paymentAccountService.getByUserId(userId));
     }
 
-    // ✅ Détail (CORRIGÉ pour éviter conflit avec /card)
     @GetMapping("/id/{id}")
     public ResponseEntity<PaymentAccountResponse> getById(
             @PathVariable Long id) {
@@ -52,7 +59,6 @@ public class PaymentAccountController {
         return ResponseEntity.ok(paymentAccountService.getById(id));
     }
 
-    // ✅ Supprimer
     @DeleteMapping("/id/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable Long id) {

@@ -1,39 +1,35 @@
 @echo off
+setlocal EnableDelayedExpansion
 
-echo ================================
-echo DUMP POM.XML
-echo ================================
-type pom.xml
-echo.
+set OUTPUT=full_project_dump.txt
 
-echo ================================
-echo DUMP APPLICATION.PROPERTIES
-echo ================================
-type src\main\resources\application.properties
-echo.
+if exist %OUTPUT% del %OUTPUT%
 
-echo ================================
-echo DUMP DOCKERFILE
-echo ================================
-type Dockerfile
-echo.
+echo =============================================== >> %OUTPUT%
+echo        FULL PROJECT DUMP - SERVICE PAIEMENT
+echo =============================================== >> %OUTPUT%
+echo. >> %OUTPUT%
 
-echo ================================
-echo DUMP DOCKER-COMPOSE
-echo ================================
-type docker-compose.yml
-echo.
+for /R %%F in (*) do (
 
-echo ================================
-echo DUMP ALL JAVA FILES
-echo ================================
+    set "filepath=%%F"
+    set "skip=false"
 
-for /R src %%f in (*.java) do (
-    echo -------------------------------
-    echo FILE: %%f
-    echo -------------------------------
-    type "%%f"
-    echo.
+    echo !filepath! | findstr /I "\.git\\" >nul && set skip=true
+    echo !filepath! | findstr /I "\target\\" >nul && set skip=true
+    echo !filepath! | findstr /I "\node_modules\\" >nul && set skip=true
+
+    if "!skip!"=="false" (
+        if not "%%~nxF"=="%OUTPUT%" (
+            echo =============================================== >> %OUTPUT%
+            echo FILE: %%F >> %OUTPUT%
+            echo =============================================== >> %OUTPUT%
+            type "%%F" >> %OUTPUT% 2>nul
+            echo. >> %OUTPUT%
+            echo. >> %OUTPUT%
+        )
+    )
 )
 
+echo Dump completed in %OUTPUT%
 pause

@@ -6,12 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-/**
- * Client OpenFeign pour G5 Notifications
- */
 @FeignClient(
         name = "notification-service",
-        url = "http://localhost:8085"
+        url = "${notification.service.url:http://notification-service:8085}"
 )
 public interface NotificationClient {
 

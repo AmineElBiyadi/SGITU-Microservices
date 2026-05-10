@@ -1,6 +1,757 @@
-================================
-DUMP POM.XML
-================================
+=============================================== 
+=============================================== 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.dockerignore 
+=============================================== 
+target/
+.git/
+.idea/
+*.iml
+.env
+.DS_Store
+node_modules/
+*.log 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.env 
+=============================================== 
+# =============================================================
+# SGITU — Variables d'environnement G6 Paiement
+# =============================================================
+
+# Base de données
+MYSQL_ROOT_PASSWORD=rootpassword
+MYSQL_PASSWORD=sgitupassword
+
+# JWT (même secret que G10 si intégré)
+JWT_SECRET=SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!
+
+# G5 Notifications
+NOTIFICATION_SERVICE_URL=http://notification-service:8085
+
+# Profil
+SPRING_PROFILES_ACTIVE=docker 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.env.example 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.gitignore 
+=============================================== 
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.gitkeep 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docker-compose.yml 
+=============================================== 
+version: '3.9'
+
+networks:
+  sgitu-network:
+    driver: bridge
+
+volumes:
+  mysql_payment_data:
+
+services:
+
+  payment-db:
+    image: mysql:8.0
+    container_name: payment-db
+    hostname: payment-db
+    networks:
+      - sgitu-network
+    ports:
+      - "3316:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: sgitu
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
+    volumes:
+      - mysql_payment_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  phpmyadmin-payment:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin-payment
+    networks:
+      - sgitu-network
+    ports:
+      - "8896:80"
+    environment:
+      PMA_HOST: payment-db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sgitu/payment-service:1.0.0
+    container_name: payment-service
+    hostname: payment-service
+    networks:
+      - sgitu-network
+    ports:
+      - "8086:8086"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: sgitu
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_SQL_INIT_MODE: always
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      JWT_EXPIRATION: 86400000
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8085}
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8086
+    restart: on-failure
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\Dockerfile 
+=============================================== 
+FROM maven:3.9-eclipse-temurin-17 AS build
+
+WORKDIR /build
+
+COPY pom.xml .
+
+RUN mvn dependency:go-offline -B
+
+COPY src ./src
+
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+
+LABEL maintainer="G6-Paiement-SGITU"
+LABEL service="payment-service"
+LABEL version="1.0.0"
+
+WORKDIR /app
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+COPY --from=build /build/target/service-paiement.jar app.jar
+
+RUN chown appuser:appgroup app.jar
+
+USER appuser
+
+EXPOSE 8086
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1
+
+ENTRYPOINT ["java", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-XX:+UseContainerSupport", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-jar", "app.jar"] 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\dump_project.bat 
+=============================================== 
+@echo off
+setlocal EnableDelayedExpansion
+
+set OUTPUT=full_project_dump.txt
+
+if exist %OUTPUT% del %OUTPUT%
+
+echo =============================================== >> %OUTPUT%
+echo        FULL PROJECT DUMP - SERVICE PAIEMENT
+echo =============================================== >> %OUTPUT%
+echo. >> %OUTPUT%
+
+for /R %%F in (*) do (
+
+    set "filepath=%%F"
+    set "skip=false"
+
+    echo !filepath! | findstr /I "\.git\\" >nul && set skip=true
+    echo !filepath! | findstr /I "\target\\" >nul && set skip=true
+    echo !filepath! | findstr /I "\node_modules\\" >nul && set skip=true
+
+    if "!skip!"=="false" (
+        if not "%%~nxF"=="%OUTPUT%" (
+            echo =============================================== >> %OUTPUT%
+            echo FILE: %%F >> %OUTPUT%
+            echo =============================================== >> %OUTPUT%
+            type "%%F" >> %OUTPUT% 2>nul
+            echo. >> %OUTPUT%
+            echo. >> %OUTPUT%
+        )
+    )
+)
+
+echo Dump completed in %OUTPUT%
+pause 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\index.js 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\mvnw 
+=============================================== 
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper startup batch script, version 3.3.4
+#
+# Optional ENV vars
+# -----------------
+#   JAVA_HOME - location of a JDK home dir, required when download maven via java source
+#   MVNW_REPOURL - repo url base for downloading maven distribution
+#   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+#   MVNW_VERBOSE - true: enable verbose log; debug: trace the mvnw script; others: silence the output
+# ----------------------------------------------------------------------------
+
+set -euf
+[ "${MVNW_VERBOSE-}" != debug ] || set -x
+
+# OS specific support.
+native_path() { printf %s\\n "$1"; }
+case "$(uname)" in
+CYGWIN* | MINGW*)
+  [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
+  native_path() { cygpath --path --windows "$1"; }
+  ;;
+esac
+
+# set JAVACMD and JAVACCMD
+set_java_home() {
+  # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
+  if [ -n "${JAVA_HOME-}" ]; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+      # IBM's JDK on AIX uses strange locations for the executables
+      JAVACMD="$JAVA_HOME/jre/sh/java"
+      JAVACCMD="$JAVA_HOME/jre/sh/javac"
+    else
+      JAVACMD="$JAVA_HOME/bin/java"
+      JAVACCMD="$JAVA_HOME/bin/javac"
+
+      if [ ! -x "$JAVACMD" ] || [ ! -x "$JAVACCMD" ]; then
+        echo "The JAVA_HOME environment variable is not defined correctly, so mvnw cannot run." >&2
+        echo "JAVA_HOME is set to \"$JAVA_HOME\", but \"\$JAVA_HOME/bin/java\" or \"\$JAVA_HOME/bin/javac\" does not exist." >&2
+        return 1
+      fi
+    fi
+  else
+    JAVACMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v java
+    )" || :
+    JAVACCMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v javac
+    )" || :
+
+    if [ ! -x "${JAVACMD-}" ] || [ ! -x "${JAVACCMD-}" ]; then
+      echo "The java/javac command does not exist in PATH nor is JAVA_HOME set, so mvnw cannot run." >&2
+      return 1
+    fi
+  fi
+}
+
+# hash string like Java String::hashCode
+hash_string() {
+  str="${1:-}" h=0
+  while [ -n "$str" ]; do
+    char="${str%"${str#?}"}"
+    h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
+    str="${str#?}"
+  done
+  printf %x\\n $h
+}
+
+verbose() { :; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
+
+die() {
+  printf %s\\n "$1" >&2
+  exit 1
+}
+
+trim() {
+  # MWRAPPER-139:
+  #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
+  #   Needed for removing poorly interpreted newline sequences when running in more
+  #   exotic environments such as mingw bash on Windows.
+  printf "%s" "${1}" | tr -d '[:space:]'
+}
+
+scriptDir="$(dirname "$0")"
+scriptName="$(basename "$0")"
+
+# parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
+while IFS="=" read -r key value; do
+  case "${key-}" in
+  distributionUrl) distributionUrl=$(trim "${value-}") ;;
+  distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
+  esac
+done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
+[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+
+case "${distributionUrl##*/}" in
+maven-mvnd-*bin.*)
+  MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/
+  case "${PROCESSOR_ARCHITECTURE-}${PROCESSOR_ARCHITEW6432-}:$(uname -a)" in
+  *AMD64:CYGWIN* | *AMD64:MINGW*) distributionPlatform=windows-amd64 ;;
+  :Darwin*x86_64) distributionPlatform=darwin-amd64 ;;
+  :Darwin*arm64) distributionPlatform=darwin-aarch64 ;;
+  :Linux*x86_64*) distributionPlatform=linux-amd64 ;;
+  *)
+    echo "Cannot detect native platform for mvnd on $(uname)-$(uname -m), use pure java version" >&2
+    distributionPlatform=linux-amd64
+    ;;
+  esac
+  distributionUrl="${distributionUrl%-bin.*}-$distributionPlatform.zip"
+  ;;
+maven-mvnd-*) MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/ ;;
+*) MVN_CMD="mvn${scriptName#mvnw}" _MVNW_REPO_PATTERN=/org/apache/maven/ ;;
+esac
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+[ -z "${MVNW_REPOURL-}" ] || distributionUrl="$MVNW_REPOURL$_MVNW_REPO_PATTERN${distributionUrl#*"$_MVNW_REPO_PATTERN"}"
+distributionUrlName="${distributionUrl##*/}"
+distributionUrlNameMain="${distributionUrlName%.*}"
+distributionUrlNameMain="${distributionUrlNameMain%-bin}"
+MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
+MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
+
+exec_maven() {
+  unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
+}
+
+if [ -d "$MAVEN_HOME" ]; then
+  verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  exec_maven "$@"
+fi
+
+case "${distributionUrl-}" in
+*?-bin.zip | *?maven-mvnd-?*-?*.zip) ;;
+*) die "distributionUrl is not valid, must match *-bin.zip or maven-mvnd-*.zip, but found '${distributionUrl-}'" ;;
+esac
+
+# prepare tmp dir
+if TMP_DOWNLOAD_DIR="$(mktemp -d)" && [ -d "$TMP_DOWNLOAD_DIR" ]; then
+  clean() { rm -rf -- "$TMP_DOWNLOAD_DIR"; }
+  trap clean HUP INT TERM EXIT
+else
+  die "cannot create temp dir"
+fi
+
+mkdir -p -- "${MAVEN_HOME%/*}"
+
+# Download and Install Apache Maven
+verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+verbose "Downloading from: $distributionUrl"
+verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+# select .zip or .tar.gz
+if ! command -v unzip >/dev/null; then
+  distributionUrl="${distributionUrl%.zip}.tar.gz"
+  distributionUrlName="${distributionUrl##*/}"
+fi
+
+# verbose opt
+__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
+[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
+
+# normalize http auth
+case "${MVNW_PASSWORD:+has-password}" in
+'') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+esac
+
+if [ -z "${MVNW_USERNAME-}" ] && command -v wget >/dev/null; then
+  verbose "Found wget ... using wget"
+  wget ${__MVNW_QUIET_WGET:+"$__MVNW_QUIET_WGET"} "$distributionUrl" -O "$TMP_DOWNLOAD_DIR/$distributionUrlName" || die "wget: Failed to fetch $distributionUrl"
+elif [ -z "${MVNW_USERNAME-}" ] && command -v curl >/dev/null; then
+  verbose "Found curl ... using curl"
+  curl ${__MVNW_QUIET_CURL:+"$__MVNW_QUIET_CURL"} -f -L -o "$TMP_DOWNLOAD_DIR/$distributionUrlName" "$distributionUrl" || die "curl: Failed to fetch $distributionUrl"
+elif set_java_home; then
+  verbose "Falling back to use Java to download"
+  javaSource="$TMP_DOWNLOAD_DIR/Downloader.java"
+  targetZip="$TMP_DOWNLOAD_DIR/$distributionUrlName"
+  cat >"$javaSource" <<-END
+	public class Downloader extends java.net.Authenticator
+	{
+	  protected java.net.PasswordAuthentication getPasswordAuthentication()
+	  {
+	    return new java.net.PasswordAuthentication( System.getenv( "MVNW_USERNAME" ), System.getenv( "MVNW_PASSWORD" ).toCharArray() );
+	  }
+	  public static void main( String[] args ) throws Exception
+	  {
+	    setDefault( new Downloader() );
+	    java.nio.file.Files.copy( java.net.URI.create( args[0] ).toURL().openStream(), java.nio.file.Paths.get( args[1] ).toAbsolutePath().normalize() );
+	  }
+	}
+	END
+  # For Cygwin/MinGW, switch paths to Windows format before running javac and java
+  verbose " - Compiling Downloader.java ..."
+  "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
+  verbose " - Running Downloader.java ..."
+  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
+fi
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+if [ -n "${distributionSha256Sum-}" ]; then
+  distributionSha256Result=false
+  if [ "$MVN_CMD" = mvnd.sh ]; then
+    echo "Checksum validation is not supported for maven-mvnd." >&2
+    echo "Please disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  elif command -v sha256sum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | sha256sum -c - >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  elif command -v shasum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | shasum -a 256 -c >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  else
+    echo "Checksum validation was requested but neither 'sha256sum' or 'shasum' are available." >&2
+    echo "Please install either command, or disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  fi
+  if [ $distributionSha256Result = false ]; then
+    echo "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised." >&2
+    echo "If you updated your Maven version, you need to update the specified distributionSha256Sum property." >&2
+    exit 1
+  fi
+fi
+
+# unzip and move
+if command -v unzip >/dev/null; then
+  unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
+else
+  tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
+fi
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+actualDistributionDir=""
+
+# First try the expected directory name (for regular distributions)
+if [ -d "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" ]; then
+  if [ -f "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain/bin/$MVN_CMD" ]; then
+    actualDistributionDir="$distributionUrlNameMain"
+  fi
+fi
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if [ -z "$actualDistributionDir" ]; then
+  # enable globbing to iterate over items
+  set +f
+  for dir in "$TMP_DOWNLOAD_DIR"/*; do
+    if [ -d "$dir" ]; then
+      if [ -f "$dir/bin/$MVN_CMD" ]; then
+        actualDistributionDir="$(basename "$dir")"
+        break
+      fi
+    fi
+  done
+  set -f
+fi
+
+if [ -z "$actualDistributionDir" ]; then
+  verbose "Contents of $TMP_DOWNLOAD_DIR:"
+  verbose "$(ls -la "$TMP_DOWNLOAD_DIR")"
+  die "Could not find Maven distribution directory in extracted archive"
+fi
+
+verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
+mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
+
+clean || :
+exec_maven "$@"
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\mvnw.cmd 
+=============================================== 
+<# : batch portion
+@REM ----------------------------------------------------------------------------
+@REM Licensed to the Apache Software Foundation (ASF) under one
+@REM or more contributor license agreements.  See the NOTICE file
+@REM distributed with this work for additional information
+@REM regarding copyright ownership.  The ASF licenses this file
+@REM to you under the Apache License, Version 2.0 (the
+@REM "License"); you may not use this file except in compliance
+@REM with the License.  You may obtain a copy of the License at
+@REM
+@REM    http://www.apache.org/licenses/LICENSE-2.0
+@REM
+@REM Unless required by applicable law or agreed to in writing,
+@REM software distributed under the License is distributed on an
+@REM "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+@REM KIND, either express or implied.  See the License for the
+@REM specific language governing permissions and limitations
+@REM under the License.
+@REM ----------------------------------------------------------------------------
+
+@REM ----------------------------------------------------------------------------
+@REM Apache Maven Wrapper startup batch script, version 3.3.4
+@REM
+@REM Optional ENV vars
+@REM   MVNW_REPOURL - repo url base for downloading maven distribution
+@REM   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+@REM   MVNW_VERBOSE - true: enable verbose log; others: silence the output
+@REM ----------------------------------------------------------------------------
+
+@IF "%__MVNW_ARG0_NAME__%"=="" (SET __MVNW_ARG0_NAME__=%~nx0)
+@SET __MVNW_CMD__=
+@SET __MVNW_ERROR__=
+@SET __MVNW_PSMODULEP_SAVE=%PSModulePath%
+@SET PSModulePath=
+@FOR /F "usebackq tokens=1* delims==" %%A IN (`powershell -noprofile "& {$scriptDir='%~dp0'; $script='%__MVNW_ARG0_NAME__%'; icm -ScriptBlock ([Scriptblock]::Create((Get-Content -Raw '%~f0'))) -NoNewScope}"`) DO @(
+  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
+)
+@SET PSModulePath=%__MVNW_PSMODULEP_SAVE%
+@SET __MVNW_PSMODULEP_SAVE=
+@SET __MVNW_ARG0_NAME__=
+@SET MVNW_USERNAME=
+@SET MVNW_PASSWORD=
+@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@echo Cannot start maven from wrapper >&2 && exit /b 1
+@GOTO :EOF
+: end batch / begin powershell #>
+
+$ErrorActionPreference = "Stop"
+if ($env:MVNW_VERBOSE -eq "true") {
+  $VerbosePreference = "Continue"
+}
+
+# calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
+$distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+if (!$distributionUrl) {
+  Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+}
+
+switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
+  "maven-mvnd-*" {
+    $USE_MVND = $true
+    $distributionUrl = $distributionUrl -replace '-bin\.[^.]*$',"-windows-amd64.zip"
+    $MVN_CMD = "mvnd.cmd"
+    break
+  }
+  default {
+    $USE_MVND = $false
+    $MVN_CMD = $script -replace '^mvnw','mvn'
+    break
+  }
+}
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+if ($env:MVNW_REPOURL) {
+  $MVNW_REPO_PATTERN = if ($USE_MVND -eq $False) { "/org/apache/maven/" } else { "/maven/mvnd/" }
+  $distributionUrl = "$env:MVNW_REPOURL$MVNW_REPO_PATTERN$($distributionUrl -replace "^.*$MVNW_REPO_PATTERN",'')"
+}
+$distributionUrlName = $distributionUrl -replace '^.*/',''
+$distributionUrlNameMain = $distributionUrlName -replace '\.[^.]*$','' -replace '-bin$',''
+
+$MAVEN_M2_PATH = "$HOME/.m2"
+if ($env:MAVEN_USER_HOME) {
+  $MAVEN_M2_PATH = "$env:MAVEN_USER_HOME"
+}
+
+if (-not (Test-Path -Path $MAVEN_M2_PATH)) {
+    New-Item -Path $MAVEN_M2_PATH -ItemType Directory | Out-Null
+}
+
+$MAVEN_WRAPPER_DISTS = $null
+if ((Get-Item $MAVEN_M2_PATH).Target[0] -eq $null) {
+  $MAVEN_WRAPPER_DISTS = "$MAVEN_M2_PATH/wrapper/dists"
+} else {
+  $MAVEN_WRAPPER_DISTS = (Get-Item $MAVEN_M2_PATH).Target[0] + "/wrapper/dists"
+}
+
+$MAVEN_HOME_PARENT = "$MAVEN_WRAPPER_DISTS/$distributionUrlNameMain"
+$MAVEN_HOME_NAME = ([System.Security.Cryptography.SHA256]::Create().ComputeHash([byte[]][char[]]$distributionUrl) | ForEach-Object {$_.ToString("x2")}) -join ''
+$MAVEN_HOME = "$MAVEN_HOME_PARENT/$MAVEN_HOME_NAME"
+
+if (Test-Path -Path "$MAVEN_HOME" -PathType Container) {
+  Write-Verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+  exit $?
+}
+
+if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNameMain)) {
+  Write-Error "distributionUrl is not valid, must end with *-bin.zip, but found $distributionUrl"
+}
+
+# prepare tmp dir
+$TMP_DOWNLOAD_DIR_HOLDER = New-TemporaryFile
+$TMP_DOWNLOAD_DIR = New-Item -Itemtype Directory -Path "$TMP_DOWNLOAD_DIR_HOLDER.dir"
+$TMP_DOWNLOAD_DIR_HOLDER.Delete() | Out-Null
+trap {
+  if ($TMP_DOWNLOAD_DIR.Exists) {
+    try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+    catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+  }
+}
+
+New-Item -Itemtype Directory -Path "$MAVEN_HOME_PARENT" -Force | Out-Null
+
+# Download and Install Apache Maven
+Write-Verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+Write-Verbose "Downloading from: $distributionUrl"
+Write-Verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+$webclient = New-Object System.Net.WebClient
+if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
+  $webclient.Credentials = New-Object System.Net.NetworkCredential($env:MVNW_USERNAME, $env:MVNW_PASSWORD)
+}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+$distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
+if ($distributionSha256Sum) {
+  if ($USE_MVND) {
+    Write-Error "Checksum validation is not supported for maven-mvnd. `nPlease disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties."
+  }
+  Import-Module $PSHOME\Modules\Microsoft.PowerShell.Utility -Function Get-FileHash
+  if ((Get-FileHash "$TMP_DOWNLOAD_DIR/$distributionUrlName" -Algorithm SHA256).Hash.ToLower() -ne $distributionSha256Sum) {
+    Write-Error "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised. If you updated your Maven version, you need to update the specified distributionSha256Sum property."
+  }
+}
+
+# unzip and move
+Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+$actualDistributionDir = ""
+
+# First try the expected directory name (for regular distributions)
+$expectedPath = Join-Path "$TMP_DOWNLOAD_DIR" "$distributionUrlNameMain"
+$expectedMvnPath = Join-Path "$expectedPath" "bin/$MVN_CMD"
+if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $expectedMvnPath -PathType Leaf)) {
+  $actualDistributionDir = $distributionUrlNameMain
+}
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if (!$actualDistributionDir) {
+  Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
+    $testPath = Join-Path $_.FullName "bin/$MVN_CMD"
+    if (Test-Path -Path $testPath -PathType Leaf) {
+      $actualDistributionDir = $_.Name
+    }
+  }
+}
+
+if (!$actualDistributionDir) {
+  Write-Error "Could not find Maven distribution directory in extracted archive"
+}
+
+Write-Verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+Rename-Item -Path "$TMP_DOWNLOAD_DIR/$actualDistributionDir" -NewName $MAVEN_HOME_NAME | Out-Null
+try {
+  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Destination $MAVEN_HOME_PARENT | Out-Null
+} catch {
+  if (! (Test-Path -Path "$MAVEN_HOME" -PathType Container)) {
+    Write-Error "fail to move MAVEN_HOME"
+  }
+} finally {
+  try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+  catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+}
+
+Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\pom.xml 
+=============================================== 
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -12,12 +763,16 @@ DUMP POM.XML
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <version>3.3.6</version>
     </parent>
 
     <groupId>ma.sgitu</groupId>
     <artifactId>service-paiement</artifactId>
     <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>service-paiement</name>
+    <description>Microservice G6 - Paiement SGITU</description>
 
     <properties>
         <java.version>17</java.version>
@@ -38,58 +793,49 @@ DUMP POM.XML
 
     <dependencies>
 
-        <!-- WEB -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- SECURITY -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- VALIDATION -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- OPENFEIGN -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
 
-        <!-- MYSQL -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- SWAGGER -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.6.0</version>
         </dependency>
 
-        <!-- LOMBOK -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- TEST -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -98,204 +844,72 @@ DUMP POM.XML
 
     </dependencies>
 
-</project>
-================================
-DUMP APPLICATION.PROPERTIES
-================================
-spring.application.name=payment-service
-server.port=8086
+    <build>
+        <finalName>service-paiement</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
-# DATABASE
-spring.datasource.url=jdbc:mysql://localhost:3306/payment_db
-spring.datasource.username=root
-spring.datasource.password=rootpassword
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-
-# Swagger
-springdoc.api-docs.enabled=true
-springdoc.swagger-ui.enabled=true
-================================
-DUMP DOCKERFILE
-================================
-# =============================================================
-# SGITU — Dockerfile Microservice G6 Paiement
-# Multi-stage build optimisé
-# =============================================================
-
-# ── ÉTAPE 1 : BUILD ──────────────────────────────────────────
-FROM maven:3.9-eclipse-temurin-17 AS build
-
-WORKDIR /build
-
-# Copie pom.xml (cache Docker)
-COPY pom.xml .
-
-# Télécharge les dépendances
-RUN mvn dependency:go-offline -B
-
-# Copie le code source
-COPY src ./src
-
-# Build du JAR
-RUN mvn clean package -DskipTests
-
-# ── ÉTAPE 2 : IMAGE RUNTIME LÉGÈRE ──────────────────────────
-FROM eclipse-temurin:17-jre-alpine
-
-LABEL maintainer="G6-Paiement-SGITU"
-LABEL service="payment-service"
-LABEL version="1.0.0"
-
-WORKDIR /app
-
-# Créer utilisateur non-root (sécurité)
-RUN addgroup -S appgroup && \
-    adduser -S appuser -G appgroup
-
-# Copier le JAR depuis build
-COPY --from=build /build/target/service-paiement-*.jar app.jar
-
-# Permissions
-RUN chown appuser:appgroup app.jar
-
-# Utilisateur non-root
-USER appuser
-
-# Port exposé
-EXPOSE 8086
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1
-
-# Lancer l'application
-ENTRYPOINT ["java", \
-    "-XX:MaxRAMPercentage=75.0", \
-    "-XX:+UseContainerSupport", \
-    "-Djava.security.egd=file:/dev/./urandom", \
-    "-jar", "app.jar"]
-================================
-DUMP DOCKER-COMPOSE
-================================
-# =============================================================
-# SGITU — Docker Compose G6 Paiement
-# MySQL + payment-service + phpMyAdmin
-# =============================================================
-
-version: '3.9'
-
-networks:
-  sgitu-network:
-    driver: bridge
-
-volumes:
-  mysql_payment_data:
-
-services:
-
-  # ───────────────────────────────────────────────────────────
-  #  BASE DE DONNÉES MySQL
-  # ───────────────────────────────────────────────────────────
-  mysql-payment:
-    image: mysql:8.0
-    container_name: sgitu-mysql-payment
-    hostname: mysql-payment
-    networks:
-      - sgitu-network
-    ports:
-      - "3316:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: payment_db
-      MYSQL_USER: sgitu
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
-    volumes:
-      - mysql_payment_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-
-  # ───────────────────────────────────────────────────────────
-  #  PHPMYADMIN
-  # ───────────────────────────────────────────────────────────
-  phpmyadmin-payment:
-    image: phpmyadmin:latest
-    container_name: sgitu-phpmyadmin-payment
-    networks:
-      - sgitu-network
-    ports:
-      - "8896:80"
-    environment:
-      PMA_HOST: mysql-payment
-      PMA_PORT: 3306
-      PMA_USER: root
-      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-    depends_on:
-      mysql-payment:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ───────────────────────────────────────────────────────────
-  #  MICROSERVICE G6 PAIEMENT
-  # ───────────────────────────────────────────────────────────
-  payment-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: sgitu/payment-service:1.0.0
-    container_name: payment-service
-    hostname: payment-service
-    networks:
-      - sgitu-network
-    ports:
-      - "8086:8086"
-    environment:
-      # Base de données
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-payment:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: sgitu
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-sgitupassword}
-
-      # Hibernate
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "false"
-      SPRING_SQL_INIT_MODE: always
-
-      # JWT
-      JWT_SECRET: ${JWT_SECRET:-SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
-      JWT_EXPIRATION: 86400000
-
-      # G5 Notifications
-      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:8085}
-
-      # Profil
-      SPRING_PROFILES_ACTIVE: docker
-
-      # Port
-      SERVER_PORT: 8086
-
-    restart: on-failure
-    depends_on:
-      mysql-payment:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-================================
-DUMP ALL JAVA FILES
-================================
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\PaymentServiceApplication.java
--------------------------------
+</project> 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\README.md 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\.mvn\wrapper\maven-wrapper.properties 
+=============================================== 
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.14/apache-maven-3.9.14-bin.zip
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\api\payment-api-contract.md 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\postman\G6-Paiement.postman_collection.json 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\uml\class-diagram-payment.puml 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\uml\component-diagram-payment.puml 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\uml\sequence-payment-card.puml 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\docs\uml\use-case-payment.puml 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\PaymentServiceApplication.java 
+=============================================== 
 package ma.sgitu.payment;
 
 import org.springframework.boot.SpringApplication;
@@ -325,10 +939,11 @@ public class PaymentServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(PaymentServiceApplication.class, args);
     }
-}
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\client\NotificationClient.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\client\NotificationClient.java 
+=============================================== 
 package ma.sgitu.payment.client;
 
 import ma.sgitu.payment.dto.request.NotificationRequest;
@@ -337,42 +952,66 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-/**
- * Client OpenFeign pour G5 Notifications
- */
 @FeignClient(
         name = "notification-service",
-        url = "http://localhost:8085"
+        url = "${notification.service.url:http://notification-service:8085}"
 )
 public interface NotificationClient {
 
     @PostMapping("/api/notifications/send")
     ResponseEntity<Void> sendNotification(@RequestBody NotificationRequest request);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\DataInitializer.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\client\SubscriptionClient.java 
+=============================================== 
+package ma.sgitu.payment.client;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.Map;
+
+@FeignClient(
+        name = "subscription-service",
+        url = "${subscription.service.url:http://subscription-service:8082}"
+)
+public interface SubscriptionClient {
+
+    @PostMapping("/abonnements/paiement/confirmation")
+    ResponseEntity<Void> confirmPayment(@RequestBody Map<String, Object> confirmationData);
+
+    @PostMapping("/abonnements/remboursement/confirmation")
+    ResponseEntity<Void> confirmRefund(@RequestBody Map<String, Object> confirmationData);
+
+    @GetMapping("/abonnements/users/{userId}/actif")
+    ResponseEntity<Map<String, Object>> checkActiveSubscription(@PathVariable Long userId);
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\DataInitializer.java 
+=============================================== 
 package ma.sgitu.payment.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import ma.sgitu.payment.entity.TestCard;
-import ma.sgitu.payment.entity.TestMobileMoneyAccount;
-import ma.sgitu.payment.enums.AccountStatus;
-import ma.sgitu.payment.repository.TestCardRepository;
-import ma.sgitu.payment.repository.TestMobileMoneyAccountRepository;
+import ma.sgitu.payment.entity.*;
+import ma.sgitu.payment.enums.*;
+import ma.sgitu.payment.repository.*;
 import ma.sgitu.payment.util.HashUtil;
+import ma.sgitu.payment.util.TokenGenerator;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-/**
- * Initialise les données de test au démarrage
- * Cartes et comptes Mobile Money fictifs
- */
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
@@ -380,45 +1019,116 @@ public class DataInitializer {
 
     private final TestCardRepository testCardRepository;
     private final TestMobileMoneyAccountRepository testMobileMoneyRepository;
+    private final PaymentAccountRepository paymentAccountRepository;
+    private final PaymentRepository paymentRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final PaymentOtpRepository paymentOtpRepository;
 
     @Bean
     @Transactional
     public CommandLineRunner initTestData() {
         return args -> {
-            log.info("=== Initialisation des données de test ===");
+            log.info("=== Initialisation des données de test complètes ===");
 
-            // ── Cartes fictives ──────────────────────────────
             if (testCardRepository.count() == 0) {
-                createTestCard("4532015112830366", "123", "VISA", new BigDecimal("1000.00"), AccountStatus.ACTIVE);
-                createTestCard("5425233430109903", "456", "MASTERCARD", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-                createTestCard("4916338506082832", "789", "VISA", new BigDecimal("50.00"), AccountStatus.ACTIVE);
-                createTestCard("5105105105105100", "321", "MASTERCARD", new BigDecimal("0.00"), AccountStatus.ACTIVE);
-                createTestCard("4111111111111111", "111", "VISA", new BigDecimal("2000.00"), AccountStatus.BLOCKED);
-
-                log.info("✅ {} cartes de test créées", testCardRepository.count());
+                initTestCards();
+                initTestMobileMoneyAccounts();
+                initPaymentAccounts();
+                initPayments();
+                initInvoices();
+                log.info("=== ✅ Toutes les données de test ont été créées avec succès ===");
             } else {
-                log.info("ℹ️ Cartes de test déjà présentes");
+                log.info("=== ℹ️ Données de test déjà présentes - skip initialisation ===");
             }
-
-            // ── Comptes Mobile Money fictifs ─────────────────
-            if (testMobileMoneyRepository.count() == 0) {
-                createTestMobileMoneyAccount("0612345678", "INWI", new BigDecimal("500.00"), AccountStatus.ACTIVE);
-                createTestMobileMoneyAccount("0623456789", "ORANGE", new BigDecimal("300.00"), AccountStatus.ACTIVE);
-                createTestMobileMoneyAccount("0634567890", "IAM", new BigDecimal("1000.00"), AccountStatus.ACTIVE);
-                createTestMobileMoneyAccount("0645678901", "INWI", new BigDecimal("0.00"), AccountStatus.ACTIVE);
-                createTestMobileMoneyAccount("0656789012", "ORANGE", new BigDecimal("750.00"), AccountStatus.BLOCKED);
-
-                log.info("✅ {} comptes Mobile Money de test créés", testMobileMoneyRepository.count());
-            } else {
-                log.info("ℹ️ Comptes Mobile Money de test déjà présents");
-            }
-
-            log.info("=== Initialisation terminée ===");
         };
     }
 
-    private void createTestCard(String cardNumber, String cvv, String provider,
-                                BigDecimal balance, AccountStatus status) {
+    private void initTestCards() {
+        log.info("--- Création des cartes de test ---");
+        
+        createTestCard("4532015112830366", "123", "VISA", new BigDecimal("1000.00"), AccountStatus.ACTIVE);
+        createTestCard("5425233430109903", "456", "MASTERCARD", new BigDecimal("500.00"), AccountStatus.ACTIVE);
+        createTestCard("4916338506082832", "789", "VISA", new BigDecimal("50.00"), AccountStatus.ACTIVE);
+        createTestCard("5105105105105100", "321", "MASTERCARD", new BigDecimal("0.00"), AccountStatus.ACTIVE);
+        createTestCard("4111111111111111", "111", "VISA", new BigDecimal("2000.00"), AccountStatus.BLOCKED);
+        createTestCard("5500000000000004", "999", "MASTERCARD", new BigDecimal("150.00"), AccountStatus.ACTIVE);
+        createTestCard("4012888888881881", "555", "VISA", new BigDecimal("750.00"), AccountStatus.ACTIVE);
+        
+        log.info("✅ {} cartes de test créées", testCardRepository.count());
+    }
+
+    private void initTestMobileMoneyAccounts() {
+        log.info("--- Création des comptes Mobile Money de test ---");
+        
+        createTestMobileMoneyAccount("0612345678", "INWI", new BigDecimal("500.00"), AccountStatus.ACTIVE);
+        createTestMobileMoneyAccount("0623456789", "ORANGE", new BigDecimal("300.00"), AccountStatus.ACTIVE);
+        createTestMobileMoneyAccount("0634567890", "IAM", new BigDecimal("1000.00"), AccountStatus.ACTIVE);
+        createTestMobileMoneyAccount("0645678901", "INWI", new BigDecimal("0.00"), AccountStatus.ACTIVE);
+        createTestMobileMoneyAccount("0656789012", "ORANGE", new BigDecimal("750.00"), AccountStatus.BLOCKED);
+        createTestMobileMoneyAccount("0667890123", "IAM", new BigDecimal("250.00"), AccountStatus.ACTIVE);
+        
+        log.info("✅ {} comptes Mobile Money créés", testMobileMoneyRepository.count());
+    }
+
+    private void initPaymentAccounts() {
+        log.info("--- Création des moyens de paiement enregistrés ---");
+        
+        createPaymentAccount(1L, PaymentMethod.CARD, "CARD-TOKEN-001", "****0366", "VISA", new BigDecimal("1000.00"), AccountStatus.ACTIVE, 12, 2027);
+        createPaymentAccount(1L, PaymentMethod.MOBILE_MONEY, "MM-TOKEN-001", "0612****78", "INWI", new BigDecimal("500.00"), AccountStatus.ACTIVE, null, null);
+        
+        createPaymentAccount(2L, PaymentMethod.CARD, "CARD-TOKEN-002", "****9903", "MASTERCARD", new BigDecimal("500.00"), AccountStatus.ACTIVE, 12, 2027);
+        createPaymentAccount(2L, PaymentMethod.MOBILE_MONEY, "MM-TOKEN-002", "0623****89", "ORANGE", new BigDecimal("300.00"), AccountStatus.ACTIVE, null, null);
+        
+        createPaymentAccount(3L, PaymentMethod.CARD, "CARD-TOKEN-003", "****2832", "VISA", new BigDecimal("50.00"), AccountStatus.ACTIVE, 12, 2027);
+        createPaymentAccount(3L, PaymentMethod.MOBILE_MONEY, "MM-TOKEN-003", "0634****90", "IAM", new BigDecimal("1000.00"), AccountStatus.ACTIVE, null, null);
+        
+        createPaymentAccount(4L, PaymentMethod.CARD, "CARD-TOKEN-004", "****5100", "MASTERCARD", new BigDecimal("0.00"), AccountStatus.ACTIVE, 12, 2027);
+        createPaymentAccount(5L, PaymentMethod.CARD, "CARD-TOKEN-005", "****1111", "VISA", new BigDecimal("2000.00"), AccountStatus.BLOCKED, 12, 2027);
+        
+        createPaymentAccount(6L, PaymentMethod.CARD, "CARD-TOKEN-006", "****0004", "MASTERCARD", new BigDecimal("150.00"), AccountStatus.ACTIVE, 6, 2028);
+        createPaymentAccount(7L, PaymentMethod.MOBILE_MONEY, "MM-TOKEN-007", "0667****23", "IAM", new BigDecimal("250.00"), AccountStatus.ACTIVE, null, null);
+        
+        log.info("✅ {} moyens de paiement enregistrés créés", paymentAccountRepository.count());
+    }
+
+    private void initPayments() {
+        log.info("--- Création des paiements de test ---");
+        
+        createPayment(1L, SourceType.TICKET, 101L, new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
+        createPayment(1L, SourceType.TICKET, 102L, new BigDecimal("30.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-001", PaymentStatus.SUCCESS, null);
+        createPayment(1L, SourceType.SUBSCRIPTION, 201L, new BigDecimal("150.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
+        
+        createPayment(2L, SourceType.TICKET, 103L, new BigDecimal("20.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.SUCCESS, null);
+        createPayment(2L, SourceType.SUBSCRIPTION, 202L, new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-002", PaymentStatus.SUCCESS, null);
+        
+        createPayment(3L, SourceType.TICKET, 104L, new BigDecimal("15.00"), PaymentMethod.CARD, "CARD-TOKEN-003", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
+        createPayment(3L, SourceType.SUBSCRIPTION, 203L, new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-003", PaymentStatus.SUCCESS, null);
+        
+        createPayment(4L, SourceType.TICKET, 105L, new BigDecimal("40.00"), PaymentMethod.CARD, "CARD-TOKEN-004", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
+        
+        createPayment(5L, SourceType.TICKET, 106L, new BigDecimal("50.00"), PaymentMethod.CARD, "CARD-TOKEN-005", PaymentStatus.FAILED, FailureReason.ACCOUNT_BLOCKED);
+        
+        createPayment(1L, SourceType.TICKET, 107L, new BigDecimal("35.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.PENDING, null);
+        createPayment(2L, SourceType.TICKET, 108L, new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.CANCELLED, null);
+        
+        log.info("✅ {} paiements créés", paymentRepository.count());
+    }
+
+    private void initInvoices() {
+        log.info("--- Création des factures pour paiements SUCCESS ---");
+        
+        paymentRepository.findAll().stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.SUCCESS)
+                .forEach(payment -> {
+                    if (!invoiceRepository.existsByPaymentId(payment.getId())) {
+                        createInvoice(payment);
+                    }
+                });
+        
+        log.info("✅ {} factures générées", invoiceRepository.count());
+    }
+
+    private void createTestCard(String cardNumber, String cvv, String provider, BigDecimal balance, AccountStatus status) {
         try {
             String last4 = cardNumber.substring(cardNumber.length() - 4);
 
@@ -441,8 +1151,7 @@ public class DataInitializer {
         }
     }
 
-    private void createTestMobileMoneyAccount(String phone, String provider,
-                                              BigDecimal balance, AccountStatus status) {
+    private void createTestMobileMoneyAccount(String phone, String provider, BigDecimal balance, AccountStatus status) {
         try {
             String maskedPhone = phone.substring(0, 4) + "****" + phone.substring(phone.length() - 2);
 
@@ -460,10 +1169,78 @@ public class DataInitializer {
             log.error("Erreur création Mobile Money {}: {}", phone, e.getMessage());
         }
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\FeignConfig.java
--------------------------------
+
+    private void createPaymentAccount(Long userId, PaymentMethod paymentMethod, String paymentToken, 
+                                     String maskedIdentifier, String provider, BigDecimal balance, 
+                                     AccountStatus status, Integer expiryMonth, Integer expiryYear) {
+        try {
+            PaymentAccount account = PaymentAccount.builder()
+                    .userId(userId)
+                    .paymentMethod(paymentMethod)
+                    .paymentToken(paymentToken)
+                    .maskedIdentifier(maskedIdentifier)
+                    .provider(provider)
+                    .balance(balance)
+                    .status(status)
+                    .expiryMonth(expiryMonth)
+                    .expiryYear(expiryYear)
+                    .build();
+
+            paymentAccountRepository.save(account);
+            log.debug("PaymentAccount créé : {} - {}", paymentToken, maskedIdentifier);
+        } catch (Exception e) {
+            log.error("Erreur création PaymentAccount {}: {}", paymentToken, e.getMessage());
+        }
+    }
+
+    private void createPayment(Long userId, SourceType sourceType, Long sourceId, BigDecimal amount, 
+                              PaymentMethod paymentMethod, String savedPaymentToken, 
+                              PaymentStatus status, FailureReason failureReason) {
+        try {
+            Payment payment = Payment.builder()
+                    .transactionToken(TokenGenerator.generateTransactionToken())
+                    .userId(userId)
+                    .sourceType(sourceType)
+                    .sourceId(sourceId)
+                    .amount(amount)
+                    .paymentMethod(paymentMethod)
+                    .savedPaymentToken(savedPaymentToken)
+                    .status(status)
+                    .failureReason(failureReason)
+                    .build();
+
+            paymentRepository.save(payment);
+            log.debug("Payment créé : {} - {} - {}", payment.getTransactionToken(), status, amount);
+        } catch (Exception e) {
+            log.error("Erreur création Payment : {}", e.getMessage());
+        }
+    }
+
+    private void createInvoice(Payment payment) {
+        try {
+            String invoiceNumber = "INV-PAY-" + payment.getId();
+
+            Invoice invoice = Invoice.builder()
+                    .invoiceNumber(invoiceNumber)
+                    .payment(payment)
+                    .userId(payment.getUserId())
+                    .sourceType(payment.getSourceType())
+                    .sourceId(payment.getSourceId())
+                    .totalAmount(payment.getAmount())
+                    .paymentMethod(payment.getPaymentMethod())
+                    .build();
+
+            invoiceRepository.save(invoice);
+            log.debug("Invoice créée : {}", invoiceNumber);
+        } catch (Exception e) {
+            log.error("Erreur création Invoice pour payment {}: {}", payment.getId(), e.getMessage());
+        }
+    }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\FeignConfig.java 
+=============================================== 
 package ma.sgitu.payment.config;
 
 import feign.RequestInterceptor;
@@ -520,10 +1297,11 @@ public class FeignConfig {
             return new ErrorDecoder.Default().decode(methodKey, response);
         };
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\SwaggerConfig.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\config\SwaggerConfig.java 
+=============================================== 
 package ma.sgitu.payment.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
@@ -553,10 +1331,11 @@ public class SwaggerConfig {
                         .version("1.0.0")
                         .description("Documentation du microservice Paiement"));
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\InvoiceController.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\InvoiceController.java 
+=============================================== 
 package ma.sgitu.payment.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -617,15 +1396,17 @@ public class InvoiceController {
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("G6 Payment Service - UP");
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\PaymentAccountController.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\PaymentAccountController.java 
+=============================================== 
 package ma.sgitu.payment.controller;
 
 import lombok.RequiredArgsConstructor;
 import ma.sgitu.payment.dto.request.AddCardRequest;
 import ma.sgitu.payment.dto.request.AddMobileMoneyRequest;
+import ma.sgitu.payment.dto.request.VerifyOtpRequest;
 import ma.sgitu.payment.dto.response.PaymentAccountResponse;
 import ma.sgitu.payment.service.PaymentAccountService;
 import org.springframework.http.ResponseEntity;
@@ -641,7 +1422,6 @@ public class PaymentAccountController {
 
     private final PaymentAccountService paymentAccountService;
 
-    // ✅ Ajouter carte
     @PostMapping("/card")
     public ResponseEntity<PaymentAccountResponse> addCard(
             @Valid @RequestBody AddCardRequest request) {
@@ -650,7 +1430,6 @@ public class PaymentAccountController {
         return ResponseEntity.status(201).body(response);
     }
 
-    // ✅ Ajouter Mobile Money
     @PostMapping("/mobile-money")
     public ResponseEntity<PaymentAccountResponse> addMobileMoney(
             @Valid @RequestBody AddMobileMoneyRequest request) {
@@ -659,7 +1438,16 @@ public class PaymentAccountController {
         return ResponseEntity.status(201).body(response);
     }
 
-    // ✅ Lister par user
+    @PostMapping("/{paymentAccountId}/verify-otp")
+    public ResponseEntity<PaymentAccountResponse> verifyOtp(
+            @PathVariable Long paymentAccountId,
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        request.setPaymentAccountId(paymentAccountId);
+        PaymentAccountResponse response = paymentAccountService.verifyOtp(request);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<PaymentAccountResponse>> getByUserId(
             @PathVariable Long userId) {
@@ -667,7 +1455,6 @@ public class PaymentAccountController {
         return ResponseEntity.ok(paymentAccountService.getByUserId(userId));
     }
 
-    // ✅ Détail (CORRIGÉ pour éviter conflit avec /card)
     @GetMapping("/id/{id}")
     public ResponseEntity<PaymentAccountResponse> getById(
             @PathVariable Long id) {
@@ -675,7 +1462,6 @@ public class PaymentAccountController {
         return ResponseEntity.ok(paymentAccountService.getById(id));
     }
 
-    // ✅ Supprimer
     @DeleteMapping("/id/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable Long id) {
@@ -683,10 +1469,11 @@ public class PaymentAccountController {
         paymentAccountService.delete(id);
         return ResponseEntity.noContent().build();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\PaymentController.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\PaymentController.java 
+=============================================== 
 package ma.sgitu.payment.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -741,10 +1528,72 @@ public class PaymentController {
             @PathVariable Long paymentId) {
         return ResponseEntity.ok(paymentService.cancelPayment(paymentId));
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\TestDataController.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\RefundController.java 
+=============================================== 
+package ma.sgitu.payment.controller;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import ma.sgitu.payment.dto.request.RefundRequest;
+import ma.sgitu.payment.dto.response.RefundResponse;
+import ma.sgitu.payment.service.RefundService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+@Slf4j
+public class RefundController {
+
+    private final RefundService refundService;
+
+    @PostMapping("/payments/{paymentId}/refund")
+    public ResponseEntity<RefundResponse> processRefund(
+            @PathVariable Long paymentId,
+            @Valid @RequestBody RefundRequest request) {
+
+        log.info("POST /payments/{}/refund appelé", paymentId);
+        RefundResponse response = refundService.processRefund(paymentId, request);
+        HttpStatus status = "REFUNDED".equals(response.getStatus())
+                ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(response);
+    }
+
+    @GetMapping("/refunds/{refundId}")
+    public ResponseEntity<RefundResponse> getRefundById(
+            @PathVariable Long refundId) {
+
+        log.info("GET /refunds/{} appelé", refundId);
+        return ResponseEntity.ok(refundService.getRefundById(refundId));
+    }
+
+    @GetMapping("/refunds/payment/{paymentId}")
+    public ResponseEntity<List<RefundResponse>> getRefundsByPaymentId(
+            @PathVariable Long paymentId) {
+
+        log.info("GET /refunds/payment/{} appelé", paymentId);
+        return ResponseEntity.ok(refundService.getRefundsByPaymentId(paymentId));
+    }
+
+    @GetMapping("/refunds/user/{userId}")
+    public ResponseEntity<List<RefundResponse>> getRefundsByUserId(
+            @PathVariable Long userId) {
+
+        log.info("GET /refunds/user/{} appelé", userId);
+        return ResponseEntity.ok(refundService.getRefundsByUserId(userId));
+    }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\TestDataController.java 
+=============================================== 
 package ma.sgitu.payment.controller;
 
 import lombok.RequiredArgsConstructor;
@@ -794,10 +1643,88 @@ public class TestDataController {
                         .build())
                 .collect(Collectors.toList());
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\AddCardRequest.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\controller\TestNotificationController.java 
+=============================================== 
+package ma.sgitu.payment.controller;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import ma.sgitu.payment.dto.request.NotificationRequest;
+import ma.sgitu.payment.entity.Payment;
+import ma.sgitu.payment.repository.PaymentRepository;
+import ma.sgitu.payment.service.NotificationService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/test")
+@RequiredArgsConstructor
+@Slf4j
+public class TestNotificationController {
+
+    private final NotificationService notificationService;
+    private final PaymentRepository paymentRepository;
+
+    @PostMapping("/notification/{paymentId}")
+    public ResponseEntity<Map<String, Object>> testNotification(
+            @PathVariable Long paymentId,
+            @RequestParam String email) {
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Paiement introuvable"));
+
+        notificationService.sendPaymentSuccessNotification(payment, email);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Notification envoyée pour paiement ID " + paymentId);
+        response.put("email", email);
+        response.put("paymentStatus", payment.getStatus());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/notification-format/{paymentId}")
+    public ResponseEntity<NotificationRequest> getNotificationFormat(
+            @PathVariable Long paymentId,
+            @RequestParam String email) {
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Paiement introuvable"));
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("paymentId", payment.getId());
+        metadata.put("amount", payment.getAmount());
+        metadata.put("paymentMethod", payment.getPaymentMethod().name());
+        metadata.put("sourceType", payment.getSourceType().name());
+        metadata.put("sourceId", payment.getSourceId());
+
+        NotificationRequest request = NotificationRequest.builder()
+                .notificationId(UUID.randomUUID().toString())
+                .sourceService("PAYMENT")
+                .eventType("PAYMENT_SUCCESS")
+                .channel("EMAIL")
+                .priority("NORMAL")
+                .recipient(NotificationRequest.Recipient.builder()
+                        .userId(String.valueOf(payment.getUserId()))
+                        .email(email)
+                        .build())
+                .metadata(metadata)
+                .build();
+
+        return ResponseEntity.ok(request);
+    }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\AddCardRequest.java 
+=============================================== 
 package ma.sgitu.payment.dto.request;
 
 import jakarta.validation.constraints.*;
@@ -839,10 +1766,11 @@ public class AddCardRequest {
     @NotBlank(message = "Email obligatoire pour OTP")
     @Email(message = "Format email invalide")
     private String email;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\AddMobileMoneyRequest.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\AddMobileMoneyRequest.java 
+=============================================== 
 package ma.sgitu.payment.dto.request;
 
 import lombok.AllArgsConstructor;
@@ -855,10 +1783,11 @@ public class AddMobileMoneyRequest {
     private String phoneNumber;
     private String provider; // INWI, ORANGE, IAM
     private String email; // Pour envoyer l'OTP via G5
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\NotificationRequest.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\NotificationRequest.java 
+=============================================== 
 package ma.sgitu.payment.dto.request;
 
 import lombok.AllArgsConstructor;
@@ -971,14 +1900,14 @@ public class NotificationRequest {
          */
         private String deviceToken;
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\PaymentRequest.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\PaymentRequest.java 
+=============================================== 
 package ma.sgitu.payment.dto.request;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 import ma.sgitu.payment.enums.PaymentMethod;
 import ma.sgitu.payment.enums.SourceType;
@@ -1006,10 +1935,44 @@ public class PaymentRequest {
 
     @NotNull(message = "savedPaymentToken est obligatoire")
     private String savedPaymentToken;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\VerifyOtpRequest.java
--------------------------------
+
+    @NotBlank(message = "Email obligatoire pour notifications")
+    @Email(message = "Format email invalide")
+    private String email;
+
+    private String description;
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\RefundRequest.java 
+=============================================== 
+package ma.sgitu.payment.dto.request;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class RefundRequest {
+
+    @NotNull(message = "amount est obligatoire")
+    @Positive(message = "Le montant doit être positif")
+    private BigDecimal amount;
+
+    private String reason;
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\request\VerifyOtpRequest.java 
+=============================================== 
 package ma.sgitu.payment.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
@@ -1035,10 +1998,11 @@ public class VerifyOtpRequest {
 
     @NotBlank(message = "Code OTP obligatoire")
     private String otpCode;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\InvoiceResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\InvoiceResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.AllArgsConstructor;
@@ -1069,10 +2033,11 @@ public class InvoiceResponse {
     private BigDecimal totalAmount;
     private String paymentMethod;     // CARD ou MOBILE_MONEY
     private LocalDateTime issuedAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentAccountResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentAccountResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.AllArgsConstructor;
@@ -1103,10 +2068,11 @@ public class PaymentAccountResponse {
     private Integer expiryMonth;
     private Integer expiryYear;
     private LocalDateTime createdAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentDetailsResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentDetailsResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.Builder;
@@ -1130,10 +2096,11 @@ public class PaymentDetailsResponse {
     private String failureReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\PaymentResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.Builder;
@@ -1149,10 +2116,42 @@ public class PaymentResponse {
     private Long invoiceId;
     private String invoiceNumber;
     private String failureReason;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\TestCardResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\RefundResponse.java 
+=============================================== 
+package ma.sgitu.payment.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class RefundResponse {
+
+    private Long refundId;
+    private String refundToken;
+    private Long paymentId;
+    private Long userId;
+    private BigDecimal amountRefunded;
+    private String status;
+    private String reason;
+    private String failureReason;
+    private String message;
+    private LocalDateTime createdAt;
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\TestCardResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.AllArgsConstructor;
@@ -1180,10 +2179,11 @@ public class TestCardResponse {
     private String provider;
     private BigDecimal balance;
     private String status;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\TestMobileMoneyResponse.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\dto\response\TestMobileMoneyResponse.java 
+=============================================== 
 package ma.sgitu.payment.dto.response;
 
 import lombok.AllArgsConstructor;
@@ -1204,10 +2204,11 @@ public class TestMobileMoneyResponse {
     private String provider;
     private BigDecimal balance;
     private String status;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\Invoice.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\Invoice.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1263,10 +2264,11 @@ public class Invoice {
     @CreationTimestamp
     @Column(name = "issued_at", nullable = false, updatable = false)
     private LocalDateTime issuedAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\Payment.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\Payment.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1328,10 +2330,11 @@ public class Payment {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\PaymentAccount.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\PaymentAccount.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1377,10 +2380,11 @@ public class PaymentAccount {
 
     @CreationTimestamp
     private LocalDateTime createdAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\PaymentOtp.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\PaymentOtp.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1420,10 +2424,69 @@ public class PaymentOtp {
     private LocalDateTime createdAt;
 
     private LocalDateTime verifiedAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\TestCard.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\Refund.java 
+=============================================== 
+package ma.sgitu.payment.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import ma.sgitu.payment.enums.RefundStatus;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "refunds")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Refund {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "refund_token", nullable = false, unique = true, length = 100)
+    private String refundToken;
+
+    @Column(name = "payment_id", nullable = false)
+    private Long paymentId;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private RefundStatus status;
+
+    @Column(name = "reason", length = 500)
+    private String reason;
+
+    @Column(name = "failure_reason", length = 100)
+    private String failureReason;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\TestCard.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1482,10 +2545,11 @@ public class TestCard {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\TestMobileMoneyAccount.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\entity\TestMobileMoneyAccount.java 
+=============================================== 
 package ma.sgitu.payment.entity;
 
 import jakarta.persistence.*;
@@ -1512,18 +2576,20 @@ public class TestMobileMoneyAccount {
 
     @Enumerated(EnumType.STRING)
     private AccountStatus status; // ACTIVE ou BLOCKED
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\AccountStatus.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\AccountStatus.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum AccountStatus {
     PENDING_VERIFICATION, ACTIVE, BLOCKED, EXPIRED
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\FailureReason.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\FailureReason.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum FailureReason {
@@ -1533,46 +2599,63 @@ public enum FailureReason {
     ACCOUNT_NOT_ACTIVE,
     INVALID_TOKEN,
     UNAUTHORIZED_TOKEN
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\NotificationType.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\OtpStatus.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\NotificationType.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\OtpStatus.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum OtpStatus {
     PENDING, VERIFIED, EXPIRED, FAILED
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\PaymentMethod.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\PaymentMethod.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum PaymentMethod {
     CARD, MOBILE_MONEY
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\PaymentStatus.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\PaymentStatus.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum PaymentStatus {
     PENDING, SUCCESS, FAILED, CANCELLED
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\SourceType.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\RefundStatus.java 
+=============================================== 
+package ma.sgitu.payment.enums;
+
+public enum RefundStatus {
+    REFUND_PENDING,
+    REFUNDED,
+    REFUND_FAILED
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\enums\SourceType.java 
+=============================================== 
 package ma.sgitu.payment.enums;
 
 public enum SourceType {
     TICKET, SUBSCRIPTION
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\BadRequestException.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\BadRequestException.java 
+=============================================== 
 package ma.sgitu.payment.exception;
 
 import org.springframework.http.HttpStatus;
@@ -1583,10 +2666,11 @@ public class BadRequestException extends RuntimeException {
     public BadRequestException(String message) {
         super(message);
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\GlobalExceptionHandler.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\GlobalExceptionHandler.java 
+=============================================== 
 package ma.sgitu.payment.exception;
 
 import org.springframework.http.HttpStatus;
@@ -1617,18 +2701,21 @@ public class GlobalExceptionHandler {
         body.put("message", "Une erreur imprévue est survenue : " + ex.getMessage());
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\NotFoundException.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\UnauthorizedException.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\InvoiceMapper.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\NotFoundException.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\exception\UnauthorizedException.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\InvoiceMapper.java 
+=============================================== 
 package ma.sgitu.payment.mapper;
 
 import ma.sgitu.payment.dto.response.InvoiceResponse;
@@ -1665,14 +2752,16 @@ public class InvoiceMapper {
                 .issuedAt(invoice.getIssuedAt())
                 .build();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\PaymentAccountMapper.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\PaymentMapper.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\PaymentAccountMapper.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\mapper\PaymentMapper.java 
+=============================================== 
 package ma.sgitu.payment.mapper;
 
 import ma.sgitu.payment.dto.response.PaymentDetailsResponse;
@@ -1698,10 +2787,11 @@ public class PaymentMapper {
                 .updatedAt(payment.getUpdatedAt())
                 .build();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\InvoiceRepository.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\InvoiceRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.Invoice;
@@ -1745,10 +2835,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
      * @return boolean
      */
     boolean existsByPaymentId(Long paymentId);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentAccountRepository.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentAccountRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.PaymentAccount;
@@ -1764,22 +2855,29 @@ public interface PaymentAccountRepository extends JpaRepository<PaymentAccount, 
     Optional<PaymentAccount> findByPaymentToken(String paymentToken);
 
     List<PaymentAccount> findByUserId(Long userId);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentOtpRepository.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentOtpRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.PaymentOtp;
+import ma.sgitu.payment.enums.OtpStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface PaymentOtpRepository extends JpaRepository<PaymentOtp, Long> {
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentRepository.java
--------------------------------
+
+    List<PaymentOtp> findByPaymentAccountIdAndStatus(Long paymentAccountId, OtpStatus status);
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\PaymentRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.Payment;
@@ -1795,10 +2893,30 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByUserId(Long userId);
     Optional<Payment> findByTransactionToken(String transactionToken);
     boolean existsBySourceTypeAndSourceId(String sourceType, Long sourceId);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\TestCardRepository.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\RefundRepository.java 
+=============================================== 
+package ma.sgitu.payment.repository;
+
+import ma.sgitu.payment.entity.Refund;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface RefundRepository extends JpaRepository<Refund, Long> {
+    Optional<Refund> findByRefundToken(String refundToken);
+    List<Refund> findByPaymentId(Long paymentId);
+    List<Refund> findByUserId(Long userId);
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\TestCardRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.TestCard;
@@ -1826,10 +2944,11 @@ public interface TestCardRepository extends JpaRepository<TestCard, Long> {
      * @return boolean
      */
     boolean existsByCardNumberHash(String cardNumberHash);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\TestMobileMoneyAccountRepository.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\repository\TestMobileMoneyAccountRepository.java 
+=============================================== 
 package ma.sgitu.payment.repository;
 
 import ma.sgitu.payment.entity.TestMobileMoneyAccount;
@@ -1841,10 +2960,11 @@ import java.util.Optional;
 public interface TestMobileMoneyAccountRepository extends JpaRepository<TestMobileMoneyAccount, Long> {
     Optional<TestMobileMoneyAccount> findByPhoneHash(String phoneHash);
     Optional<TestMobileMoneyAccount> findByMaskedPhone(String maskedPhone);
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\security\SecurityConfig.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\security\SecurityConfig.java 
+=============================================== 
 package ma.sgitu.payment.security;
 
 import org.springframework.context.annotation.Bean;
@@ -1866,10 +2986,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\InvoiceService.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\InvoiceService.java 
+=============================================== 
 package ma.sgitu.payment.service;
 
 import lombok.RequiredArgsConstructor;
@@ -1885,19 +3006,9 @@ import ma.sgitu.payment.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Service métier pour les factures
- * Responsable de :
- * - Génération de factures après paiement SUCCESS
- * - Consultation de factures
- * - Notification G5 après génération
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -1908,24 +3019,15 @@ public class InvoiceService {
     private final InvoiceMapper invoiceMapper;
     private final NotificationService notificationService;
 
-    /**
-     * Génère une facture après paiement SUCCESS
-     * Appelé automatiquement après Payment.status = SUCCESS
-     *
-     * @param payment Payment SUCCESS
-     * @return InvoiceResponse
-     */
     @Transactional
-    public InvoiceResponse generateInvoice(Payment payment) {
+    public InvoiceResponse generateInvoice(Payment payment, String userEmail) {
         log.info("Génération facture pour paiement ID: {}", payment.getId());
 
-        // Validation : le paiement doit être SUCCESS
         if (payment.getStatus() != PaymentStatus.SUCCESS) {
             log.error("Tentative de génération facture pour paiement non SUCCESS: {}", payment.getStatus());
             throw new BadRequestException("Impossible de générer une facture pour un paiement non réussi");
         }
 
-        // Validation : pas de facture déjà existante
         if (invoiceRepository.existsByPaymentId(payment.getId())) {
             log.warn("Facture déjà existante pour paiement ID: {}", payment.getId());
             return invoiceMapper.toResponse(
@@ -1934,10 +3036,8 @@ public class InvoiceService {
             );
         }
 
-        // Génération du numéro de facture unique
         String invoiceNumber = generateInvoiceNumber(payment.getId());
 
-        // Création de la facture
         Invoice invoice = Invoice.builder()
                 .invoiceNumber(invoiceNumber)
                 .payment(payment)
@@ -1951,23 +3051,15 @@ public class InvoiceService {
         invoice = invoiceRepository.save(invoice);
         log.info("Facture générée avec succès: {}", invoiceNumber);
 
-        // Notification G5 : INVOICE_GENERATED
         try {
-            notificationService.sendInvoiceGeneratedNotification(invoice);
+            notificationService.sendInvoiceGeneratedNotification(invoice, userEmail);
         } catch (Exception e) {
             log.error("Échec notification INVOICE_GENERATED pour facture {}: {}", invoiceNumber, e.getMessage());
-            // On ne bloque pas la génération de facture si la notification échoue
         }
 
         return invoiceMapper.toResponse(invoice);
     }
 
-    /**
-     * Récupère une facture par son ID
-     *
-     * @param invoiceId ID de la facture
-     * @return InvoiceResponse
-     */
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoiceById(Long invoiceId) {
         log.info("Consultation facture ID: {}", invoiceId);
@@ -1978,12 +3070,6 @@ public class InvoiceService {
         return invoiceMapper.toResponse(invoice);
     }
 
-    /**
-     * Récupère une facture par numéro
-     *
-     * @param invoiceNumber Numéro de facture (ex: INV-PAY-100)
-     * @return InvoiceResponse
-     */
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoiceByNumber(String invoiceNumber) {
         log.info("Consultation facture numéro: {}", invoiceNumber);
@@ -1994,21 +3080,13 @@ public class InvoiceService {
         return invoiceMapper.toResponse(invoice);
     }
 
-    /**
-     * Récupère la facture liée à un paiement
-     *
-     * @param paymentId ID du paiement
-     * @return InvoiceResponse
-     */
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoiceByPaymentId(Long paymentId) {
         log.info("Consultation facture pour paiement ID: {}", paymentId);
 
-        // Vérification : le paiement existe
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new BadRequestException("Paiement introuvable avec ID: " + paymentId));
 
-        // Vérification : le paiement est SUCCESS
         if (payment.getStatus() != PaymentStatus.SUCCESS) {
             throw new BadRequestException("Aucune facture pour un paiement non réussi (statut: " + payment.getStatus() + ")");
         }
@@ -2019,12 +3097,6 @@ public class InvoiceService {
         return invoiceMapper.toResponse(invoice);
     }
 
-    /**
-     * Liste toutes les factures d'un utilisateur
-     *
-     * @param userId ID utilisateur
-     * @return List<InvoiceResponse>
-     */
     @Transactional(readOnly = true)
     public List<InvoiceResponse> getInvoicesByUserId(Long userId) {
         log.info("Consultation factures utilisateur ID: {}", userId);
@@ -2036,20 +3108,14 @@ public class InvoiceService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Génère un numéro de facture unique
-     * Format : INV-PAY-{paymentId}
-     *
-     * @param paymentId ID du paiement
-     * @return String numéro facture
-     */
     private String generateInvoiceNumber(Long paymentId) {
         return "INV-PAY-" + paymentId;
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\NotificationService.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\NotificationService.java 
+=============================================== 
 package ma.sgitu.payment.service;
 
 import lombok.RequiredArgsConstructor;
@@ -2065,17 +3131,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Service pour envoyer les notifications à G5
- * Conforme au contrat G5 Notifications v3.1
- *
- * Types de notifications G6 :
- * 1. PAYMENT_METHOD_OTP - OTP pour valider CARD ou MOBILE_MONEY
- * 2. PAYMENT_SUCCESS - Paiement validé
- * 3. PAYMENT_FAILED - Paiement échoué
- * 4. PAYMENT_CANCELLED - Paiement annulé
- * 5. INVOICE_GENERATED - Facture générée
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -2083,24 +3138,15 @@ public class NotificationService {
 
     private final NotificationClient notificationClient;
 
-    /**
-     * Envoie OTP par email pour validation moyen de paiement
-     *
-     * @param paymentAccount Compte de paiement en attente
-     * @param otpCode Code OTP généré
-     * @param userEmail Email de l'utilisateur
-     */
     public void sendOtpNotification(PaymentAccount paymentAccount, String otpCode, String userEmail) {
         log.info("Envoi notification OTP pour PaymentAccount ID: {}", paymentAccount.getId());
 
-        // Construction metadata
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("paymentAccountId", paymentAccount.getId());
         metadata.put("otpCode", otpCode);
         metadata.put("paymentMethod", paymentAccount.getPaymentMethod().name());
         metadata.put("maskedIdentifier", paymentAccount.getMaskedIdentifier());
 
-        // Construction request
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService("PAYMENT")
@@ -2114,26 +3160,17 @@ public class NotificationService {
                 .metadata(metadata)
                 .build();
 
-        // Envoi via OpenFeign
         try {
             notificationClient.sendNotification(request);
-            log.info("Notification OTP envoyée avec succès pour PaymentAccount ID: {}", paymentAccount.getId());
+            log.info("Notification OTP envoyée avec succès");
         } catch (Exception e) {
-            log.error("Échec envoi notification OTP pour PaymentAccount ID {}: {}", paymentAccount.getId(), e.getMessage());
-            throw new RuntimeException("Impossible d'envoyer l'OTP par email", e);
+            log.warn("G5 indisponible — OTP généré localement uniquement");
         }
     }
 
-    /**
-     * Envoie notification de paiement réussi
-     *
-     * @param payment Paiement SUCCESS
-     * @param userEmail Email de l'utilisateur
-     */
     public void sendPaymentSuccessNotification(Payment payment, String userEmail) {
         log.info("Envoi notification PAYMENT_SUCCESS pour paiement ID: {}", payment.getId());
 
-        // Construction metadata
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("paymentId", payment.getId());
         metadata.put("amount", payment.getAmount());
@@ -2141,7 +3178,6 @@ public class NotificationService {
         metadata.put("sourceType", payment.getSourceType().name());
         metadata.put("sourceId", payment.getSourceId());
 
-        // Construction request
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService("PAYMENT")
@@ -2155,26 +3191,17 @@ public class NotificationService {
                 .metadata(metadata)
                 .build();
 
-        // Envoi via OpenFeign
         try {
             notificationClient.sendNotification(request);
             log.info("Notification PAYMENT_SUCCESS envoyée pour paiement ID: {}", payment.getId());
         } catch (Exception e) {
             log.error("Échec notification PAYMENT_SUCCESS pour paiement ID {}: {}", payment.getId(), e.getMessage());
-            // On ne bloque pas le processus si la notification échoue
         }
     }
 
-    /**
-     * Envoie notification de paiement échoué
-     *
-     * @param payment Paiement FAILED
-     * @param userEmail Email de l'utilisateur
-     */
     public void sendPaymentFailedNotification(Payment payment, String userEmail) {
         log.info("Envoi notification PAYMENT_FAILED pour paiement ID: {}", payment.getId());
 
-        // Construction metadata
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("paymentId", payment.getId());
         metadata.put("amount", payment.getAmount());
@@ -2183,7 +3210,6 @@ public class NotificationService {
         metadata.put("sourceType", payment.getSourceType().name());
         metadata.put("sourceId", payment.getSourceId());
 
-        // Construction request
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService("PAYMENT")
@@ -2197,7 +3223,6 @@ public class NotificationService {
                 .metadata(metadata)
                 .build();
 
-        // Envoi via OpenFeign
         try {
             notificationClient.sendNotification(request);
             log.info("Notification PAYMENT_FAILED envoyée pour paiement ID: {}", payment.getId());
@@ -2206,23 +3231,15 @@ public class NotificationService {
         }
     }
 
-    /**
-     * Envoie notification de paiement annulé
-     *
-     * @param payment Paiement CANCELLED
-     * @param userEmail Email de l'utilisateur
-     */
     public void sendPaymentCancelledNotification(Payment payment, String userEmail) {
         log.info("Envoi notification PAYMENT_CANCELLED pour paiement ID: {}", payment.getId());
 
-        // Construction metadata
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("paymentId", payment.getId());
         metadata.put("amount", payment.getAmount());
         metadata.put("sourceType", payment.getSourceType().name());
         metadata.put("sourceId", payment.getSourceId());
 
-        // Construction request
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService("PAYMENT")
@@ -2236,7 +3253,6 @@ public class NotificationService {
                 .metadata(metadata)
                 .build();
 
-        // Envoi via OpenFeign
         try {
             notificationClient.sendNotification(request);
             log.info("Notification PAYMENT_CANCELLED envoyée pour paiement ID: {}", payment.getId());
@@ -2245,15 +3261,9 @@ public class NotificationService {
         }
     }
 
-    /**
-     * Envoie notification de facture générée
-     *
-     * @param invoice Facture générée
-     */
-    public void sendInvoiceGeneratedNotification(Invoice invoice) {
+    public void sendInvoiceGeneratedNotification(Invoice invoice, String userEmail) {
         log.info("Envoi notification INVOICE_GENERATED pour facture: {}", invoice.getInvoiceNumber());
 
-        // Construction metadata
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("invoiceId", invoice.getId());
         metadata.put("invoiceNumber", invoice.getInvoiceNumber());
@@ -2263,7 +3273,6 @@ public class NotificationService {
         metadata.put("sourceType", invoice.getSourceType().name());
         metadata.put("sourceId", invoice.getSourceId());
 
-        // Construction request
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService("PAYMENT")
@@ -2272,12 +3281,11 @@ public class NotificationService {
                 .priority("NORMAL")
                 .recipient(NotificationRequest.Recipient.builder()
                         .userId(String.valueOf(invoice.getUserId()))
-                        .email("user@example.com") // TODO: récupérer email réel depuis G3
+                        .email(userEmail)
                         .build())
                 .metadata(metadata)
                 .build();
 
-        // Envoi via OpenFeign
         try {
             notificationClient.sendNotification(request);
             log.info("Notification INVOICE_GENERATED envoyée pour facture: {}", invoice.getInvoiceNumber());
@@ -2285,10 +3293,11 @@ public class NotificationService {
             log.error("Échec notification INVOICE_GENERATED pour facture {}: {}", invoice.getInvoiceNumber(), e.getMessage());
         }
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\OtpService.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\OtpService.java 
+=============================================== 
 package ma.sgitu.payment.service;
 
 import lombok.RequiredArgsConstructor;
@@ -2337,32 +3346,26 @@ public class OtpService {
 
         return otpCode;
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentAccountService.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentAccountService.java 
+=============================================== 
 package ma.sgitu.payment.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import ma.sgitu.payment.dto.request.AddCardRequest;
-import ma.sgitu.payment.dto.request.AddMobileMoneyRequest;
-import ma.sgitu.payment.dto.response.PaymentAccountResponse;
-import ma.sgitu.payment.entity.PaymentAccount;
-import ma.sgitu.payment.entity.TestCard;
-import ma.sgitu.payment.entity.TestMobileMoneyAccount;
-import ma.sgitu.payment.enums.AccountStatus;
-import ma.sgitu.payment.enums.PaymentMethod;
+import ma.sgitu.payment.dto.request.*;
+import ma.sgitu.payment.dto.response.*;
+import ma.sgitu.payment.entity.*;
+import ma.sgitu.payment.enums.*;
 import ma.sgitu.payment.exception.BadRequestException;
-import ma.sgitu.payment.repository.PaymentAccountRepository;
-import ma.sgitu.payment.repository.TestCardRepository;
-import ma.sgitu.payment.repository.TestMobileMoneyAccountRepository;
-import ma.sgitu.payment.util.HashUtil;
-import ma.sgitu.payment.util.MaskingUtil;
-import ma.sgitu.payment.util.TokenGenerator;
+import ma.sgitu.payment.repository.*;
+import ma.sgitu.payment.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -2374,39 +3377,35 @@ public class PaymentAccountService {
     private final PaymentAccountRepository paymentAccountRepository;
     private final TestCardRepository testCardRepository;
     private final TestMobileMoneyAccountRepository testMobileMoneyRepository;
+    private final PaymentOtpRepository paymentOtpRepository;
     private final OtpService otpService;
     private final NotificationService notificationService;
 
+    // ✅ ADD CARD
     @Transactional
     public PaymentAccountResponse addCard(AddCardRequest request) {
-        log.info("Ajout carte pour userId: {}", request.getUserId());
 
-        // 1. Hash du numéro de carte
-        String cardNumberHash = HashUtil.hash(request.getCardNumber());
-
-        // 2. Vérifier si carte existe dans test_cards
-        TestCard testCard = testCardRepository.findByCardNumberHash(cardNumberHash)
+        TestCard testCard = testCardRepository.findAll().stream()
+                .filter(card -> HashUtil.verify(request.getCardNumber(), card.getCardNumberHash()))
+                .findFirst()
                 .orElseThrow(() -> new BadRequestException("Carte non reconnue"));
 
-        // 3. Vérifier CVV
         if (!HashUtil.verify(request.getCvv(), testCard.getCvvHash())) {
             throw new BadRequestException("CVV incorrect");
         }
 
-        // 4. Vérifier statut et expiration
         if (testCard.getStatus() != AccountStatus.ACTIVE) {
             throw new BadRequestException("Carte bloquée ou expirée");
         }
 
-        // 5. Créer PaymentAccount
-        String paymentToken = TokenGenerator.generateCardToken();
-        String maskedCard = MaskingUtil.maskCardNumber(request.getCardNumber());
+        String token = TokenGenerator.generateCardToken();
+        String masked = MaskingUtil.maskCardNumber(request.getCardNumber());
 
         PaymentAccount account = PaymentAccount.builder()
                 .userId(request.getUserId())
                 .paymentMethod(PaymentMethod.CARD)
-                .paymentToken(paymentToken)
-                .maskedIdentifier(maskedCard)
+                .paymentToken(token)
+                .maskedIdentifier(masked)
                 .provider(testCard.getProvider())
                 .balance(testCard.getBalance())
                 .status(AccountStatus.PENDING_VERIFICATION)
@@ -2416,45 +3415,37 @@ public class PaymentAccountService {
 
         account = paymentAccountRepository.save(account);
 
-        // 6. Générer et envoyer OTP
-        String otpCode = otpService.generateOtp(account);
-        notificationService.sendOtpNotification(account, otpCode, request.getEmail());
-
-        log.info("Carte ajoutée avec succès, OTP envoyé: {}", paymentToken);
+        String otp = otpService.generateOtp(account);
+        notificationService.sendOtpNotification(account, otp, request.getEmail());
 
         return toResponse(account);
     }
 
+    // ✅ ADD MOBILE MONEY
     @Transactional
     public PaymentAccountResponse addMobileMoney(AddMobileMoneyRequest request) {
-        log.info("Ajout Mobile Money pour userId: {}", request.getUserId());
 
-        // 1. Hash du téléphone
-        String phoneHash = HashUtil.hash(request.getPhoneNumber());
-
-        // 2. Vérifier dans test_mobile_money_accounts
-        TestMobileMoneyAccount testAccount = testMobileMoneyRepository.findByPhoneHash(phoneHash)
+        TestMobileMoneyAccount testAccount = testMobileMoneyRepository.findAll().stream()
+                .filter(acc -> HashUtil.verify(request.getPhoneNumber(), acc.getPhoneHash()))
+                .findFirst()
                 .orElseThrow(() -> new BadRequestException("Numéro Mobile Money non reconnu"));
 
-        // 3. Vérifier provider
         if (!testAccount.getProvider().equals(request.getProvider())) {
-            throw new BadRequestException("Provider incorrect pour ce numéro");
+            throw new BadRequestException("Provider incorrect");
         }
 
-        // 4. Vérifier statut
         if (testAccount.getStatus() != AccountStatus.ACTIVE) {
             throw new BadRequestException("Compte Mobile Money bloqué");
         }
 
-        // 5. Créer PaymentAccount
-        String paymentToken = TokenGenerator.generateMobileMoneyToken();
-        String maskedPhone = MaskingUtil.maskPhoneNumber(request.getPhoneNumber());
+        String token = TokenGenerator.generateMobileMoneyToken();
+        String masked = MaskingUtil.maskPhoneNumber(request.getPhoneNumber());
 
         PaymentAccount account = PaymentAccount.builder()
                 .userId(request.getUserId())
                 .paymentMethod(PaymentMethod.MOBILE_MONEY)
-                .paymentToken(paymentToken)
-                .maskedIdentifier(maskedPhone)
+                .paymentToken(token)
+                .maskedIdentifier(masked)
                 .provider(request.getProvider())
                 .balance(testAccount.getBalance())
                 .status(AccountStatus.PENDING_VERIFICATION)
@@ -2462,33 +3453,68 @@ public class PaymentAccountService {
 
         account = paymentAccountRepository.save(account);
 
-        // 6. Générer et envoyer OTP
-        String otpCode = otpService.generateOtp(account);
-        notificationService.sendOtpNotification(account, otpCode, request.getEmail());
+        String otp = otpService.generateOtp(account);
+        notificationService.sendOtpNotification(account, otp, request.getEmail());
 
-        log.info("Mobile Money ajouté, OTP envoyé: {}", paymentToken);
+        return toResponse(account);
+    }
+
+    // ✅ VERIFY OTP (SANS LAMBDA BUG)
+    @Transactional
+    public PaymentAccountResponse verifyOtp(VerifyOtpRequest request) {
+
+        PaymentAccount account = paymentAccountRepository.findById(request.getPaymentAccountId())
+                .orElseThrow(() -> new BadRequestException("Compte introuvable"));
+
+        List<PaymentOtp> otps =
+                paymentOtpRepository.findByPaymentAccountIdAndStatus(account.getId(), OtpStatus.PENDING);
+
+        if (otps.isEmpty()) {
+            throw new BadRequestException("Aucun OTP en attente");
+        }
+
+        PaymentOtp otp = otps.get(otps.size() - 1);
+
+        if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
+            otp.setStatus(OtpStatus.EXPIRED);
+            paymentOtpRepository.save(otp);
+            throw new BadRequestException("OTP expiré");
+        }
+
+        if (!HashUtil.verify(request.getOtpCode(), otp.getOtpHash())) {
+            otp.setAttempts(otp.getAttempts() + 1);
+            paymentOtpRepository.save(otp);
+            throw new BadRequestException("OTP incorrect");
+        }
+
+        otp.setStatus(OtpStatus.VERIFIED);
+        otp.setVerifiedAt(LocalDateTime.now());
+        paymentOtpRepository.save(otp);
+
+        account.setStatus(AccountStatus.ACTIVE);
+        paymentAccountRepository.save(account);
 
         return toResponse(account);
     }
 
     public List<PaymentAccountResponse> getByUserId(Long userId) {
-        return paymentAccountRepository.findByUserId(userId).stream()
+        return paymentAccountRepository.findByUserId(userId)
+                .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
     public PaymentAccountResponse getById(Long id) {
         PaymentAccount account = paymentAccountRepository.findById(id)
-                .orElseThrow(() -> new BadRequestException("Moyen de paiement introuvable"));
+                .orElseThrow(() -> new BadRequestException("Introuvable"));
         return toResponse(account);
     }
 
     @Transactional
     public void delete(Long id) {
         PaymentAccount account = paymentAccountRepository.findById(id)
-                .orElseThrow(() -> new BadRequestException("Moyen de paiement introuvable"));
+                .orElseThrow(() -> new BadRequestException("Introuvable"));
         paymentAccountRepository.delete(account);
-        log.info("Moyen de paiement supprimé: {}", id);
     }
 
     private PaymentAccountResponse toResponse(PaymentAccount account) {
@@ -2506,21 +3532,28 @@ public class PaymentAccountService {
                 .createdAt(account.getCreatedAt())
                 .build();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentService.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentService.java 
+=============================================== 
 package ma.sgitu.payment.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import ma.sgitu.payment.dto.request.PaymentRequest;
 import ma.sgitu.payment.dto.response.PaymentDetailsResponse;
 import ma.sgitu.payment.dto.response.PaymentResponse;
 import ma.sgitu.payment.entity.Payment;
+import ma.sgitu.payment.entity.PaymentAccount;
+import ma.sgitu.payment.enums.AccountStatus;
+import ma.sgitu.payment.enums.FailureReason;
 import ma.sgitu.payment.enums.PaymentStatus;
+import ma.sgitu.payment.exception.BadRequestException;
+import ma.sgitu.payment.mapper.PaymentMapper;
 import ma.sgitu.payment.repository.PaymentAccountRepository;
 import ma.sgitu.payment.repository.PaymentRepository;
-import ma.sgitu.payment.repository.TestMobileMoneyAccountRepository;
+import ma.sgitu.payment.util.TokenGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -2529,15 +3562,22 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentAccountRepository paymentAccountRepository;
-    private final TestMobileMoneyAccountRepository testMobileMoneyAccountRepository;
+    private final PaymentMapper paymentMapper;
+    private final InvoiceService invoiceService;
+    private final NotificationService notificationService;
+    private final SubscriptionCallbackService subscriptionCallbackService;
+
     @Transactional
     public PaymentResponse processPayment(PaymentRequest request) {
 
-        // Créer transaction PENDING
+        log.info("Traitement paiement userId={}, sourceType={}, sourceId={}, amount={}",
+                request.getUserId(), request.getSourceType(), request.getSourceId(), request.getAmount());
+
         Payment payment = Payment.builder()
                 .userId(request.getUserId())
                 .sourceType(request.getSourceType())
@@ -2546,108 +3586,367 @@ public class PaymentService {
                 .paymentMethod(request.getPaymentMethod())
                 .savedPaymentToken(request.getSavedPaymentToken())
                 .status(PaymentStatus.PENDING)
-                .transactionToken("PAY-" + System.currentTimeMillis())
+                .transactionToken(TokenGenerator.generateTransactionToken())
                 .build();
 
-        if (request.getPaymentMethod() == ma.sgitu.payment.enums.PaymentMethod.MOBILE_MONEY) {
-            handleMobileMoneyPayment(payment);
+        payment = paymentRepository.save(payment);
+
+        PaymentAccount account = paymentAccountRepository
+                .findByPaymentToken(request.getSavedPaymentToken())
+                .orElse(null);
+
+        if (account == null) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(FailureReason.INVALID_TOKEN);
+            paymentRepository.save(payment);
+            notificationService.sendPaymentFailedNotification(payment, request.getEmail());
+            subscriptionCallbackService.sendPaymentConfirmation(payment);
+            return buildFailedResponse(payment);
         }
 
+        if (!account.getUserId().equals(request.getUserId())) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(FailureReason.UNAUTHORIZED_TOKEN);
+            paymentRepository.save(payment);
+            notificationService.sendPaymentFailedNotification(payment, request.getEmail());
+            subscriptionCallbackService.sendPaymentConfirmation(payment);
+            return buildFailedResponse(payment);
+        }
+
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(FailureReason.ACCOUNT_NOT_ACTIVE);
+            paymentRepository.save(payment);
+            notificationService.sendPaymentFailedNotification(payment, request.getEmail());
+            subscriptionCallbackService.sendPaymentConfirmation(payment);
+            return buildFailedResponse(payment);
+        }
+
+        if (account.getBalance().compareTo(request.getAmount()) < 0) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason(FailureReason.INSUFFICIENT_BALANCE);
+            paymentRepository.save(payment);
+            notificationService.sendPaymentFailedNotification(payment, request.getEmail());
+            subscriptionCallbackService.sendPaymentConfirmation(payment);
+            return buildFailedResponse(payment);
+        }
+
+        account.setBalance(account.getBalance().subtract(request.getAmount()));
+        paymentAccountRepository.save(account);
+
+        payment.setStatus(PaymentStatus.SUCCESS);
         payment = paymentRepository.save(payment);
-        String msg = payment.getStatus() == PaymentStatus.SUCCESS ? "Paiement réussi" : "Paiement en attente ou échoué";
+
+        log.info("Paiement SUCCESS ID={}, montant débité", payment.getId());
+
+        invoiceService.generateInvoice(payment, request.getEmail());
+        notificationService.sendPaymentSuccessNotification(payment, request.getEmail());
+        subscriptionCallbackService.sendPaymentConfirmation(payment);
 
         return PaymentResponse.builder()
                 .paymentId(payment.getId())
                 .transactionToken(payment.getTransactionToken())
                 .status(payment.getStatus().name())
-                .failureReason(payment.getFailureReason() != null ? payment.getFailureReason().name() : null)
-                .message(payment.getStatus() == PaymentStatus.SUCCESS ? "Paiement réussi" : "Le paiement a échoué")
+                .message("Paiement validé avec succès")
+                .invoiceId(null)
+                .invoiceNumber(null)
+                .failureReason(null)
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public PaymentDetailsResponse getPaymentById(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Paiement introuvable: " + paymentId));
-        return toDetailsResponse(payment);
+                .orElseThrow(() -> new BadRequestException("Paiement introuvable ID: " + paymentId));
+        return paymentMapper.toDetailsResponse(payment);
     }
 
+    @Transactional(readOnly = true)
     public List<PaymentDetailsResponse> getPaymentsByUserId(Long userId) {
         return paymentRepository.findByUserId(userId)
                 .stream()
-                .map(this::toDetailsResponse)
+                .map(paymentMapper::toDetailsResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public PaymentDetailsResponse cancelPayment(Long paymentId) {
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Paiement introuvable: " + paymentId));
+                .orElseThrow(() -> new BadRequestException("Paiement introuvable ID: " + paymentId));
 
         if (payment.getStatus() != PaymentStatus.PENDING) {
-            throw new RuntimeException("Seul un paiement PENDING peut être annulé");
+            throw new BadRequestException("Seul un paiement PENDING peut être annulé");
         }
 
         payment.setStatus(PaymentStatus.CANCELLED);
-        paymentRepository.save(payment);
-        return toDetailsResponse(payment);
+        payment = paymentRepository.save(payment);
+
+        log.info("Paiement annulé ID={}", paymentId);
+
+        return paymentMapper.toDetailsResponse(payment);
     }
 
-    private PaymentDetailsResponse toDetailsResponse(Payment payment) {
-        return PaymentDetailsResponse.builder()
-                .id(payment.getId())
+    private PaymentResponse buildFailedResponse(Payment payment) {
+        return PaymentResponse.builder()
+                .paymentId(payment.getId())
                 .transactionToken(payment.getTransactionToken())
-                .userId(payment.getUserId())
-                .sourceType(payment.getSourceType().name())
-                .sourceId(payment.getSourceId())
-                .amount(payment.getAmount())
-                .paymentMethod(payment.getPaymentMethod().name())
-                .savedPaymentToken(payment.getSavedPaymentToken())
                 .status(payment.getStatus().name())
+                .message("Paiement échoué")
+                .invoiceId(null)
+                .invoiceNumber(null)
                 .failureReason(payment.getFailureReason() != null ? payment.getFailureReason().name() : null)
-                .createdAt(payment.getCreatedAt())
-                .updatedAt(payment.getUpdatedAt())
                 .build();
     }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentSimulationService.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\RefundService.java 
+=============================================== 
+package ma.sgitu.payment.service;
 
-    private void handleMobileMoneyPayment(Payment payment) {
-        // 1. Chercher le compte
-        ma.sgitu.payment.entity.PaymentAccount account = paymentAccountRepository
-                .findByPaymentToken(payment.getSavedPaymentToken())
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import ma.sgitu.payment.dto.request.RefundRequest;
+import ma.sgitu.payment.dto.response.RefundResponse;
+import ma.sgitu.payment.entity.Payment;
+import ma.sgitu.payment.entity.PaymentAccount;
+import ma.sgitu.payment.entity.Refund;
+import ma.sgitu.payment.enums.PaymentStatus;
+import ma.sgitu.payment.enums.RefundStatus;
+import ma.sgitu.payment.enums.SourceType;
+import ma.sgitu.payment.exception.BadRequestException;
+import ma.sgitu.payment.repository.PaymentAccountRepository;
+import ma.sgitu.payment.repository.PaymentRepository;
+import ma.sgitu.payment.repository.RefundRepository;
+import ma.sgitu.payment.util.TokenGenerator;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class RefundService {
+
+    private final RefundRepository refundRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentAccountRepository paymentAccountRepository;
+    private final SubscriptionCallbackService subscriptionCallbackService;
+
+    @Transactional
+    public RefundResponse processRefund(Long paymentId, RefundRequest request) {
+        log.info("Demande de remboursement pour paiement ID: {}", paymentId);
+
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new BadRequestException("Paiement introuvable ID: " + paymentId));
+
+        if (payment.getStatus() != PaymentStatus.SUCCESS) {
+            throw new BadRequestException("Seul un paiement SUCCESS peut être remboursé");
+        }
+
+        if (request.getAmount().compareTo(payment.getAmount()) > 0) {
+            throw new BadRequestException("Le montant du remboursement ne peut pas dépasser le montant du paiement");
+        }
+
+        String refundToken = "REFUND-TOKEN-" + System.currentTimeMillis();
+
+        Refund refund = Refund.builder()
+                .refundToken(refundToken)
+                .paymentId(paymentId)
+                .userId(payment.getUserId())
+                .amount(request.getAmount())
+                .status(RefundStatus.REFUND_PENDING)
+                .reason(request.getReason())
+                .build();
+
+        refund = refundRepository.save(refund);
+
+        PaymentAccount account = paymentAccountRepository.findByPaymentToken(payment.getSavedPaymentToken())
                 .orElse(null);
 
         if (account == null) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.INVALID_TOKEN);
+            refund.setStatus(RefundStatus.REFUND_FAILED);
+            refund.setFailureReason("PAYMENT_ACCOUNT_NOT_FOUND");
+            refundRepository.save(refund);
+            return toFailedResponse(refund, "Compte de paiement introuvable");
+        }
+
+        account.setBalance(account.getBalance().add(request.getAmount()));
+        paymentAccountRepository.save(account);
+
+        refund.setStatus(RefundStatus.REFUNDED);
+        refund = refundRepository.save(refund);
+
+        log.info("Remboursement SUCCESS ID={}, montant crédité", refund.getId());
+
+        if (payment.getSourceType() == SourceType.SUBSCRIPTION) {
+            subscriptionCallbackService.sendRefundConfirmation(payment, refund);
+        }
+
+        return toSuccessResponse(refund);
+    }
+
+    @Transactional(readOnly = true)
+    public RefundResponse getRefundById(Long refundId) {
+        Refund refund = refundRepository.findById(refundId)
+                .orElseThrow(() -> new BadRequestException("Remboursement introuvable ID: " + refundId));
+        return toResponse(refund);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RefundResponse> getRefundsByPaymentId(Long paymentId) {
+        return refundRepository.findByPaymentId(paymentId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<RefundResponse> getRefundsByUserId(Long userId) {
+        return refundRepository.findByUserId(userId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private RefundResponse toResponse(Refund refund) {
+        return RefundResponse.builder()
+                .refundId(refund.getId())
+                .refundToken(refund.getRefundToken())
+                .paymentId(refund.getPaymentId())
+                .userId(refund.getUserId())
+                .amountRefunded(refund.getAmount())
+                .status(refund.getStatus().name())
+                .reason(refund.getReason())
+                .failureReason(refund.getFailureReason())
+                .createdAt(refund.getCreatedAt())
+                .build();
+    }
+
+    private RefundResponse toSuccessResponse(Refund refund) {
+        return RefundResponse.builder()
+                .refundId(refund.getId())
+                .refundToken(refund.getRefundToken())
+                .paymentId(refund.getPaymentId())
+                .status(refund.getStatus().name())
+                .amountRefunded(refund.getAmount())
+                .message("Remboursement effectué avec succès")
+                .failureReason(null)
+                .createdAt(refund.getCreatedAt())
+                .build();
+    }
+
+    private RefundResponse toFailedResponse(Refund refund, String message) {
+        return RefundResponse.builder()
+                .refundId(refund.getId())
+                .refundToken(refund.getRefundToken())
+                .paymentId(refund.getPaymentId())
+                .status(refund.getStatus().name())
+                .amountRefunded(java.math.BigDecimal.ZERO)
+                .message(message)
+                .failureReason(refund.getFailureReason())
+                .createdAt(refund.getCreatedAt())
+                .build();
+    }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\SubscriptionCallbackService.java 
+=============================================== 
+package ma.sgitu.payment.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import ma.sgitu.payment.client.SubscriptionClient;
+import ma.sgitu.payment.entity.Payment;
+import ma.sgitu.payment.entity.Refund;
+import ma.sgitu.payment.enums.SourceType;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class SubscriptionCallbackService {
+
+    private final SubscriptionClient subscriptionClient;
+
+    public void sendPaymentConfirmation(Payment payment) {
+        if (payment.getSourceType() != SourceType.SUBSCRIPTION) {
+            log.debug("Paiement non-SUBSCRIPTION, pas de callback G2");
             return;
         }
 
-        // 2. Vérifier Solde et Statut
-        if (account.getStatus() != ma.sgitu.payment.enums.AccountStatus.ACTIVE) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.ACCOUNT_NOT_ACTIVE);
-        } else if (account.getBalance().compareTo(payment.getAmount()) < 0) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason(ma.sgitu.payment.enums.FailureReason.INSUFFICIENT_BALANCE);
-        } else {
-            // 3. Débit et Succès
-            account.setBalance(account.getBalance().subtract(payment.getAmount()));
-            paymentAccountRepository.save(account);
-            testMobileMoneyAccountRepository.findByMaskedPhone(account.getMaskedIdentifier())
-                    .ifPresent(testAccount -> {
-                        testAccount.setBalance(testAccount.getBalance().subtract(payment.getAmount()));
-                        testMobileMoneyAccountRepository.save(testAccount);
-                    });
-            payment.setStatus(PaymentStatus.SUCCESS);
+        log.info("Envoi confirmation paiement vers G2 pour subscription ID: {}", payment.getSourceId());
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("transactionToken", payment.getTransactionToken());
+        data.put("status", payment.getStatus().name());
+        data.put("message", payment.getStatus().name().equals("SUCCESS") ? "Paiement validé" : "Paiement refusé");
+
+        if (payment.getFailureReason() != null) {
+            data.put("failureReason", payment.getFailureReason().name());
+        }
+
+        try {
+            subscriptionClient.confirmPayment(data);
+            log.info("Confirmation paiement envoyée à G2 avec succès");
+        } catch (Exception e) {
+            log.error("Échec envoi confirmation paiement vers G2: {}", e.getMessage());
         }
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\service\PaymentSimulationService.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\HashUtil.java
--------------------------------
+
+    public void sendRefundConfirmation(Payment payment, Refund refund) {
+        if (payment.getSourceType() != SourceType.SUBSCRIPTION) {
+            log.debug("Paiement non-SUBSCRIPTION, pas de callback refund G2");
+            return;
+        }
+
+        log.info("Envoi confirmation remboursement vers G2 pour subscription ID: {}", payment.getSourceId());
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("transactionToken", payment.getTransactionToken());
+        data.put("refundToken", refund.getRefundToken());
+        data.put("status", refund.getStatus().name());
+        data.put("amountRefunded", refund.getAmount());
+        data.put("message", refund.getStatus().name().equals("REFUNDED") ? "Remboursement effectué avec succès" : "Remboursement échoué");
+
+        if (refund.getFailureReason() != null) {
+            data.put("failureReason", refund.getFailureReason());
+        }
+
+        try {
+            subscriptionClient.confirmRefund(data);
+            log.info("Confirmation remboursement envoyée à G2 avec succès");
+        } catch (Exception e) {
+            log.error("Échec envoi confirmation remboursement vers G2: {}", e.getMessage());
+        }
+    }
+
+    public Map<String, Object> checkActiveSubscription(Long userId) {
+        log.info("Vérification abonnement actif pour userId: {}", userId);
+
+        try {
+            return subscriptionClient.checkActiveSubscription(userId).getBody();
+        } catch (Exception e) {
+            log.error("Échec vérification abonnement actif: {}", e.getMessage());
+            return null;
+        }
+    }
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\HashUtil.java 
+=============================================== 
 package ma.sgitu.payment.util;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -2686,10 +3985,11 @@ public class HashUtil {
         }
         return encoder.matches(input, hash);
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\MaskingUtil.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\MaskingUtil.java 
+=============================================== 
 package ma.sgitu.payment.util;
 
 /**
@@ -2718,10 +4018,11 @@ public class MaskingUtil {
         }
         return phone.substring(0, 4) + "****" + phone.substring(phone.length() - 2);
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\OtpGenerator.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\OtpGenerator.java 
+=============================================== 
 package ma.sgitu.payment.util;
 
 import java.security.SecureRandom;
@@ -2753,10 +4054,11 @@ public class OtpGenerator {
         int otp = bound / 10 + random.nextInt(bound - bound / 10);
         return String.valueOf(otp);
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\TokenGenerator.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\java\ma\sgitu\payment\util\TokenGenerator.java 
+=============================================== 
 package ma.sgitu.payment.util;
 
 import java.util.UUID;
@@ -2792,18 +4094,48 @@ public class TokenGenerator {
     public static String generateTransactionToken() {
         return "PAY-TOKEN-" + System.currentTimeMillis();
     }
-}.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\PaymentServiceTests.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\PaymentSimulationTests.java
--------------------------------
-.
--------------------------------
-FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\ServicePaiementApplicationTests.java
--------------------------------
+} 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\resources\application-docker.properties 
+=============================================== 
+spring.datasource.url=jdbc:mysql://payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+notification.service.url=http://notification-service:8085
+subscription.service.url=http://subscription-service:8082 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\main\resources\application.properties 
+=============================================== 
+spring.application.name=payment-service
+server.port=8086
+
+spring.datasource.url=jdbc:mysql://localhost:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=rootpassword
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+notification.service.url=http://localhost:8085
+subscription.service.url=http://localhost:8082
+
+springdoc.api-docs.enabled=true
+springdoc.swagger-ui.enabled=true 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\PaymentServiceTests.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\PaymentSimulationTests.java 
+=============================================== 
+ 
+ 
+=============================================== 
+FILE: C:\Users\ASUS\Desktop\SGITU-Microservices\service-paiement\src\test\java\ma\sgitu\payment\ServicePaiementApplicationTests.java 
+=============================================== 
 package ma.sgitu.payment;
 
 import org.junit.jupiter.api.Test;
@@ -2817,5 +4149,5 @@ class ServicePaiementApplicationTests {
     }
 
 }
-.
-Appuyez sur une touche pour continuer... 
+ 
+ 
