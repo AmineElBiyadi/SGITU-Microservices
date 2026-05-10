@@ -16,4 +16,5 @@ public class SignalementResponseDTO {
     private StatutIncident statut;
     private LocalDateTime dateSignalement;
     private String message;
+    private boolean doublon;
 }

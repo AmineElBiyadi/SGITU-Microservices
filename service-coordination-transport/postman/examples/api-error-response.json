@@ -1,0 +1,8 @@
+{
+	"status": 404,
+	"error": "NOT_FOUND",
+	"message": "Ligne 999999 introuvable",
+	"path": "/api/g4/lignes/999999",
+	"timestamp": "2026-05-07T10:15:30.123Z",
+	"fieldErrors": null
+}

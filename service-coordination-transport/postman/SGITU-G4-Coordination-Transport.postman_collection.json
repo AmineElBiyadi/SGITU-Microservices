@@ -1,0 +1,406 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "SGITU G4 — Coordination des transports",
+		"description": "Scénarios de test pour le microservice G4 (Spring Boot). Exécuter «Auth — login» en premier pour remplir la variable `accessToken`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8084" },
+		{ "key": "accessToken", "value": "" },
+		{ "key": "ligneId", "value": "1" },
+		{ "key": "trajetId", "value": "1" },
+		{ "key": "arretId", "value": "1" },
+		{ "key": "horaireId", "value": "1" },
+		{ "key": "affectationId", "value": "1" },
+		{ "key": "missionId", "value": "1" },
+		{ "key": "eventId", "value": "1" },
+		{ "key": "vehiculeId", "value": "VH-001" }
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+	},
+	"item": [
+		{
+			"name": "00 — Auth",
+			"item": [
+				{
+					"name": "Login (JWT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  const j = pm.response.json();",
+									"  pm.collectionVariables.set('accessToken', j.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.reseau\",\n  \"password\": \"password\"\n}"
+						},
+						"url": "{{baseUrl}}/api/auth/login",
+						"description": "Comptes démo (mot de passe : password) : gestionnaire.reseau = G4_OPERATOR (réseau), gestionnaire.flotte = G4_DISPATCHER (flotte), admin.technique = G4_ADMIN (supervision + tout), g10.integration = gateway."
+					}
+				}
+			]
+		},
+		{
+			"name": "01 — Lignes",
+			"item": [
+				{
+					"name": "POST créer ligne",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"code\": \"L12\",\n  \"nom\": \"Centre — Gare\",\n  \"description\": \"Ligne structurante\",\n  \"active\": true\n}" },
+						"url": "{{baseUrl}}/api/g4/lignes"
+					}
+				},
+				{ "name": "GET toutes", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/lignes" } },
+				{ "name": "GET actives", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/lignes/actives" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}" } },
+				{
+					"name": "PUT ligne",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"code\": \"L12\",\n  \"nom\": \"Centre — Gare (maj)\",\n  \"description\": \"Mise à jour\",\n  \"active\": true\n}" },
+						"url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}"
+					}
+				},
+				{ "name": "GET trajets de la ligne", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}/trajets" } },
+				{ "name": "DELETE ligne", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}" } }
+			]
+		},
+		{
+			"name": "02 — Trajets",
+			"item": [
+				{
+					"name": "POST créer trajet",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ligneId\": 1,\n  \"code\": \"T12-A\",\n  \"nom\": \"Sens aller\",\n  \"sens\": \"ALLER\",\n  \"actif\": true,\n  \"arretSequence\": [\n    { \"arretId\": 1, \"sequenceOrder\": 1 },\n    { \"arretId\": 2, \"sequenceOrder\": 2 }\n  ]\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/trajets"
+					}
+				},
+				{ "name": "GET tous", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/trajets" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}" } },
+				{ "name": "GET arrêts du trajet", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}/arrets" } },
+				{
+					"name": "PUT trajet",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ligneId\": 1,\n  \"code\": \"T12-A\",\n  \"nom\": \"Sens aller (maj)\",\n  \"sens\": \"ALLER\",\n  \"actif\": true,\n  \"arretSequence\": []\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}"
+					}
+				},
+				{ "name": "DELETE trajet", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}" } }
+			]
+		},
+		{
+			"name": "03 — Horaires",
+			"item": [
+				{
+					"name": "POST créer horaire",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"trajetId\": 1,\n  \"arretId\": 1,\n  \"heurePassage\": \"07:15:00\",\n  \"jourSemaine\": 1,\n  \"validFrom\": \"2026-01-01\",\n  \"validTo\": \"2026-12-31\",\n  \"libelle\": \"Premier passage\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/horaires"
+					}
+				},
+				{ "name": "GET tous", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/horaires" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}" } },
+				{
+					"name": "PUT horaire",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"trajetId\": 1,\n  \"arretId\": 1,\n  \"heurePassage\": \"07:20:00\",\n  \"jourSemaine\": 1,\n  \"validFrom\": \"2026-01-01\",\n  \"validTo\": \"2026-12-31\",\n  \"libelle\": \"Décalé\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}"
+					}
+				},
+				{ "name": "DELETE horaire", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}" } }
+			]
+		},
+		{
+			"name": "04 — Arrêts",
+			"item": [
+				{
+					"name": "POST créer arrêt",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR-PLM\",\n  \"nom\": \"Place du Maroc\",\n  \"latitude\": 35.57,\n  \"longitude\": -5.37,\n  \"ligneId\": 1\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/arrets"
+					}
+				},
+				{ "name": "GET tous", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/arrets" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/arrets/{{arretId}}" } },
+				{
+					"name": "PUT arrêt",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR-PLM\",\n  \"nom\": \"Place du Maroc (maj)\",\n  \"latitude\": 35.571,\n  \"longitude\": -5.371,\n  \"ligneId\": 1\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/arrets/{{arretId}}"
+					}
+				},
+				{ "name": "GET arrêts par ligne", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/arrets/ligne/{{ligneId}}" } },
+				{ "name": "DELETE arrêt", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/g4/arrets/{{arretId}}" } }
+			]
+		},
+		{
+			"name": "05 — Affectations",
+			"item": [
+				{
+					"name": "POST créer affectation",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"dateDebut\": \"2026-05-07T06:00:00Z\",\n  \"dateFin\": null,\n  \"statut\": \"ACTIF\",\n  \"commentaire\": \"Affectation du jour\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/affectations"
+					}
+				},
+				{ "name": "GET toutes", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/affectations" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/affectations/{{affectationId}}" } },
+				{ "name": "GET par véhicule", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/affectations/vehicule/{{vehiculeId}}" } },
+				{
+					"name": "PUT affectation",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"dateDebut\": \"2026-05-07T06:00:00Z\",\n  \"dateFin\": \"2026-05-07T18:00:00Z\",\n  \"statut\": \"TERMINE\",\n  \"commentaire\": \"Clôturée\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/affectations/{{affectationId}}"
+					}
+				},
+				{ "name": "DELETE affectation", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/g4/affectations/{{affectationId}}" } }
+			]
+		},
+		{
+			"name": "06 — Missions",
+			"item": [
+				{
+					"name": "POST créer mission",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"trajetId\": 1,\n  \"affectationId\": 1,\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\",\n  \"notes\": \"Mission régulière\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/missions"
+					}
+				},
+				{ "name": "GET toutes", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/missions" } },
+				{ "name": "GET actives", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/missions/actives" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/missions/{{missionId}}" } },
+				{ "name": "GET statut mission", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/missions/{{missionId}}/status" } },
+				{
+					"name": "PUT mission",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"ligneId\": 1,\n  \"trajetId\": 1,\n  \"statut\": \"EN_COURS\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\",\n  \"actualStart\": \"2026-05-07T08:02:00Z\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/missions/{{missionId}}"
+					}
+				},
+				{ "name": "POST clôturer mission", "request": { "method": "POST", "url": "{{baseUrl}}/api/g4/missions/{{missionId}}/cloturer" } },
+				{ "name": "POST annuler mission", "request": { "method": "POST", "url": "{{baseUrl}}/api/g4/missions/{{missionId}}/annuler" } }
+			]
+		},
+		{
+			"name": "07 — Événements coordination",
+			"item": [
+				{
+					"name": "POST enregistrer événement",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"RETARD\",\n  \"status\": \"SIGNALE\",\n  \"missionId\": 1,\n  \"vehiculeId\": \"VH-001\",\n  \"description\": \"Embouteillage confirmé\",\n  \"occurredAt\": \"2026-05-07T09:30:00Z\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/events"
+					}
+				},
+				{ "name": "GET tous", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/events" } },
+				{ "name": "GET par id", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/events/{{eventId}}" } },
+				{ "name": "GET par type", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/events/type/RETARD" } },
+				{ "name": "GET par statut", "request": { "method": "GET", "url": "{{baseUrl}}/api/g4/events/status/SIGNALE" } },
+				{
+					"name": "POST detect-delay",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"missionId\": 1,\n  \"retardMinutes\": 12,\n  \"cause\": \"Traffic\"\n}" },
+						"url": "{{baseUrl}}/api/g4/events/detect-delay"
+					}
+				},
+				{
+					"name": "POST detect-deviation",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"missionId\": 1,\n  \"details\": \"Hors itinéraire planifié\",\n  \"ecartMetres\": 180\n}" },
+						"url": "{{baseUrl}}/api/g4/events/detect-deviation"
+					}
+				},
+				{
+					"name": "POST detect-breakdown",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"vehiculeId\": \"VH-001\",\n  \"missionId\": 1,\n  \"symptomes\": \"Perte puissance moteur\"\n}" },
+						"url": "{{baseUrl}}/api/g4/events/detect-breakdown"
+					}
+				},
+				{
+					"name": "POST detect-incident",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"incidentReference\": \"G9-INC-2026-042\",\n  \"missionId\": 1,\n  \"vehiculeId\": \"VH-001\",\n  \"resume\": \"Incident confirmé par G9 — voie réduite\"\n}"
+						},
+						"url": "{{baseUrl}}/api/g4/events/detect-incident"
+					}
+				},
+				{
+					"name": "POST cancel-mission (événement)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"missionId\": 1,\n  \"motif\": \"Annulation opérationnelle\",\n  \"notifierG1\": true\n}" },
+						"url": "{{baseUrl}}/api/g4/events/cancel-mission"
+					}
+				}
+			]
+		},
+		{
+			"name": "08 — Notifications (G5)",
+			"item": [
+				{
+					"name": "POST envoyer notification",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"canal\": \"MOBILE_PUSH\",\n  \"sujet\": \"Retard ligne L12\",\n  \"corps\": \"Le véhicule VH-001 accuse 10 min de retard.\",\n  \"metadata\": {\n    \"missionId\": \"1\",\n    \"ligne\": \"L12\"\n  }\n}"
+						},
+						"url": "{{baseUrl}}/api/notifications/send",
+						"description": "Relaye vers G5 (client HTTP stub si service absent)."
+					}
+				}
+			]
+		},
+		{
+			"name": "09 — Supervision",
+			"item": [
+				{
+					"name": "GET health G4 (public)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": "{{baseUrl}}/api/g4/health"
+					}
+				},
+				{
+					"name": "GET statut opérateur",
+					"request": {
+						"method": "GET",
+						"url": "{{baseUrl}}/api/v1/operator/status"
+					}
+				},
+				{
+					"name": "GET logs supervision",
+					"request": {
+						"method": "GET",
+						"url": "{{baseUrl}}/api/g4/logs"
+					}
+				}
+			]
+		},
+		{
+			"name": "10 — Cas d erreur (exemples)",
+			"item": [
+				{
+					"name": "GET ligne inexistante → 404",
+					"request": { "method": "GET", "url": "{{baseUrl}}/api/g4/lignes/999999" }
+				},
+				{
+					"name": "POST ligne invalide → 400",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n  \"code\": \"\",\n  \"nom\": \"x\",\n  \"active\": null\n}" },
+						"url": "{{baseUrl}}/api/g4/lignes"
+					}
+				},
+				{
+					"name": "GET missions sans JWT → 401",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": "{{baseUrl}}/api/g4/missions"
+					}
+				}
+			]
+		},
+		{
+			"name": "11 — OpenAPI",
+			"item": [
+				{
+					"name": "GET swagger doc (public)",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"url": "{{baseUrl}}/v3/api-docs"
+					}
+				}
+			]
+		}
+	]
+}

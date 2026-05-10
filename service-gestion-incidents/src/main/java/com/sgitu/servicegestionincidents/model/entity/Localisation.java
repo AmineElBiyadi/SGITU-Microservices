@@ -21,19 +21,10 @@ public class Localisation {
     @Column(nullable = false)
     private Double longitude;
 
-    private String adresse;
-    private String commune;
-    private String quartier;
     private String ligneTransport;
-    private String arretProche;
 
     public String getCoordonnees() {
         return latitude + ", " + longitude;
     }
 
-    public String getAdresseComplete() {
-        return (adresse != null ? adresse + ", " : "") +
-                (quartier != null ? quartier + ", " : "") +
-                (commune != null ? commune : "");
-    }
 }

@@ -10,6 +10,6 @@ import java.util.Optional;
 @FeignClient(name = "service-utilisateur", url = "${application.config.utilisateur-service-url}")
 public interface UtilisateurServiceClient {
 
-    @GetMapping("/users/{id}")
+    @GetMapping("/api/users/{id}")
     UserDTO getUserById(@PathVariable("id") Long id);
 }

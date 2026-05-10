@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -12,5 +14,5 @@ import lombok.NoArgsConstructor;
 public class IdentityContext {
     private String holderId;
     private String eventId;
-    private String rawPayload;
+    private Map<String, Object> rawPayload;
 }
