@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  replicas: 1 # Ajustez le nombre d'instances selon vos besoins
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: notification-service
+          image: sgitu/notification-service:1.0.0 # Remplacez par le vrai nom de l'image (Docker Hub, Harbor, etc.)
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          
+          # Injection des variables d'environnement
+          envFrom:
+            - configMapRef:
+                name: notification-config
+            - secretRef:
+                name: notification-secret
+          
+          # Montage du volume pour Firebase
+          volumeMounts:
+            - name: firebase-key-volume
+              mountPath: /app/firebase-adminsdk.json
+              subPath: firebase-adminsdk.json
+              readOnly: true
+              
+          # Health Checks (Actuator)
+          livenessProbe:
+            httpGet:
+              path: /api/notifications/health
+              port: 8085
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/notifications/health
+              port: 8085
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            
+      # Declaration des volumes
+      volumes:
+        - name: firebase-key-volume
+          secret:
+            secretName: firebase-secret # Vous devrez creer ce secret manuellement avec kubectl

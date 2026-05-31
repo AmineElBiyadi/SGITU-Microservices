@@ -5,8 +5,15 @@
 # Environment variables (secrets)
 .env
 
+# Service notification secrets
+service-notification/firebase-adminsdk.json
+service-notification/k8s/02-secret.yaml
+
 # Livraisons ZIP locales (ne pas versionner)
 *.zip
+
+# Fichiers de dump/arborescence locaux
+directory-tree.txt
 
 # Operating System Files and Logs
 .DS_Store

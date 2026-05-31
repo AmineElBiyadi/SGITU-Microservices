@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         APPENDER 1 : Opérations admin générales
+         Fichier : logs/admin-operations.log
+         Rotation quotidienne, conservation 30 jours, max 100MB
+    ══════════════════════════════════════════════════════════════════ -->
+    <appender name="ADMIN_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/admin-operations.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/admin-operations.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         APPENDER 2 : Notifications de type LOG (canal LOG → admin)
+         Fichier : logs/admin-notifications.log
+         Ce fichier trace les notifications admin non destinées à un
+         utilisateur final (alertes, audits, incidents critiques G7, etc.)
+         Rotation quotidienne, conservation 90 jours, max 200MB
+    ══════════════════════════════════════════════════════════════════ -->
+    <appender name="NOTIF_LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/admin-notifications.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/admin-notifications.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         LOGGERS — Opérations admin
+    ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Contrôleur admin (stats, force-retry, delete) -->
+    <logger name="ma.sgitu.g5.admin" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- Sécurité et traçabilité JWT (token validation, G3 spécial, trace IDs) -->
+    <logger name="ma.sgitu.g5.security" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- Service de traçabilité vers G10 via Kafka -->
+    <logger name="ma.sgitu.g5.service.TracingService" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+    <logger name="ma.sgitu.g5.service.TracingServiceImpl" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- Contrôleur des notifications (envoi, retry, liste) -->
+    <logger name="ma.sgitu.g5.controller.NotificationController" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- Exceptions globales -->
+    <logger name="ma.sgitu.g5.exceptions" level="ERROR" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- Kafka consumer (events G1, G2, G3, G7, G9, DLT) -->
+    <logger name="ma.sgitu.g5.controller.KafkaConsumerController" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- AdminController (endpoint /api/notifications/admin/**) -->
+    <logger name="ma.sgitu.g5.controller.AdminController" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         LOGGER — Notifications canal LOG (fichier log admin dédié)
+         → logs/admin-notifications.log
+         Ce logger est utilisé par LogFileAdapter
+    ══════════════════════════════════════════════════════════════════ -->
+    <logger name="ma.sgitu.g5.notifications.log" level="INFO" additivity="false">
+        <appender-ref ref="NOTIF_LOG_FILE" />
+    </logger>
+
+    <!-- Provider LOG (LogFileAdapter) -->
+    <logger name="ma.sgitu.g5.provider.LogFileAdapter" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+        <appender-ref ref="NOTIF_LOG_FILE" />
+    </logger>
+
+    <!-- RetryScheduler et RetryService (traçabilité des relances) -->
+    <logger name="ma.sgitu.g5.service.RetryScheduler" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+    <logger name="ma.sgitu.g5.service.RetryServiceImpl" level="INFO" additivity="false">
+        <appender-ref ref="ADMIN_FILE" />
+    </logger>
+
+</configuration>

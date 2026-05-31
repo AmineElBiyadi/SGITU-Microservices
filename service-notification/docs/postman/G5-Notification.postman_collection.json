@@ -1,0 +1,399 @@
+{
+	"info": {
+		"_postman_id": "f5f7a5b3-3a78-43d9-9599-4ccb8b26a6b5",
+		"name": "G5 - Notification Service",
+		"description": "Postman collection to test the G5 Notification Service, including the new dynamic filtering features for listing notifications.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "System Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"health"
+							]
+						},
+						"description": "Checks the system health status."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Send Notifications",
+			"item": [
+				{
+					"name": "Send Email Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G6_PAYMENT\",\n  \"eventType\": \"PAYMENT_SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"user-123\",\n    \"email\": \"test.client@example.com\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"amount\": \"150 MAD\",\n      \"clientName\": \"Mohamed\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/send",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"send"
+							]
+						},
+						"description": "Sends an email notification via SMTP (MailHog in dev)."
+					},
+					"response": []
+				},
+				{
+					"name": "Send SMS Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G9_INCIDENT\",\n  \"eventType\": \"INCIDENT_CONFIRMATION\",\n  \"channel\": \"SMS\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"user-456\",\n    \"phone\": \"+212600000000\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"incidentId\": \"INC-2026\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/send",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"send"
+							]
+						},
+						"description": "Sends an SMS notification via Twilio SMS."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Push Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G4_COORDINATION\",\n  \"eventType\": \"MISSION_ASSIGNED\",\n  \"channel\": \"PUSH\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"user-789\",\n    \"deviceToken\": \"fcm-token-example-123456\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"missionId\": \"M-9988\",\n      \"driverName\": \"Youssef\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/send",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"send"
+							]
+						},
+						"description": "Sends a mobile push notification via FCM."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Dynamic Filtering & Lists",
+			"item": [
+				{
+					"name": "List All (No Filters)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?page=0&size=20&sort=createdAt,desc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "0"
+								},
+								{
+									"key": "size",
+									"value": "20"
+								},
+								{
+									"key": "sort",
+									"value": "createdAt,desc"
+								}
+							]
+						},
+						"description": "Returns a paginated list of all notifications sorted from newest to oldest."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?userId=user-123",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "user-123"
+								}
+							]
+						},
+						"description": "Retrieves only notifications matching the specified userId."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by Status (SENT)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?status=SENT",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "SENT"
+								}
+							]
+						},
+						"description": "Filters notifications to display only those that have been sent successfully."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by Status (FAILED)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?status=FAILED",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "FAILED"
+								}
+							]
+						},
+						"description": "Retrieves notifications that failed during the sending process."
+					},
+					"response": []
+				},
+				{
+					"name": "Filter by Source Service",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?sourceService=G6_PAYMENT",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "sourceService",
+									"value": "G6_PAYMENT"
+								}
+							]
+						},
+						"description": "Retrieves notifications requested by a specific microservice (case-insensitive)."
+					},
+					"response": []
+				},
+				{
+					"name": "Combined Filters (User + Status + Service)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?userId=user-123&status=SENT&sourceService=G6_PAYMENT",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "user-123"
+								},
+								{
+									"key": "status",
+									"value": "SENT"
+								},
+								{
+									"key": "sourceService",
+									"value": "G6_PAYMENT"
+								}
+							]
+						},
+						"description": "Retrieves notifications satisfying all multiple criteria at once."
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Status Handling (Error Test)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications?status=INVALID_STATUS",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "INVALID_STATUS"
+								}
+							]
+						},
+						"description": "Validates the dynamic filter bad request handler by providing an invalid enum value (Expected: 400 Bad Request)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Consult & Retry",
+			"item": [
+				{
+					"name": "Get Notification Status by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/test-001",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"test-001"
+							]
+						},
+						"description": "Retrieves all details and the current status of a specific notification by its unique notificationId."
+					},
+					"response": []
+				},
+				{
+					"name": "Manual Retry Failed Notification",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/notifications/test-002/retry",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"test-002",
+								"retry"
+							]
+						},
+						"description": "Triggers a manual retry for a notification currently in FAILED status."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8085",
+			"type": "string"
+		}
+	]
+}

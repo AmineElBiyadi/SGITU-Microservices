@@ -1,5 +1,7 @@
 package ma.sgitu.g5.provider;
 
-public interface IPushProvider {
+import ma.sgitu.g5.dto.response.SendResultDTO;
 
+public interface IPushProvider {
+    SendResultDTO send(String deviceToken, String message);
 }

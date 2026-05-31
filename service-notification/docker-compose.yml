@@ -75,19 +75,6 @@ services:
         condition: service_healthy
 
   # ─────────────────────────────────────────────────────────
-  #  MAILHOG — Serveur SMTP de test
-  #  SMTP : localhost:1026 | Interface Web : http://localhost:8026
-  # ─────────────────────────────────────────────────────────
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: sgitu-mailhog        # ← préfixé
-    networks:
-      - sgitu-network
-    ports:
-      - "1026:1025"
-      - "8026:8025"
-
-  # ─────────────────────────────────────────────────────────
   #  PHPMYADMIN — Interface web MySQL
   #  Accessible sur http://localhost:8889
   # ─────────────────────────────────────────────────────────
@@ -154,16 +141,25 @@ services:
       # Kafka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_KAFKA_CONSUMER_GROUP_ID: notification-group
-      # MailHog (SMTP)
-      SPRING_MAIL_HOST: mailhog
-      SPRING_MAIL_PORT: 1025
+      # SMTP reel (depuis .env)
+      SPRING_MAIL_HOST: ${MAIL_HOST}
+      SPRING_MAIL_PORT: ${MAIL_PORT}
       SPRING_MAIL_PROTOCOL: smtp
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SPRING_MAIL_FROM: ${MAIL_FROM}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_FROM_PHONE: ${TWILIO_FROM_PHONE}
       # JWT (fourni par G10)
       JWT_SECRET: ${JWT_SECRET}
+      FIREBASE_CREDENTIALS_PATH: /app/firebase-adminsdk.json
       # Profil actif
       SPRING_PROFILES_ACTIVE: docker
+    volumes:
+      - ./firebase-adminsdk.json:/app/firebase-adminsdk.json:ro
     restart: on-failure
     depends_on:
       mysql-notification:
