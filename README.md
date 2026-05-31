@@ -55,7 +55,7 @@ Chaque service est contenu dans son propre répertoire. Pour développer un serv
 
 ## Demarrage G10 uniquement
 
-Pour travailler seulement sur le groupe 10, lancer l'API Gateway, sa base MySQL et phpMyAdmin :
+Pour travailler seulement sur le groupe 10, lancer l'API Gateway :
 
 ```bash
 cd api-gateway
@@ -67,16 +67,8 @@ URLs utiles :
 - API Gateway : http://localhost:8080
 - Health check : http://localhost:8080/actuator/health
 - Swagger : http://localhost:8080/swagger-ui.html
-- phpMyAdmin : http://localhost:8090
 
-Connexion phpMyAdmin :
-
-```text
-Serveur : gateway-db
-Utilisateur : root
-Mot de passe : root
-Base : gateway_db
-```
+G10 ne lance plus de base MySQL locale. Les comptes, roles, permissions, mots de passe et JWT appartiennent au service G3 Gestion des utilisateurs.
 
 Pour arreter seulement G10 :
 

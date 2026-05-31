@@ -1,0 +1,529 @@
+{
+  "info": {
+    "_postman_id": "g10-g3-g8-integration-collection",
+    "name": "SGITU - Integration G10 + G3 + G8 - Tests complets",
+    "description": "Collection Postman complete pour valider le flux Client -> G10 Gateway -> G3 Utilisateurs/JWT et Client -> G10 Gateway -> G8 Analytics/ML. Elle couvre preconditions, creation utilisateur, login G3, validation JWT par G10, RBAC, endpoints utilisateurs G3, ingestion G8, analytics G8, ML G8 et cas d'erreur 400/401/403/404/409.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const now = new Date();",
+          "pm.collectionVariables.set('isoNow', now.toISOString());",
+          "pm.collectionVariables.set('today', now.toISOString().slice(0, 10));",
+          "if (!pm.collectionVariables.get('runId')) { pm.collectionVariables.set('runId', 'int-' + Date.now()); }",
+          "pm.collectionVariables.set('testEmail', 'integration.' + pm.collectionVariables.get('runId') + '@sgitu.ma');",
+          "",
+          "const autoGenerate = String(pm.collectionVariables.get('autoGenerateTokens') || 'true').toLowerCase() === 'true';",
+          "if (autoGenerate) {",
+          "  if (typeof CryptoJS === 'undefined') { throw new Error('CryptoJS indisponible: mettre autoGenerateTokens=false et coller des JWT G3.'); }",
+          "  const secret = pm.collectionVariables.get('jwtSecret');",
+          "  const nowSec = Math.floor(Date.now() / 1000);",
+          "  function base64Url(wordArray) { return CryptoJS.enc.Base64.stringify(wordArray).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_'); }",
+          "  function encodeObject(obj) { return base64Url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj))); }",
+          "  function makeJwt(email, userId, roles, ttlSeconds) {",
+          "    const header = { alg: 'HS256', typ: 'JWT' };",
+          "    const payload = { sub: email, userId: String(userId), roles: roles, iat: nowSec, exp: nowSec + ttlSeconds, jti: 'postman-' + Math.random().toString(36).slice(2) };",
+          "    const headerPart = encodeObject(header);",
+          "    const payloadPart = encodeObject(payload);",
+          "    const signature = base64Url(CryptoJS.HmacSHA256(headerPart + '.' + payloadPart, secret));",
+          "    return headerPart + '.' + payloadPart + '.' + signature;",
+          "  }",
+          "  pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "  pm.collectionVariables.set('operatorToken', makeJwt('operator.g10@sgitu.ma', '2', ['ROLE_OPERATOR'], 3600));",
+          "  pm.collectionVariables.set('staffToken', makeJwt('staff.g10@sgitu.ma', '3', ['ROLE_STAFF'], 3600));",
+          "  pm.collectionVariables.set('passengerToken', makeJwt('passenger.g10@sgitu.ma', '4', ['ROLE_PASSENGER'], 3600));",
+          "  pm.collectionVariables.set('expiredToken', makeJwt('expired.g10@sgitu.ma', '5', ['ROLE_ADMIN'], -60));",
+          "}",
+          "",
+          "if (!pm.collectionVariables.get('createdUserToken')) {",
+          "  pm.collectionVariables.set('createdUserToken', pm.collectionVariables.get('passengerToken'));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "g3DirectUrl", "value": "http://localhost:8083/api", "type": "string" },
+    { "key": "g8AnalyticsDirectUrl", "value": "http://localhost:8088", "type": "string" },
+    { "key": "g8MlDirectUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!", "type": "string" },
+    { "key": "autoGenerateTokens", "value": "true", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "operatorToken", "value": "", "type": "string" },
+    { "key": "staffToken", "value": "", "type": "string" },
+    { "key": "passengerToken", "value": "", "type": "string" },
+    { "key": "expiredToken", "value": "", "type": "string" },
+    { "key": "createdUserToken", "value": "", "type": "string" },
+    { "key": "createdUserId", "value": "1", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" },
+    { "key": "isoNow", "value": "", "type": "string" },
+    { "key": "today", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preconditions G10 G3 G8",
+      "item": [
+        {
+          "name": "00.1 - G10 health",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Gateway UP', function () { pm.expect(pm.response.json().status).to.eql('UP'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/actuator/health" }
+        },
+        {
+          "name": "00.2 - G10 OpenAPI contient G3 et G8",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Contains G3 and G8 paths', function () { const p = pm.response.json().paths; pm.expect(p['/api/users']).to.exist; pm.expect(p['/api/v1/analytics/dashboard']).to.exist; pm.expect(p['/predict/peak-hours']).to.exist; });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/v3/api-docs" }
+        },
+        {
+          "name": "00.3 - G3 direct Swagger",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G3 direct responds', function () { pm.expect([200, 302]).to.include(pm.response.code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{g3DirectUrl}}/swagger-ui.html" }
+        },
+        {
+          "name": "00.4 - G8 analytics direct dashboard",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G8 analytics direct responds', function () { pm.expect([200, 204, 404]).to.include(pm.response.code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{g8AnalyticsDirectUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "00.5 - G8 ML direct docs",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('ML direct responds', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{g8MlDirectUrl}}/docs" }
+        }
+      ]
+    },
+    {
+      "name": "01 - G3 Auth et Utilisateurs via G10",
+      "item": [
+        {
+          "name": "01.1 - 201 creation utilisateur publique",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+            "pm.test('User created and id captured', function () { const j = pm.response.json(); pm.expect(j.id).to.exist; pm.expect(j.email).to.eql(pm.collectionVariables.get('testEmail')); pm.collectionVariables.set('createdUserId', String(j.id)); });",
+            "pm.test('Correlation returned', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('int-g3-create'); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g3-create" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"Integration\",\n    \"lastName\": \"G10G3G8\",\n    \"phone\": \"+212600000001\",\n    \"address\": \"Casablanca\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "01.2 - 409 email deja utilise",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 409', function () { pm.response.to.have.status(409); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "01.3 - 400 payload utilisateur invalide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 400', function () { pm.response.to.have.status(400); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"123\",\n  \"role\": \"ROLE_PASSENGER\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "01.4 - 200 login G3 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('G3 returns JWT', function () { const j = pm.response.json(); pm.expect(j.token).to.be.a('string'); pm.collectionVariables.set('createdUserToken', j.token); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "01.5 - 401 login mauvais mot de passe",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"WrongPassword123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "01.6 - 200 get utilisateur cree",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Correct id', function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get('createdUserId')); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{createdUserToken}}" }],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          }
+        },
+        {
+          "name": "01.7 - 200 exists utilisateur",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Exists true', function () { pm.expect(pm.response.json().exists).to.eql(true); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{createdUserToken}}" }],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}/exists"
+          }
+        },
+        {
+          "name": "01.8 - 200 update profil",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Profile updated', function () { pm.expect(pm.response.json().profile.firstName).to.eql('Updated'); });"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"profile\": {\n    \"firstName\": \"Updated\",\n    \"lastName\": \"Integration\",\n    \"phone\": \"+212600000002\",\n    \"address\": \"Rabat\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Securite G10 pour G3 et G8",
+      "item": [
+        {
+          "name": "02.1 - 401 route protegee sans JWT",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', function () { pm.response.to.have.status(401); });",
+            "pm.test('UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/users/{{createdUserId}}" }
+        },
+        {
+          "name": "02.2 - 401 JWT invalide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', function () { pm.response.to.have.status(401); });",
+            "pm.test('INVALID_TOKEN', function () { pm.expect(pm.response.json().code).to.eql('INVALID_TOKEN'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer invalid-token" }], "url": "{{baseUrl}}/api/users/{{createdUserId}}" }
+        },
+        {
+          "name": "02.3 - 401 JWT expire",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{expiredToken}}" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.4 - 403 ROLE_PASSENGER interdit sur liste users",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{passengerToken}}" }], "url": "{{baseUrl}}/api/users" }
+        },
+        {
+          "name": "02.5 - 403 ROLE_PASSENGER interdit sur analytics",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{passengerToken}}" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.6 - 404 route inconnue avec JWT valide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 404', function () { pm.response.to.have.status(404); });",
+            "pm.test('ROUTE_NOT_FOUND', function () { pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/unknown/integration" }
+        }
+      ]
+    },
+    {
+      "name": "03 - G8 Ingestion via G10 avec contexte G3",
+      "item": [
+        {
+          "name": "03.1 - 201/207 ingestion users depuis G3 event",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status accepted', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{createdUserToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g8-users-ingestion" }
+            ],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"userId\": \"{{createdUserId}}\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"deviceOS\": \"Postman\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/users"
+          }
+        },
+        {
+          "name": "03.2 - 201/207 ingestion tickets",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status accepted', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{createdUserToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g8-tickets-ingestion" }
+            ],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"ticketId\": \"TCK-{{runId}}\",\n    \"userId\": \"{{createdUserId}}\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"scanType\": \"NFC\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          }
+        },
+        {
+          "name": "03.3 - 201/207 ingestion payments",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status accepted', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{createdUserToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g8-payments-ingestion" }
+            ],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"transactionId\": \"TXN-{{runId}}\",\n    \"userId\": \"{{createdUserId}}\",\n    \"status\": \"completed\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\",\n    \"timestamp\": \"{{isoNow}}\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/payments"
+          }
+        },
+        {
+          "name": "03.4 - 400 ingestion payload invalide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status client error', function () { pm.expect([400, 422]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{createdUserToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"ticketId\": \"INVALID-NO-TIMESTAMP\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - G8 Analytics et ML via G10 RBAC",
+      "item": [
+        {
+          "name": "04.1 - 200 analytics dashboard ROLE_ADMIN",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "int-g8-dashboard-admin" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "04.2 - 200 analytics trips ROLE_OPERATOR",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{operatorToken}}" }, { "key": "X-Correlation-Id", "value": "int-g8-trips-operator" }], "url": "{{baseUrl}}/api/v1/analytics/trips/summary?period={{today}}" }
+        },
+        {
+          "name": "04.3 - 200 analytics users ROLE_STAFF",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{staffToken}}" }, { "key": "X-Correlation-Id", "value": "int-g8-users-staff" }], "url": "{{baseUrl}}/api/v1/analytics/users/stats?period={{today}}" }
+        },
+        {
+          "name": "04.4 - 200 reports generate ROLE_ADMIN",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Report payload optional capture', function () { const j = pm.response.json(); if (j.id) pm.collectionVariables.set('reportId', j.id); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"period\": \"{{today}}\",\n  \"types\": [\"TRIPS\", \"USERS\", \"REVENUE\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/analytics/reports/generate"
+          }
+        },
+        {
+          "name": "04.5 - 200 ML peak hours ROLE_OPERATOR",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Prediction payload', function () { pm.expect(pm.response.json().predicted_peak_hours).to.be.an('array'); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 },\n    { \"hour\": 17, \"validationCount\": 180 },\n    { \"hour\": 18, \"validationCount\": 160 }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/predict/peak-hours"
+          }
+        },
+        {
+          "name": "04.6 - 200 ML incidents ROLE_STAFF",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Incident prediction payload', function () { pm.expect(pm.response.json().at_risk_zones).to.be.an('array'); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staffToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"zone\": \"Z_CENTER\", \"incidentCount\": 5, \"severity\": \"HIGH\" },\n    { \"zone\": \"Z_NORTH\", \"incidentCount\": 2, \"severity\": \"CRITICAL\" }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/predict/incidents"
+          }
+        },
+        {
+          "name": "04.7 - 403 ML ROLE_PASSENGER",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/predict/peak-hours"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Administration G3 et nettoyage",
+      "item": [
+        {
+          "name": "05.1 - 200 update roles admin vers OPERATOR STAFF",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Roles updated', function () { const r = pm.response.json().roles; pm.expect(r).to.include('ROLE_OPERATOR'); pm.expect(r).to.include('ROLE_STAFF'); });"
+          ] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"roles\": [\"ROLE_OPERATOR\", \"ROLE_STAFF\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}/roles"
+          }
+        },
+        {
+          "name": "05.2 - 200 deactivate user admin",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Inactive', function () { pm.expect(pm.response.json().active).to.eql(false); });"
+          ] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/users/{{createdUserId}}/deactivate" }
+        },
+        {
+          "name": "05.3 - 403 login user desactive",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "05.4 - 200 activate user admin",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('Active', function () { pm.expect(pm.response.json().active).to.eql(true); });"
+          ] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/users/{{createdUserId}}/activate" }
+        },
+        {
+          "name": "05.5 - 204 delete user admin",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 204', function () { pm.response.to.have.status(204); });"
+          ] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/users/{{createdUserId}}" }
+        },
+        {
+          "name": "05.6 - 404 get deleted user",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 404', function () { pm.response.to.have.status(404); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/users/{{createdUserId}}" }
+        }
+      ]
+    },
+    {
+      "name": "06 - Diagnostics directs hors Gateway",
+      "item": [
+        {
+          "name": "06.1 - G3 direct create diagnostic",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 201 or 409', function () { pm.expect([201, 409]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"direct.{{runId}}@sgitu.ma\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{g3DirectUrl}}/users"
+          }
+        },
+        {
+          "name": "06.2 - G8 analytics direct diagnostic",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status direct G8', function () { pm.expect([200, 204, 404]).to.include(pm.response.code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{g8AnalyticsDirectUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "06.3 - G8 ML direct diagnostic",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status direct ML', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{g8MlDirectUrl}}/predict/peak-hours"
+          }
+        }
+      ]
+    }
+  ]
+}

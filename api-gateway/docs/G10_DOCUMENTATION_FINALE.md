@@ -1,209 +1,167 @@
-# Documentation finale - Groupe 10 API Gateway & Securite
+# SGITU - Groupe 10 API Gateway & Securite
 
-## Role du groupe 10
+## 1. Role de G10
 
-G10 fournit le point d'entree unique du systeme SGITU. Le client appelle la Gateway, la Gateway valide le JWT, applique les regles de securite, ajoute les headers utiles, puis route vers le microservice cible.
+G10 est le point d'entree unique du systeme SGITU.
 
-G10 gere aussi l'authentification locale : inscription, verification email, login, refresh token, logout, forgot password/reset password, compte admin initial et endpoints admin de securite.
+Apres clarification architecturale, G10 ne possede plus de base utilisateurs. Le service **G3 Gestion des utilisateurs** est la source de verite pour les comptes, profils, roles, permissions, mots de passe, verification email, reset password et emission JWT.
 
-## Demarrage
+G10 assure :
+
+- validation des JWT emis par G3 ;
+- controle d'acces par role ;
+- routage vers G1-G9 ;
+- propagation des headers utilisateur ;
+- gestion des erreurs Gateway ;
+- logs avec `X-Correlation-Id` ;
+- Swagger/OpenAPI Gateway ;
+- execution Docker.
+
+## 2. Execution
 
 Depuis le dossier `api-gateway` :
 
-```bash
+```powershell
 docker compose up -d --build
 ```
 
-Services exposes :
-
-- API Gateway : `http://localhost:8080`
-- Swagger : `http://localhost:8080/swagger-ui.html`
-- Health : `http://localhost:8080/actuator/health`
-- phpMyAdmin : `http://localhost:8090`
-- MySQL G10 : `localhost:3360`
-
-Connexion phpMyAdmin :
+URLs :
 
 ```text
-Serveur: gateway-db
-Utilisateur: root
-Mot de passe: root
-Base: gateway_db
+Gateway : http://localhost:8080
+Health  : http://localhost:8080/actuator/health
+Swagger : http://localhost:8080/swagger-ui.html
+Logs    : logs/api-gateway.log
 ```
 
-## Compte admin initial
+G10 ne lance plus MySQL/phpMyAdmin car il ne stocke plus les comptes utilisateurs.
 
-Au demarrage, G10 cree un admin si l'email n'existe pas encore :
+## 3. Contrat JWT avec G3
 
-```text
-email: admin@sgitu.ma
-password: Admin123456
-role: ROLE_ADMIN
-```
+G3 doit emettre un access token JWT signe avec le secret partage configure dans G10.
 
-Variables configurables :
-
-```text
-G10_ADMIN_BOOTSTRAP_ENABLED=true
-G10_ADMIN_EMAIL=admin@sgitu.ma
-G10_ADMIN_PASSWORD=Admin123456
-```
-
-## Endpoints principaux
-
-Publics :
-
-- `POST /auth/register`
-- `GET /auth/verify-email?token=...`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/forgot-password`
-- `POST /auth/reset-password`
-
-Protege :
-
-- `POST /auth/logout`
-
-Admin G10, role `ROLE_ADMIN` obligatoire :
-
-- `GET /admin/users`
-- `GET /admin/users/{id}`
-- `PUT /admin/users/{id}/role`
-- `PUT /admin/users/{id}/status`
-- `PUT /admin/users/{id}/email-verification`
-
-## Integration avec G5 Notifications
-
-G10 appelle G5 pour envoyer les emails de verification et de reset password.
-
-URL locale :
-
-```text
-http://localhost:8085/api/notifications/send
-```
-
-URL Docker :
-
-```text
-http://notification-service:8085/api/notifications/send
-```
-
-Pour les appels client routes par la Gateway, G10 garde le chemin complet :
-
-```text
-Client -> G10: /api/notifications/**
-G10 -> G5: /api/notifications/**
-```
-
-Il n'y a pas de `RewritePath` sur la route G5, car G5 expose directement `/api/notifications/**`.
-
-Dans `api-gateway/docker-compose.yml`, les notifications sont desactivees par defaut pour tester G10 sans lancer G5 :
-
-```text
-G10_NOTIFICATIONS_ENABLED=false
-G10_EMAIL_LOG_TOKENS=true
-```
-
-Payload REST envoye par G10 a G5 pour verification email :
+Claims attendus :
 
 ```json
 {
-  "notificationId": "auth-8f2a9c2e-1234-45aa-90bb-abcdef123456",
-  "sourceService": "AUTH",
-  "eventType": "VERIFY_EMAIL",
-  "channel": "EMAIL",
-  "priority": "NORMAL",
-  "recipient": {
-    "userId": "10",
-    "email": "user@sgitu.ma"
-  },
-  "metadata": {
-    "sourceType": "ACCOUNT",
-    "sourceId": 10,
-    "verificationLink": "http://localhost:8080/auth/verify-email?token=abc"
-  }
+  "sub": "user@sgitu.ma",
+  "roles": ["ROLE_USER"],
+  "userId": 10,
+  "iat": 1715000000,
+  "exp": 1715003600,
+  "jti": "uuid"
 }
 ```
 
-Payload REST envoye par G10 a G5 pour reset password :
+Compatibilite : G10 accepte aussi l'ancien claim `"role": "ROLE_USER"` si G3 garde ce format temporairement.
 
-```json
-{
-  "notificationId": "auth-8f2a9c2e-1234-45aa-90bb-abcdef123456",
-  "sourceService": "AUTH",
-  "eventType": "RESET_PASSWORD",
-  "channel": "EMAIL",
-  "priority": "NORMAL",
-  "recipient": {
-    "userId": "10",
-    "email": "user@sgitu.ma"
-  },
-  "metadata": {
-    "sourceType": "ACCOUNT",
-    "sourceId": 10,
-    "resetLink": "http://localhost:8080/auth/reset-password?token=xyz"
-  }
-}
-```
+G10 valide :
 
-Regle G5 respectee : `eventType` est un champ racine du JSON, separe de `metadata`.
+- signature ;
+- expiration `exp` ;
+- presence du `sub` ;
+- presence d'au moins un role dans `roles` ou `role`.
 
-Si G5 impose `Authorization: Bearer <JWT>` pour les appels service-to-service, configurer :
+## 4. Headers transmis aux microservices
 
-```text
-G10_NOTIFICATIONS_BEARER_TOKEN=<token_fourni_par_G5>
-```
+G10 ajoute apres validation JWT :
 
-## JWT fourni par G10
-
-Le JWT contient au minimum :
-
-- `sub` : email utilisateur
-- `role` : role principal, exemple `ROLE_USER`
-- `iat` : date de creation
-- `exp` : date d'expiration
-- `jti` : identifiant unique du token
-
-Header attendu par la Gateway :
-
-```text
-Authorization: Bearer <accessToken>
-```
-
-Headers transmis par G10 aux microservices :
-
-```text
+```http
 X-User-Id: 10
 X-User-Email: user@sgitu.ma
 X-Roles: ROLE_USER
-X-Correlation-Id: 8f2a9c2e-1234-45aa-90bb-abcdef123456
+X-Correlation-Id: test-123
 ```
 
-## Tests
+## 5. Routes principales
 
-Lancer les tests automatises :
+### G3 Auth et utilisateurs
 
-```bash
-cd api-gateway
-.\mvnw.cmd test
+| Path | Responsable reel |
+| --- | --- |
+| `/auth/**` | G3 |
+| `/api/users/**` | G3 |
+| `/api/profiles/**` | G3 |
+
+Note integration : G10 expose `/auth/**`, mais transmet vers `/api/auth/**` dans `user-service`, car G3 utilise `server.servlet.context-path=/api`.
+
+### Autres groupes
+
+| Groupe | Prefixes |
+| --- | --- |
+| G1 | `/api/v1/tickets/**`, `/api/v1/admin/**`, `/api/v1/ticket-types/**` |
+| G2 | `/api/abonnements/**`, `/api/plans/**` |
+| G4 | `/api/g4/**`, `/api/v1/operator/status` |
+| G5 | `/api/notifications/**` |
+| G6 | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**` |
+| G7 | `/api/suivi-vehicules/**` |
+| G8 Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` |
+| G8 ML | `/predict/peak-hours`, `/predict/incidents` |
+| G9 | `/api/incidents/**`, `/api/rapports/**` |
+
+## 6. Securite
+
+Regles appliquees par G10 :
+
+- `/auth/login`, `/auth/refresh`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` sont publics et routes vers G3.
+- `POST /api/users` est public pour la creation de compte via G3.
+- `/api/v1/admin/**` demande `ROLE_ADMIN`.
+- `/api/v1/ticket-types/**` demande `ROLE_ADMIN`.
+- `GET /api/users`, `/api/users/{id}/roles`, `/api/users/{id}/activate`, `/api/users/{id}/deactivate` et `DELETE /api/users/{id}` demandent `ROLE_ADMIN`.
+- `/api/v1/analytics/**` et `/predict/**` demandent `ROLE_ADMIN`, `ROLE_OPERATOR` ou `ROLE_STAFF`.
+- `/api/**` demande un JWT valide.
+
+## 7. Tests
+
+Commande :
+
+```powershell
+.\mvnw.cmd clean test
 ```
 
 Les tests couvrent :
 
-- creation du compte admin initial
-- login admin
-- inscription avec verification email
-- refus de login avant verification
-- refresh token
-- logout et revocation du refresh token
-- forgot password / reset password
-- protection des endpoints admin par role
-- erreurs 401 et 404 structurees
+- absence de JWT -> 401 ;
+- JWT invalide -> 401 ;
+- role insuffisant -> 403 ;
+- route inconnue -> 404 structuree ;
+- conformite des routes G1, G2, G3, G4, G5, G6, G7, G8 ;
+- conformite de la route G9 ;
+- protection admin/analytics.
 
-## Regles de securite importantes
+## 8. Logs
 
-- `ROLE_ADMIN` ne peut pas etre cree par inscription publique.
-- Le refresh token est stocke en base pour pouvoir etre revoque.
-- Les tokens sont revoques lors du logout, du reset password et de certaines actions admin.
-- Les routes `/api/**` demandent un JWT valide.
-- Les routes `/admin/**` demandent un JWT avec `ROLE_ADMIN`.
+Fichier :
+
+```text
+logs/api-gateway.log
+```
+
+Exemple :
+
+```text
+Gateway request correlationId=test-g1 method=GET path=/api/v1/tickets/1 user=user@sgitu.ma roles=ROLE_USER
+Gateway response correlationId=test-g1 status=200 path=/api/v1/tickets/1
+```
+
+## 9. Points d'integration a fournir aux autres groupes
+
+G10 fournit :
+
+- URL Gateway ;
+- prefixes de routes ;
+- format JWT attendu ;
+- header `Authorization: Bearer <JWT>` ;
+- headers transmis aux services ;
+- codes d'erreur Gateway ;
+- regles de securite par prefixe ;
+- requirement G3 : JWT signe avec claims `sub`, `roles`, `userId`, `iat`, `exp`.
+
+## 10. Conclusion
+
+La responsabilite utilisateur est maintenant correctement separee :
+
+- G3 possede les utilisateurs et emet les JWT.
+- G10 valide les JWT, applique la securite transverse et route les requetes.
+
+Cette version est plus conforme aux principes microservices : pas de duplication des comptes, pas de base utilisateur dans la Gateway, et une seule source de verite pour l'identite.

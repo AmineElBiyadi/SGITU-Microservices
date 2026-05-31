@@ -1,26 +1,28 @@
 package com.agileflow.api_gateway.filter;
 
 import com.agileflow.api_gateway.error.ApiErrorWriter;
+import com.agileflow.api_gateway.security.JwtPrincipal;
 import com.agileflow.api_gateway.service.JwtService;
-import com.agileflow.api_gateway.service.UserDetailsServiceImpl;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter implements WebFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsServiceImpl userDetailsService;
     private final ApiErrorWriter errorWriter;
 
     @Override
@@ -32,23 +34,23 @@ public class JwtAuthFilter implements WebFilter {
         }
 
         try {
-            String email = jwtService.extractUsername(token);
+            Claims claims = jwtService.validateAndExtractClaims(token);
+            String email = claims.getSubject();
+            String userId = jwtService.extractUserId(claims);
+            List<SimpleGrantedAuthority> authorities = jwtService.extractRoles(claims)
+                    .stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .toList();
 
-            if (email != null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(
+                            new JwtPrincipal(userId, email),
+                            token,
+                            authorities
+                    );
 
-                if (jwtService.validateToken(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-
-                    return chain.filter(exchange)
-                            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
-                }
-            }
+            return chain.filter(exchange)
+                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
         } catch (Exception ignored) {
             return errorWriter.write(
                     exchange,
@@ -57,13 +59,6 @@ public class JwtAuthFilter implements WebFilter {
                     "JWT invalide ou expire"
             );
         }
-
-        return errorWriter.write(
-                exchange,
-                HttpStatus.UNAUTHORIZED,
-                "INVALID_TOKEN",
-                "JWT invalide ou expire"
-        );
     }
 
     public String extractToken(ServerWebExchange exchange) {

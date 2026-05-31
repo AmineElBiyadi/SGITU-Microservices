@@ -2,19 +2,15 @@ package com.agileflow.api_gateway.config;
 
 import com.agileflow.api_gateway.error.ApiErrorWriter;
 import com.agileflow.api_gateway.filter.JwtAuthFilter;
-import com.agileflow.api_gateway.service.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.ReactiveAuthenticationManager;
-import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
 import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 @Configuration
@@ -24,7 +20,6 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
-    private final UserDetailsServiceImpl userDetailsService;
     private final ApiErrorWriter errorWriter;
 
     @Bean
@@ -48,7 +43,6 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(
                                 "/auth/login",
-                                "/auth/register",
                                 "/auth/refresh",
                                 "/auth/verify-email",
                                 "/auth/forgot-password",
@@ -59,9 +53,12 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/webjars/**"
                         ).permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/users").permitAll()
                         .pathMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/users").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(
                                 "/api/users/*/roles",
+                                "/api/users/*/activate",
                                 "/api/users/*/deactivate",
                                 "/api/abonnements/admin",
                                 "/api/abonnements/admin/**",
@@ -69,27 +66,15 @@ public class SecurityConfig {
                                 "/api/v1/ticket-types",
                                 "/api/v1/ticket-types/**"
                         ).hasAuthority("ROLE_ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/users/*").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(
                                 "/api/v1/analytics/**",
                                 "/predict/**"
-                        ).hasAnyAuthority("ROLE_ADMIN", "ROLE_AGENT")
+                        ).hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR", "ROLE_STAFF")
                         .pathMatchers("/api/**").authenticated()
                         .anyExchange().authenticated()
                 )
                 .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
-    }
-
-    @Bean
-    public ReactiveAuthenticationManager reactiveAuthenticationManager() {
-        UserDetailsRepositoryReactiveAuthenticationManager manager =
-                new UserDetailsRepositoryReactiveAuthenticationManager(userDetailsService);
-        manager.setPasswordEncoder(passwordEncoder());
-        return manager;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

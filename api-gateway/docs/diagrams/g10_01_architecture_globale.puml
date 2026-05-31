@@ -1,0 +1,52 @@
+@startuml
+title SGITU - G10 Architecture globale adaptee
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Client Web / Mobile\nou Postman" as Client
+
+node "G10 - API Gateway & Securite\nSpring Cloud Gateway :8080" as G10 {
+  component "JWT Validation Filter\nsignature / exp / roles" as JwtFilter
+  component "Authorization Rules\nRBAC par prefixe" as RBAC
+  component "Correlation Filter\nX-Correlation-Id" as CorrFilter
+  component "Gateway Routes\napplication.yml" as Routes
+  component "Error Handler\n401 / 403 / 404 / 503" as ErrorHandler
+}
+
+component "G3 Gestion utilisateurs\nSource de verite comptes / roles / JWT" as G3
+database "User DB\nappartient a G3" as G3Db
+component "G5 Notifications\nemails / SMS / alertes" as G5
+
+package "Microservices metier SGITU" {
+  component "G1 Billetterie" as G1
+  component "G2 Abonnements" as G2
+  component "G4 Coordination" as G4
+  component "G6 Paiement" as G6
+  component "G7 Vehicules" as G7
+  component "G8 Analyse & Donnees" as G8
+  component "G9 Incidents" as G9
+}
+
+Client --> G10 : REST + Bearer JWT
+G10 --> G3 : /auth/**,\n/api/users/**, /api/profiles/**
+G3 --> G3Db : persistance utilisateurs
+G3 --> G5 : email verification / reset
+
+G10 --> G1 : route REST
+G10 --> G2 : route REST
+G10 --> G4 : route REST
+G10 --> G5 : route REST
+G10 --> G6 : route REST
+G10 --> G7 : route REST
+G10 --> G8 : route REST
+G10 --> G9 : route REST
+
+note bottom of G10
+G10 ne stocke pas les utilisateurs.
+Il valide le JWT emis par G3, controle les roles,
+ajoute les headers et route vers le service cible.
+end note
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml
+title G10 - Diagramme UML de composants adapte
+
+skinparam componentStyle uml2
+skinparam shadowing false
+
+actor "Client Web / Mobile\nou Postman" as Client
+
+component "G10 - API Gateway & Securite" as G10 {
+  component "API Gateway\nSpring Cloud Gateway" as Gateway
+  component "JWT Auth Filter\nvalidate JWT from G3" as JwtFilter
+  component "JWT Service\nsignature / claims / expiration" as JwtService
+  component "Gateway Headers Filter\nX-User-* / X-Correlation-Id" as HeadersFilter
+  component "Security Config\nRBAC rules" as SecurityConfig
+  component "Gateway Routes\napplication.yml" as Routes
+  component "Error Handler\nApiErrorWriter" as ErrorHandler
+  component "Swagger Config" as Swagger
+}
+
+component "G3 Gestion utilisateurs\nAuth + profils + roles" as G3
+database "User DB\npropriete G3" as G3Db
+component "G5 Notifications" as G5
+component "Microservices metier\nG1, G2, G4, G6, G7, G8, G9" as Services
+
+interface "IGatewayAPI" as IGatewayAPI
+interface "IUserAuthAPI" as IUserAuthAPI
+interface "IRoutedServicesAPI" as IRoutedServicesAPI
+interface "INotificationAPI" as INotificationAPI
+
+Client --> IGatewayAPI
+IGatewayAPI - Gateway
+
+Gateway --> JwtFilter
+JwtFilter --> JwtService
+Gateway --> HeadersFilter
+Gateway --> SecurityConfig
+Gateway --> Routes
+Gateway --> ErrorHandler
+Gateway --> Swagger
+
+Gateway --> IUserAuthAPI : route /auth/**\n/api/users/**
+IUserAuthAPI - G3
+G3 --> G3Db
+G3 --> INotificationAPI
+INotificationAPI - G5
+
+Gateway --> IRoutedServicesAPI
+IRoutedServicesAPI - Services
+
+note bottom of G10
+Pas de Auth DB dans G10.
+Pas de creation/modification officielle des comptes dans G10.
+end note
+
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+title G10 - Diagramme de deploiement Docker adapte
+
+skinparam shadowing false
+
+node "Machine developpeur / Docker Host" {
+  node "Docker Compose - api-gateway" {
+    node "Container api-gateway" as Gateway {
+      artifact "Spring Boot JAR\napi-gateway.jar"
+      folder "/app/logs" as Logs
+    }
+  }
+}
+
+cloud "G3 User/Auth Service" as G3
+cloud "Microservices SGITU\nG1..G9" as Services
+
+Gateway --> Logs : api-gateway.log
+Gateway --> G3 : /auth/** + JWT validation contract
+Gateway --> Services : REST routes
+
+note bottom of Gateway
+Commande:
+docker compose up -d --build
+
+Pas de container MySQL G10.
+La base utilisateurs appartient a G3.
+end note
+
+@enduml

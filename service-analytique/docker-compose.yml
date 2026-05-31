@@ -17,10 +17,18 @@ services:
       start_period: 20s
 
   ml-service:
-    build: ./ml-service
+    build:
+      context: ./ml-service
+      network: host
+      extra_hosts:
+        - "pypi.org=151.101.64.223"
+        - "files.pythonhosted.org=151.101.128.223"
     container_name: g8-ml-service
     ports:
       - "5000:5000"
+    networks:
+      - default
+      - sgitu-network
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/docs')"]
       interval: 30s
@@ -29,19 +37,27 @@ services:
       start_period: 15s
 
   g8-analytics:
-    build: .
+    build:
+      context: .
+      network: host
+      extra_hosts:
+        - "repo.maven.apache.org=104.18.18.12"
     container_name: g8-analytics-service
     ports:
       - "8088:8088"
     environment:
       MONGO_URI: mongodb://mongodb:27017/g8_analytics
       ML_SERVICE_URL: http://ml-service:5000
+      G5_NOTIFICATION_URL: http://notification-service:8085/api/notifications/send
     depends_on:
       mongodb:
         condition: service_healthy
       ml-service:
         condition: service_healthy
     restart: on-failure
+    networks:
+      - default
+      - sgitu-network
 
   mongo-express:
     image: mongo-express
@@ -60,3 +76,7 @@ services:
 
 volumes:
   g8-mongo-data:
+
+networks:
+  sgitu-network:
+    external: true

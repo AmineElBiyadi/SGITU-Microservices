@@ -2,17 +2,17 @@ package com.agileflow.api_gateway.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Key;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.List;
 import java.util.function.Function;
 
 @Service
@@ -21,58 +21,28 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secretKey;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    public Claims validateAndExtractClaims(String token) {
+        Claims claims = extractAllClaims(token);
 
-    @Value("${jwt.refresh-expiration}")
-    private long refreshExpiration;
+        if (claims.getExpiration() == null || claims.getExpiration().before(new Date())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT expire");
+        }
 
-    // ────────────────────────────────────────────────
-    //  Génération des tokens
-    // ────────────────────────────────────────────────
+        if (claims.getSubject() == null || claims.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans subject");
+        }
 
-    public String generateAccessToken(UserDetails userDetails) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("role", extractPrimaryRole(userDetails));
-        return buildToken(claims, userDetails, jwtExpiration);
-    }
+        List<String> roles = extractRoles(claims);
+        if (roles.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "JWT sans role");
+        }
 
-    public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, refreshExpiration);
-    }
-
-    private String buildToken(Map<String, Object> extraClaims,
-                              UserDetails userDetails,
-                              long expiration) {
-        extraClaims.put("jti", UUID.randomUUID().toString());
-
-        return Jwts.builder()
-                .setClaims(extraClaims)
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSignKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    // ────────────────────────────────────────────────
-    //  Validation
-    // ────────────────────────────────────────────────
-
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername())
-                && !isTokenExpired(token)
-                && userDetails.isEnabled();
+        return claims;
     }
 
     public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
-
-    // ────────────────────────────────────────────────
-    //  Extraction des claims
-    // ────────────────────────────────────────────────
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -83,7 +53,54 @@ public class JwtService {
     }
 
     public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+        return extractRole(extractAllClaims(token));
+    }
+
+    public String extractRole(Claims claims) {
+        return extractRoles(claims)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<String> extractRoles(Claims claims) {
+        List<String> roles = new ArrayList<>();
+        addRoles(roles, claims.get("role"));
+        addRoles(roles, claims.get("roles"));
+
+        return roles.stream()
+                .map(String::trim)
+                .filter(role -> !role.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private void addRoles(List<String> roles, Object claimValue) {
+        if (claimValue == null) {
+            return;
+        }
+
+        if (claimValue instanceof Collection<?> collection) {
+            collection.forEach(value -> addRoles(roles, value));
+            return;
+        }
+
+        if (claimValue instanceof String value) {
+            for (String role : value.split(",")) {
+                roles.add(role);
+            }
+            return;
+        }
+
+        roles.add(claimValue.toString());
+    }
+
+    public String extractUserId(Claims claims) {
+        Object userId = claims.get("userId");
+        if (userId == null) {
+            userId = claims.get("id");
+        }
+        return userId == null ? null : userId.toString();
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
@@ -101,13 +118,5 @@ public class JwtService {
     private Key getSignKey() {
         byte[] keyBytes = secretKey.getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    private String extractPrimaryRole(UserDetails userDetails) {
-        return userDetails.getAuthorities()
-                .stream()
-                .findFirst()
-                .map(Object::toString)
-                .orElse("ROLE_USER");
     }
 }

@@ -1,0 +1,39 @@
+@startuml
+title Sequence - Routage Gateway avec JWT emis par G3
+
+autonumber
+actor "Client" as Client
+participant "G10 Gateway" as Gateway
+participant "Correlation ID Filter" as Corr
+participant "JWT Auth Filter" as JwtFilter
+participant "JWT Service" as Jwt
+participant "Microservice cible" as Service
+
+Client -> Gateway : GET /api/v1/tickets/1\nAuthorization: Bearer JWT_G3
+activate Gateway
+Gateway -> Corr : verifier/generer X-Correlation-Id
+Corr --> Gateway : correlationId
+Gateway -> JwtFilter : lire Authorization
+activate JwtFilter
+JwtFilter -> Jwt : valider signature, exp, sub, roles
+Jwt --> JwtFilter : claims valides
+
+alt JWT invalide ou absent
+  JwtFilter --> Gateway : erreur 401
+  Gateway --> Client : 401 Unauthorized
+else role insuffisant
+  JwtFilter --> Gateway : erreur 403
+  Gateway --> Client : 403 Forbidden
+else JWT et roles valides
+  JwtFilter --> Gateway : authenticated principal
+  deactivate JwtFilter
+  Gateway -> Service : requete routee\nX-User-Id, X-User-Email, X-Roles,\nX-Correlation-Id
+  activate Service
+  Service --> Gateway : reponse metier
+  deactivate Service
+  Gateway --> Client : reponse HTTP
+end
+
+deactivate Gateway
+
+@enduml

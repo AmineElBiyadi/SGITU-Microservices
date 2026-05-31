@@ -1,0 +1,36 @@
+@startuml
+title Sequence - Inscription et email avec G3 source de verite
+
+autonumber
+actor "Visiteur" as Visitor
+participant "G10 Gateway" as G10
+participant "G3 User/Auth Service" as G3
+database "User DB G3" as Db
+participant "G5 Notifications" as G5
+
+Visitor -> G10 : POST /api/users
+activate G10
+G10 -> G3 : route /api/users
+activate G3
+G3 -> Db : creer utilisateur\nemailVerified=false
+Db --> G3 : userId
+G3 -> Db : creer token verification
+G3 -> G5 : POST /api/notifications/send\nVERIFY_EMAIL
+G5 --> G3 : notification acceptee
+G3 --> G10 : 200/201 inscription creee
+deactivate G3
+G10 --> Visitor : reponse G3
+deactivate G10
+
+Visitor -> G10 : GET /auth/verify-email?token=abc
+activate G10
+G10 -> G3 : route verification
+activate G3
+G3 -> Db : verifier token\nactiver compte
+Db --> G3 : compte active
+G3 --> G10 : 200 email verifie
+deactivate G3
+G10 --> Visitor : 200 email verifie
+deactivate G10
+
+@enduml
