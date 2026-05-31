@@ -133,6 +133,48 @@ class ApiGatewayApplicationTests {
                 .headers(headers -> headers.setBearerAuth(jwt("user@sgitu.ma", "ROLE_USER", "10")))
                 .exchange()
                 .expectStatus().isForbidden();
+
+        webTestClient.post()
+                .uri("/api/abonnements/admin/1/suspendre?motif=test")
+                .headers(headers -> headers.setBearerAuth(jwt("admin.g2@sgitu.ma", "ROLE_ADMIN_G2", "20")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+    }
+
+    @Test
+    void g2PublicRoutesMatchSubscriptionServiceContract() {
+        webTestClient.get()
+                .uri("/api/plans")
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.get()
+                .uri("/api/abonnements/1")
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.post()
+                .uri("/api/abonnements/paiement/confirmation")
+                .bodyValue(Map.of("transactionId", "tx-test", "status", "SUCCESS"))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+    }
+
+    @Test
+    void g2PlanAdministrationRequiresRoleAdminG2() {
+        webTestClient.post()
+                .uri("/api/plans")
+                .headers(headers -> headers.setBearerAuth(jwt("admin@sgitu.ma", "ROLE_ADMIN", "1")))
+                .bodyValue(Map.of("nom", "Plan Test"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.post()
+                .uri("/api/plans")
+                .headers(headers -> headers.setBearerAuth(jwt("admin.g2@sgitu.ma", "ROLE_ADMIN_G2", "20")))
+                .bodyValue(Map.of("nom", "Plan Test"))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
     }
 
     @Test
@@ -150,6 +192,105 @@ class ApiGatewayApplicationTests {
                         Map.of("hour", 8, "validationCount", 120),
                         Map.of("hour", 17, "validationCount", 180)
                 )))
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void g4CoordinationRoutesUseG4RoleContract() {
+        webTestClient.get()
+                .uri("/api/g4/health")
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.get()
+                .uri("/api/g4/lignes")
+                .headers(headers -> headers.setBearerAuth(jwt("passenger@sgitu.ma", "ROLE_PASSENGER", "30")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/g4/lignes")
+                .headers(headers -> headers.setBearerAuth(jwt("operator.g4@sgitu.ma", "ROLE_G4_OPERATOR", "40")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.post()
+                .uri("/api/g4/lignes")
+                .headers(headers -> headers.setBearerAuth(jwt("dispatcher.g4@sgitu.ma", "ROLE_DISPATCHER", "41")))
+                .bodyValue(Map.of("code", "L-GW-SEC", "nom", "Ligne Gateway Security", "active", true))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.post()
+                .uri("/api/g4/missions")
+                .headers(headers -> headers.setBearerAuth(jwt("operator.g4@sgitu.ma", "ROLE_G4_OPERATOR", "40")))
+                .bodyValue(Map.of("vehiculeId", "VH-GW-SEC", "ligneId", 1, "statut", "PLANIFIEE"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/v1/operator/status")
+                .headers(headers -> headers.setBearerAuth(jwt("operator.g4@sgitu.ma", "ROLE_G4_OPERATOR", "40")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/v1/operator/status")
+                .headers(headers -> headers.setBearerAuth(jwt("admin.g4@sgitu.ma", "ROLE_G4_ADMIN", "42")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+    }
+
+    @Test
+    void g7VehicleTrackingRoutesUseG7RoleContract() {
+        webTestClient.get()
+                .uri("/api/suivi-vehicules/vehicules")
+                .exchange()
+                .expectStatus().isUnauthorized();
+
+        webTestClient.get()
+                .uri("/api/suivi-vehicules/vehicules")
+                .headers(headers -> headers.setBearerAuth(jwt("passenger@sgitu.ma", "ROLE_PASSENGER", "70")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/suivi-vehicules/vehicules")
+                .headers(headers -> headers.setBearerAuth(jwt("operator.g7@sgitu.ma", "ROLE_OPERATOR", "71")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.post()
+                .uri("/api/suivi-vehicules/vehicules")
+                .headers(headers -> headers.setBearerAuth(jwt("driver@sgitu.ma", "ROLE_DRIVER", "72")))
+                .bodyValue(Map.of("immatriculation", "BUS-GW-SEC", "type", "BUS", "ligne", "L1"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.post()
+                .uri("/api/suivi-vehicules/vehicules")
+                .headers(headers -> headers.setBearerAuth(jwt("admin.g7@sgitu.ma", "ROLE_ADMIN_G7", "73")))
+                .bodyValue(Map.of("immatriculation", "BUS-GW-SEC", "type", "BUS", "ligne", "L1"))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.post()
+                .uri("/api/suivi-vehicules/positions")
+                .headers(headers -> headers.setBearerAuth(jwt("driver@sgitu.ma", "ROLE_DRIVER", "72")))
+                .bodyValue(Map.of(
+                        "vehiculeId", "53c31262-591a-44d4-8872-51e84611ac5e",
+                        "latitude", 36.7372,
+                        "longitude", 3.0865,
+                        "vitesse", 45.5,
+                        "cap", 180.0
+                ))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.put()
+                .uri("/api/suivi-vehicules/alerts/53c31262-591a-44d4-8872-51e84611ac5e/cancel")
+                .headers(headers -> headers.setBearerAuth(jwt("technician@sgitu.ma", "ROLE_TECHNICIAN", "74")))
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -189,6 +330,16 @@ class ApiGatewayApplicationTests {
                 .jsonPath("$.paths['/api/users/{id}/roles'].put.summary").isEqualTo("Update user roles")
                 .jsonPath("$.paths['/api/users/{id}/activate'].put.summary").isEqualTo("Activate user")
                 .jsonPath("$.paths['/api/users/{id}/deactivate'].put.summary").isEqualTo("Deactivate user")
+                .jsonPath("$.paths['/api/g4/health'].get.summary").isEqualTo("Health G4 route vers Coordination")
+                .jsonPath("$.paths['/api/g4/lignes'].get.summary").isEqualTo("List G4 lines")
+                .jsonPath("$.paths['/api/g4/lignes'].post.summary").isEqualTo("Create G4 line")
+                .jsonPath("$.paths['/api/g4/missions'].post.summary").isEqualTo("Create G4 mission")
+                .jsonPath("$.paths['/api/v1/operator/status'].get.summary").isEqualTo("Get G4 operator status")
+                .jsonPath("$.paths['/api/suivi-vehicules/health'].get.summary").isEqualTo("Health G7 route vers Suivi Vehicules")
+                .jsonPath("$.paths['/api/suivi-vehicules/vehicules'].get.summary").isEqualTo("List G7 vehicles")
+                .jsonPath("$.paths['/api/suivi-vehicules/vehicules'].post.summary").isEqualTo("Create G7 vehicle")
+                .jsonPath("$.paths['/api/suivi-vehicules/positions'].post.summary").isEqualTo("Create G7 GPS position")
+                .jsonPath("$.paths['/api/suivi-vehicules/alerts/stats'].get.summary").isEqualTo("Get G7 alert stats")
                 .jsonPath("$.paths['/api/v1/ingestion/payments'].post.summary").isEqualTo("Ingest payments")
                 .jsonPath("$.paths['/api/v1/analytics/dashboard'].get.summary").isEqualTo("Get complete analytics dashboard")
                 .jsonPath("$.paths['/api/v1/analytics/reports/generate'].post.summary").isEqualTo("Generate analytics report")

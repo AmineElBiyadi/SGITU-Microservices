@@ -86,12 +86,12 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | Groupe | Prefixes exposes via G10 | Service cible | Port logique | Securite G10 |
 | --- | --- | --- | --- | --- |
 | G1 Billetterie | `/api/v1/tickets/**`, `/api/v1/admin/**`, `/api/v1/ticket-types/**` | `service-billetterie` | 8081 | JWT, admin pour `/api/v1/admin/**` et ticket-types |
-| G2 Abonnements | `/api/abonnements/**`, `/api/plans/**` | `service-abonnement` | 8082 | JWT, admin pour `/api/abonnements/admin/**` |
+| G2 Abonnements | `/api/abonnements/**`, `/api/plans/**` | `service-abonnement` | 8082 | GET public selon contrat G2, JWT pour souscription/actions, `ROLE_ADMIN_G2` pour `/api/plans/**` en ecriture et `/api/abonnements/admin/**` |
 | G3 Utilisateurs/Auth | `/auth/**`, `/api/users/**`, `/api/profiles/**` | `user-service` | 8083 | Public pour auth publique, admin pour modification roles/desactivation, JWT pour `/api/**` |
-| G4 Coordination | `/api/g4/**`, `/api/v1/operator/status` | `coordination-service` | 8084 | JWT |
+| G4 Coordination | `/api/g4/**`, `/api/v1/operator/status` | `coordination-service` | 8084 | Health/logs publics, lecture avec `ROLE_G4_OPERATOR`/`ROLE_DISPATCHER`/`ROLE_G4_ADMIN`, ecriture reseau avec `ROLE_G4_OPERATOR` ou `ROLE_G4_ADMIN`, ecriture flotte avec `ROLE_DISPATCHER` ou `ROLE_G4_ADMIN`, supervision avec `ROLE_G4_ADMIN` |
 | G5 Notifications | `/api/notifications/**` | `notification-service` | 8085 | JWT, retry admin selon endpoint |
 | G6 Paiement | `/api/payments/**`, `/api/refunds/**`, `/api/payment-accounts/**`, `/api/invoices/**`, `/api/test-cards`, `/api/health` | `payment-service` | 8086 | JWT |
-| G7 Suivi vehicules | `/api/suivi-vehicules/**` | `g7-suivi-vehicules` | 8087 | JWT |
+| G7 Suivi vehicules | `/api/suivi-vehicules/**` | `g7-suivi-vehicules` | 8087 | Lecture avec `ROLE_ADMIN_G7`/`ROLE_OPERATOR`/`ROLE_TECHNICIAN`, administration vehicules avec `ROLE_ADMIN_G7`, positions avec `ROLE_DRIVER` ou `ROLE_ADMIN_G7`, modification alertes avec `ROLE_OPERATOR` ou `ROLE_ADMIN_G7` |
 | G8 Ingestion/Analytics | `/api/v1/ingestion/**`, `/api/v1/analytics/**` | `g8-analytics` | 8088 | JWT, admin/operator/staff pour analytics |
 | G8 ML Predictions | `/predict/peak-hours`, `/predict/incidents` | `ml-service` | 5000 | JWT, admin/operator/staff |
 | G9 Incidents | `/api/incidents/**`, `/api/rapports/**` | `service-gestion-incidents` | 8089 | JWT |

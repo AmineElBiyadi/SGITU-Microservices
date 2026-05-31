@@ -1,4 +1,4 @@
-global:
+﻿global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
@@ -58,3 +58,7 @@ scrape_configs:
   # ---------------------------------------------------------------
   #  G10 — (ajoutez votre bloc ici)
   # ---------------------------------------------------------------
+  - job_name: 'g10-api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: '/actuator/prometheus'

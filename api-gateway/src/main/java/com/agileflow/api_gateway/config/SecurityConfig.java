@@ -54,16 +54,28 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/users").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/g4/health", "/api/g4/logs").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/plans", "/api/plans/*").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/abonnements/**").permitAll()
+                        .pathMatchers(
+                                "/api/abonnements/paiement/confirmation",
+                                "/api/abonnements/remboursement/confirmation",
+                                "/api/abonnements/users/*/actif"
+                        ).permitAll()
                         .pathMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/users").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/users/roles/*")
                                 .hasAnyAuthority("ROLE_SUPERVISOR", "ROLE_DISPATCHER")
                         .pathMatchers(
+                                "/api/plans",
+                                "/api/plans/**",
+                                "/api/abonnements/admin",
+                                "/api/abonnements/admin/**"
+                        ).hasAuthority("ROLE_ADMIN_G2")
+                        .pathMatchers(
                                 "/api/users/*/roles",
                                 "/api/users/*/activate",
                                 "/api/users/*/deactivate",
-                                "/api/abonnements/admin",
-                                "/api/abonnements/admin/**",
                                 "/api/v1/admin/**",
                                 "/api/v1/ticket-types",
                                 "/api/v1/ticket-types/**"
@@ -73,6 +85,94 @@ public class SecurityConfig {
                                 "/api/v1/analytics/**",
                                 "/predict/**"
                         ).hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR", "ROLE_STAFF")
+                        .pathMatchers(HttpMethod.GET, "/api/v1/operator/status")
+                                .hasAuthority("ROLE_G4_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/v1/**", "/api/g4/**")
+                                .hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_DISPATCHER", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/api/g4/lignes",
+                                "/api/g4/lignes/**",
+                                "/api/g4/trajets",
+                                "/api/g4/trajets/**",
+                                "/api/g4/arrets",
+                                "/api/g4/arrets/**",
+                                "/api/g4/horaires",
+                                "/api/g4/horaires/**"
+                        ).hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.PUT,
+                                "/api/g4/lignes",
+                                "/api/g4/lignes/**",
+                                "/api/g4/trajets",
+                                "/api/g4/trajets/**",
+                                "/api/g4/arrets",
+                                "/api/g4/arrets/**",
+                                "/api/g4/horaires",
+                                "/api/g4/horaires/**"
+                        ).hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.DELETE,
+                                "/api/g4/lignes",
+                                "/api/g4/lignes/**",
+                                "/api/g4/trajets",
+                                "/api/g4/trajets/**",
+                                "/api/g4/arrets",
+                                "/api/g4/arrets/**",
+                                "/api/g4/horaires",
+                                "/api/g4/horaires/**"
+                        ).hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/api/g4/missions",
+                                "/api/g4/missions/**",
+                                "/api/g4/affectations",
+                                "/api/g4/affectations/**",
+                                "/api/g4/events",
+                                "/api/g4/events/**",
+                                "/api/g4/incident-impacts",
+                                "/api/g4/incident-impacts/**"
+                        ).hasAnyAuthority("ROLE_DISPATCHER", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.PUT,
+                                "/api/g4/missions",
+                                "/api/g4/missions/**",
+                                "/api/g4/affectations",
+                                "/api/g4/affectations/**",
+                                "/api/g4/events",
+                                "/api/g4/events/**"
+                        ).hasAnyAuthority("ROLE_DISPATCHER", "ROLE_G4_ADMIN")
+                        .pathMatchers(
+                                HttpMethod.DELETE,
+                                "/api/g4/missions",
+                                "/api/g4/missions/**",
+                                "/api/g4/affectations",
+                                "/api/g4/affectations/**",
+                                "/api/g4/events",
+                                "/api/g4/events/**"
+                        ).hasAnyAuthority("ROLE_DISPATCHER", "ROLE_G4_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/g4/pending-notifications")
+                                .hasAuthority("ROLE_G4_ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/g4/pending-notifications", "/api/g4/pending-notifications/**")
+                                .hasAuthority("ROLE_G4_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/suivi-vehicules/**")
+                                .hasAnyAuthority("ROLE_ADMIN_G7", "ROLE_OPERATOR", "ROLE_TECHNICIAN")
+                        .pathMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                                .hasAuthority("ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.PUT, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                                .hasAuthority("ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                                .hasAuthority("ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.POST, "/api/suivi-vehicules/positions", "/api/suivi-vehicules/positions/**")
+                                .hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/positions/**")
+                                .hasAuthority("ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.POST, "/api/suivi-vehicules/alerts", "/api/suivi-vehicules/alerts/**")
+                                .hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.PUT, "/api/suivi-vehicules/alerts", "/api/suivi-vehicules/alerts/**")
+                                .hasAnyAuthority("ROLE_OPERATOR", "ROLE_ADMIN_G7")
+                        .pathMatchers(HttpMethod.PATCH, "/api/suivi-vehicules/alerts", "/api/suivi-vehicules/alerts/**")
+                                .hasAnyAuthority("ROLE_OPERATOR", "ROLE_ADMIN_G7")
                         .pathMatchers("/api/**").authenticated()
                         .anyExchange().authenticated()
                 )

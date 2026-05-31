@@ -52,27 +52,3 @@ Chaque service est contenu dans son propre répertoire. Pour développer un serv
 3. Commiter vos changements (`git commit -m 'Ajouter une fonctionnalité incroyable'`)
 4. Pousser vers la branche (`git push origin feature/AmazingFeature`)
 5. Ouvrir une Pull Request
-
-## Demarrage G10 uniquement
-
-Pour travailler seulement sur le groupe 10, lancer l'API Gateway :
-
-```bash
-cd api-gateway
-docker compose up -d --build
-```
-
-URLs utiles :
-
-- API Gateway : http://localhost:8080
-- Health check : http://localhost:8080/actuator/health
-- Swagger : http://localhost:8080/swagger-ui.html
-
-G10 ne lance plus de base MySQL locale. Les comptes, roles, permissions, mots de passe et JWT appartiennent au service G3 Gestion des utilisateurs.
-
-Pour arreter seulement G10 :
-
-```bash
-cd api-gateway
-docker compose down
-```

@@ -102,6 +102,18 @@ public class SwaggerConfig {
                         .name("G3 - Administration via Gateway")
                         .description("Operations admin G3 protegees par ROLE_ADMIN au niveau Gateway."),
                 new Tag()
+                        .name("G2 - Abonnements via Gateway")
+                        .description("Plans et abonnements G2 routes par G10."),
+                new Tag()
+                        .name("G2 - Administration via Gateway")
+                        .description("Operations G2 protegees par ROLE_ADMIN_G2."),
+                new Tag()
+                        .name("G4 - Coordination via Gateway")
+                        .description("Lignes, missions et supervision G4 routees par G10 avec RBAC dedie."),
+                new Tag()
+                        .name("G7 - Suivi vehicules via Gateway")
+                        .description("Vehicules, positions GPS et alertes G7 routes par G10 avec RBAC dedie."),
+                new Tag()
                         .name("G8 - Ingestion via Gateway")
                         .description("Reception d'evenements metier destines aux calculs analytiques G8."),
                 new Tag()
@@ -142,6 +154,11 @@ public class SwaggerConfig {
                 .addSchemas("UserResponse", userResponseSchema())
                 .addSchemas("Profile", profileSchema())
                 .addSchemas("LoginResponse", loginResponseSchema())
+                .addSchemas("PlanAbonnement", planAbonnementSchema())
+                .addSchemas("G4Ligne", g4LigneSchema())
+                .addSchemas("G4Mission", g4MissionSchema())
+                .addSchemas("G7Vehicule", g7VehiculeSchema())
+                .addSchemas("G7Position", g7PositionSchema())
                 .addSchemas("BatchIngestionResponse", batchIngestionResponseSchema())
                 .addSchemas("IncomingEvent", incomingEventSchema())
                 .addSchemas("ReportRequest", reportRequestSchema())
@@ -176,6 +193,30 @@ public class SwaggerConfig {
                         "Activate user",
                         "Reactive un compte utilisateur. Acces : ROLE_ADMIN.",
                         true))
+                .addPathItem("/api/plans", plansPath())
+                .addPathItem("/api/plans/{id}", planByIdPath())
+                .addPathItem("/api/abonnements/souscrire", subscribePath())
+                .addPathItem("/api/abonnements/{id}", subscriptionByIdPath())
+                .addPathItem("/api/abonnements/utilisateur/{userId}", subscriptionsByUserPath())
+                .addPathItem("/api/abonnements/paiement/confirmation", paymentCallbackPath())
+                .addPathItem("/api/abonnements/remboursement/confirmation", refundCallbackPath())
+                .addPathItem("/api/abonnements/admin/{id}/suspendre", adminSuspendSubscriptionPath())
+                .addPathItem("/api/g4/health", g4HealthPath())
+                .addPathItem("/api/g4/logs", g4LogsPath())
+                .addPathItem("/api/g4/lignes", g4LignesPath())
+                .addPathItem("/api/g4/lignes/{id}", g4LigneByIdPath())
+                .addPathItem("/api/g4/missions", g4MissionsPath())
+                .addPathItem("/api/g4/missions/{id}/status", g4MissionStatusPath())
+                .addPathItem("/api/v1/operator/status", g4OperatorStatusPath())
+                .addPathItem("/api/suivi-vehicules/health", g7HealthPath())
+                .addPathItem("/api/suivi-vehicules/vehicules", g7VehiculesPath())
+                .addPathItem("/api/suivi-vehicules/vehicules/{id}", g7VehiculeByIdPath())
+                .addPathItem("/api/suivi-vehicules/vehicules/{id}/statut", g7VehicleStatusPath())
+                .addPathItem("/api/suivi-vehicules/positions", g7PositionsPath())
+                .addPathItem("/api/suivi-vehicules/positions/{vehiculeId}", g7PositionByVehiclePath())
+                .addPathItem("/api/suivi-vehicules/alerts/active", g7ActiveAlertsPath())
+                .addPathItem("/api/suivi-vehicules/alerts/stats", g7AlertStatsPath())
+                .addPathItem("/api/suivi-vehicules/alerts/{id}/cancel", g7CancelAlertPath())
                 .addPathItem("/api/v1/ingestion/tickets", ingestionPath("tickets", "Ingest tickets"))
                 .addPathItem("/api/v1/ingestion/incidents", ingestionPath("incidents", "Ingest incidents"))
                 .addPathItem("/api/v1/ingestion/payments", ingestionPath("payments", "Ingest payments"))
@@ -551,6 +592,475 @@ public class SwaggerConfig {
         return new PathItem().put(operation);
     }
 
+    private PathItem plansPath() {
+        Operation listOperation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "listG2PlansViaGateway",
+                "List subscription plans",
+                "Route Gateway vers G2 `/plans`. Acces public en lecture."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Plans G2", new ObjectSchema(), "plansPage", map("content", List.of(planExample()))))
+                .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation createOperation = securedOperation(
+                "G2 - Administration via Gateway",
+                "createG2PlanViaGateway",
+                "Create subscription plan",
+                "Route Gateway vers G2 `/plans`. Acces : ROLE_ADMIN_G2."
+        ).requestBody(jsonRequest("Plan a creer", ref("PlanAbonnement"), "plan", planExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Plan cree", ref("PlanAbonnement"), "plan", planExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G2 requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(listOperation).post(createOperation);
+    }
+
+    private PathItem planByIdPath() {
+        Operation getOperation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "getG2PlanViaGateway",
+                "Get subscription plan",
+                "Route Gateway vers G2 `/plans/{id}`. Acces public en lecture."
+        ).addParametersItem(pathParameter("id", "Identifiant du plan G2", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Plan trouve", ref("PlanAbonnement"), "plan", planExample()))
+                        .addApiResponse("404", errorResponse("Plan introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation updateOperation = securedOperation(
+                "G2 - Administration via Gateway",
+                "updateG2PlanViaGateway",
+                "Update subscription plan",
+                "Route Gateway vers G2 `/plans/{id}`. Acces : ROLE_ADMIN_G2."
+        ).addParametersItem(pathParameter("id", "Identifiant du plan G2", "1"))
+                .requestBody(jsonRequest("Plan mis a jour", ref("PlanAbonnement"), "plan", planExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Plan mis a jour", ref("PlanAbonnement"), "plan", planExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G2 requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Plan introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation deleteOperation = securedOperation(
+                "G2 - Administration via Gateway",
+                "deleteG2PlanViaGateway",
+                "Delete subscription plan",
+                "Route Gateway vers G2 `/plans/{id}`. Acces : ROLE_ADMIN_G2."
+        ).addParametersItem(pathParameter("id", "Identifiant du plan G2", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("204", noContentResponse("Plan supprime"))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G2 requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Plan introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(getOperation).put(updateOperation).delete(deleteOperation);
+    }
+
+    private PathItem subscribePath() {
+        Operation operation = securedOperation(
+                "G2 - Abonnements via Gateway",
+                "subscribeViaGateway",
+                "Subscribe to plan",
+                "Route Gateway vers G2 `/abonnements/souscrire`. Acces : JWT valide."
+        ).addParametersItem(new Parameter().name("userId").in("query").required(true)
+                        .schema(new IntegerSchema().format("int64").example(1)))
+                .addParametersItem(new Parameter().name("planId").in("query").required(true)
+                        .schema(new IntegerSchema().format("int64").example(1)))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Abonnement cree", new ObjectSchema(), "subscription", map("id", 1, "statut", "EN_ATTENTE_PAIEMENT")))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Plan ou utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem subscriptionByIdPath() {
+        Operation operation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "getSubscriptionViaGateway",
+                "Get subscription",
+                "Route Gateway vers G2 `/abonnements/{id}`. Acces public en lecture selon le contrat G2."
+        ).addParametersItem(pathParameter("id", "Identifiant abonnement G2", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Abonnement trouve", new ObjectSchema(), "subscription", map("id", 1, "statut", "ACTIF")))
+                        .addApiResponse("404", errorResponse("Abonnement introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem subscriptionsByUserPath() {
+        Operation operation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "getUserSubscriptionsViaGateway",
+                "List user subscriptions",
+                "Route Gateway vers G2 `/abonnements/utilisateur/{userId}`. Acces public en lecture selon le contrat G2."
+        ).addParametersItem(pathParameter("userId", "Identifiant utilisateur", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Abonnements utilisateur", arrayOf(new ObjectSchema()), "subscriptions", List.of(map("id", 1, "statut", "ACTIF"))))
+                        .addApiResponse("404", errorResponse("Utilisateur introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem paymentCallbackPath() {
+        Operation operation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "confirmG2PaymentViaGateway",
+                "Payment callback",
+                "Callback G6 route vers G2 `/abonnements/paiement/confirmation`. Acces public."
+        ).requestBody(jsonRequest("Callback paiement", new ObjectSchema(), "paymentCallback",
+                        map("transactionToken", "tx-demo", "status", "SUCCESS", "message", "Paiement accepte")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Paiement traite", new ObjectSchema(), "ok", map("statut", "OK")))
+                        .addApiResponse("404", errorResponse("Transaction introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem refundCallbackPath() {
+        Operation operation = publicOperation(
+                "G2 - Abonnements via Gateway",
+                "confirmG2RefundViaGateway",
+                "Refund callback",
+                "Callback G6 route vers G2 `/abonnements/remboursement/confirmation`. Acces public."
+        ).requestBody(jsonRequest("Callback remboursement", new ObjectSchema(), "refundCallback",
+                        map("transactionId", "refund-demo", "statut", "REMBOURSE", "montantRembourse", 25.0, "motif", "Annulation")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Remboursement traite", new ObjectSchema(), "ok", map("statut", "OK")))
+                        .addApiResponse("404", errorResponse("Transaction introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem adminSuspendSubscriptionPath() {
+        Operation operation = securedOperation(
+                "G2 - Administration via Gateway",
+                "suspendG2SubscriptionViaGateway",
+                "Suspend subscription",
+                "Route Gateway vers G2 `/abonnements/admin/{id}/suspendre`. Acces : ROLE_ADMIN_G2."
+        ).addParametersItem(pathParameter("id", "Identifiant abonnement G2", "1"))
+                .addParametersItem(new Parameter().name("motif").in("query").required(true)
+                        .schema(new StringSchema().example("Controle administratif")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", noContentResponse("Abonnement suspendu"))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G2 requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Abonnement introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G2 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g4HealthPath() {
+        Operation operation = publicOperation(
+                "G4 - Coordination via Gateway",
+                "getG4HealthViaGateway",
+                "Health G4 route vers Coordination",
+                "Verifie l'etat du service G4 Coordination via la Gateway. Acces public."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("G4 disponible", new ObjectSchema(), "g4Health",
+                        map("status", "UP", "component", "G4-Coordination-Transport")))
+                .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g4LogsPath() {
+        Operation operation = publicOperation(
+                "G4 - Coordination via Gateway",
+                "getG4LogsViaGateway",
+                "Logs G4 route vers Coordination",
+                "Retourne les logs de supervision exposes par G4. Acces public selon contrat G4."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Logs G4", arrayOf(new ObjectSchema()), "g4Logs",
+                        List.of(map("level", "INFO", "message", "G4 request processed"))))
+                .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g4LignesPath() {
+        Operation listOperation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "listG4LinesViaGateway",
+                "List G4 lines",
+                "Liste les lignes de transport G4. Acces : ROLE_G4_OPERATOR, ROLE_DISPATCHER ou ROLE_G4_ADMIN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Lignes G4", arrayOf(ref("G4Ligne")), "g4Lines", List.of(g4LineExample())))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation createOperation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "createG4LineViaGateway",
+                "Create G4 line",
+                "Cree une ligne G4. Acces : ROLE_G4_OPERATOR ou ROLE_G4_ADMIN."
+        ).requestBody(jsonRequest("Ligne a creer", ref("G4Ligne"), "g4Line", g4LineExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Ligne creee", ref("G4Ligne"), "g4Line", g4LineExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(listOperation).post(createOperation);
+    }
+
+    private PathItem g4LigneByIdPath() {
+        Operation operation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "getG4LineByIdViaGateway",
+                "Get G4 line by id",
+                "Consulte une ligne G4 par id. Acces : ROLE_G4_OPERATOR, ROLE_DISPATCHER ou ROLE_G4_ADMIN."
+        ).addParametersItem(pathParameter("id", "Identifiant ligne G4", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Ligne trouvee", ref("G4Ligne"), "g4Line", g4LineExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Ligne introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g4MissionsPath() {
+        Operation listOperation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "listG4MissionsViaGateway",
+                "List G4 missions",
+                "Liste les missions G4. Acces : ROLE_G4_OPERATOR, ROLE_DISPATCHER ou ROLE_G4_ADMIN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Missions G4", arrayOf(ref("G4Mission")), "g4Missions", List.of(g4MissionExample())))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation createOperation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "createG4MissionViaGateway",
+                "Create G4 mission",
+                "Cree une mission G4. Acces : ROLE_DISPATCHER ou ROLE_G4_ADMIN."
+        ).requestBody(jsonRequest("Mission a creer", ref("G4Mission"), "g4Mission", g4MissionExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Mission creee", ref("G4Mission"), "g4Mission", g4MissionExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(listOperation).post(createOperation);
+    }
+
+    private PathItem g4MissionStatusPath() {
+        Operation operation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "getG4MissionStatusViaGateway",
+                "Get G4 mission status",
+                "Consulte le statut d'une mission G4. Acces : ROLE_G4_OPERATOR, ROLE_DISPATCHER ou ROLE_G4_ADMIN."
+        ).addParametersItem(pathParameter("id", "Identifiant mission G4", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Statut mission", new ObjectSchema(), "g4MissionStatus",
+                                map("missionId", 1, "statut", "PLANIFIEE", "vehiculeId", "VH-G10-G4-001", "ligneId", 1)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g4OperatorStatusPath() {
+        Operation operation = securedOperation(
+                "G4 - Coordination via Gateway",
+                "getG4OperatorStatusViaGateway",
+                "Get G4 operator status",
+                "Retourne la supervision operateur G4. Acces : ROLE_G4_ADMIN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Statut operateur G4", new ObjectSchema(), "g4OperatorStatus",
+                        map("status", "UP", "activeMissions", 3, "pendingNotifications", 0)))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G4 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7HealthPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "getG7HealthViaGateway",
+                "Health G7 route vers Suivi Vehicules",
+                "Verifie l'etat du service G7 via la Gateway. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("G7 disponible", new ObjectSchema(), "g7Health",
+                        map("status", "UP", "service", "g7-suivi-vehicules", "version", "1.0.0")))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7VehiculesPath() {
+        Operation listOperation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "listG7VehiclesViaGateway",
+                "List G7 vehicles",
+                "Liste les vehicules G7. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Vehicules G7", arrayOf(ref("G7Vehicule")), "g7Vehicles", List.of(g7VehicleExample())))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation createOperation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "createG7VehicleViaGateway",
+                "Create G7 vehicle",
+                "Cree un vehicule G7. Acces : ROLE_ADMIN_G7."
+        ).requestBody(jsonRequest("Vehicule a creer", ref("G7Vehicule"), "g7Vehicle", g7VehicleExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Vehicule cree", ref("G7Vehicule"), "g7Vehicle", g7VehicleExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G7 requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(listOperation).post(createOperation);
+    }
+
+    private PathItem g7VehiculeByIdPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "getG7VehicleByIdViaGateway",
+                "Get G7 vehicle by id",
+                "Consulte un vehicule G7 par UUID. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).addParametersItem(pathParameter("id", "UUID vehicule G7", "53c31262-591a-44d4-8872-51e84611ac5e"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Vehicule trouve", ref("G7Vehicule"), "g7Vehicle", g7VehicleExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Vehicule introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7VehicleStatusPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "updateG7VehicleStatusViaGateway",
+                "Update G7 vehicle status",
+                "Change le statut d'un vehicule G7. Acces : ROLE_ADMIN_G7."
+        ).addParametersItem(pathParameter("id", "UUID vehicule G7", "53c31262-591a-44d4-8872-51e84611ac5e"))
+                .addParametersItem(new Parameter().name("statut").in("query").required(true)
+                        .schema(new StringSchema().example("EN_SERVICE")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Statut mis a jour", ref("G7Vehicule"), "g7Vehicle", g7VehicleExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN_G7 requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().put(operation);
+    }
+
+    private PathItem g7PositionsPath() {
+        Operation listOperation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "listG7PositionsViaGateway",
+                "List G7 positions",
+                "Liste les positions GPS G7. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Positions G7", arrayOf(ref("G7Position")), "g7Positions", List.of(g7PositionExample())))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        Operation createOperation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "createG7PositionViaGateway",
+                "Create G7 GPS position",
+                "Enregistre une position GPS G7. Acces : ROLE_DRIVER ou ROLE_ADMIN_G7."
+        ).requestBody(jsonRequest("Position GPS", ref("G7Position"), "g7Position", g7PositionExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Position creee", ref("G7Position"), "g7Position", g7PositionExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_DRIVER ou ROLE_ADMIN_G7 requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(listOperation).post(createOperation);
+    }
+
+    private PathItem g7PositionByVehiclePath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "getG7CurrentPositionViaGateway",
+                "Get G7 current vehicle position",
+                "Consulte la position courante d'un vehicule G7. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).addParametersItem(pathParameter("vehiculeId", "UUID vehicule G7", "53c31262-591a-44d4-8872-51e84611ac5e"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Position courante", ref("G7Position"), "g7Position", g7PositionExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7ActiveAlertsPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "listG7ActiveAlertsViaGateway",
+                "List G7 active alerts",
+                "Liste les alertes actives G7. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Alertes actives", arrayOf(new ObjectSchema()), "g7Alerts",
+                        List.of(map("statut", "OUVERTE", "typeAlert", "VITESSE_EXCESSIVE"))))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7AlertStatsPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "getG7AlertStatsViaGateway",
+                "Get G7 alert stats",
+                "Retourne les statistiques d'alertes G7. Acces : ROLE_ADMIN_G7, ROLE_OPERATOR ou ROLE_TECHNICIAN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Stats alertes", new ObjectSchema(), "g7AlertStats",
+                        map("totalAlertes", 0, "parType", map(), "parStatut", map())))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("Role insuffisant", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g7CancelAlertPath() {
+        Operation operation = securedOperation(
+                "G7 - Suivi vehicules via Gateway",
+                "cancelG7AlertViaGateway",
+                "Cancel G7 alert",
+                "Annule une alerte G7. Acces : ROLE_OPERATOR ou ROLE_ADMIN_G7."
+        ).addParametersItem(pathParameter("id", "UUID alerte G7", "36b01ab6-31f8-47cb-82f4-5ffad4a90b95"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Alerte annulee", new ObjectSchema(), "g7Alert",
+                                map("statut", "ANNULEE")))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_OPERATOR ou ROLE_ADMIN_G7 requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G7 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().put(operation);
+    }
+
     private PathItem ingestionPath(String source, String summary) {
         Operation operation = securedOperation(
                 "G8 - Ingestion via Gateway",
@@ -921,6 +1431,76 @@ public class SwaggerConfig {
         return schema;
     }
 
+    private Schema<?> planAbonnementSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Plan d'abonnement G2 route via la Gateway.");
+        schema.addProperty("idPlan", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("nomPlan", new StringSchema().example("Pass Mensuel Bus"));
+        schema.addProperty("description", new StringSchema().example("Abonnement mensuel bus pour passagers"));
+        schema.addProperty("prix", new NumberSchema().format("double").example(120.0));
+        schema.addProperty("duree", new StringSchema().example("MENSUEL"));
+        schema.addProperty("categorie", new StringSchema().example("ROLE_PASSENGER"));
+        schema.addProperty("transportType", new StringSchema().example("BUS"));
+        schema.addProperty("estActif", new StringSchema().example("ACTIF"));
+        schema.addProperty("maxDesactivation", new IntegerSchema().example(2));
+        schema.addProperty("minJoursEntreDesactivation", new IntegerSchema().example(7));
+        schema.addProperty("maxPeriodeDesactivation", new IntegerSchema().example(15));
+        return schema;
+    }
+
+    private Schema<?> g4LigneSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Ligne de transport G4 routee via la Gateway.");
+        schema.addProperty("id", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("code", new StringSchema().example("G10-G4-DEMO"));
+        schema.addProperty("nom", new StringSchema().example("Ligne integration G10 G4"));
+        schema.addProperty("description", new StringSchema().example("Creee via Gateway"));
+        schema.addProperty("active", new Schema<Boolean>().type("boolean").example(true));
+        schema.addProperty("createdAt", new StringSchema().format("date-time").example("2026-06-01T08:00:00Z"));
+        schema.addProperty("updatedAt", new StringSchema().format("date-time").example("2026-06-01T08:00:00Z"));
+        return schema;
+    }
+
+    private Schema<?> g4MissionSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Mission G4 routee via la Gateway.");
+        schema.addProperty("id", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("vehiculeId", new StringSchema().example("VH-G10-G4-001"));
+        schema.addProperty("chauffeurId", new StringSchema().example("driver-demo"));
+        schema.addProperty("ligneId", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("trajetId", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("affectationId", new IntegerSchema().format("int64").example(1));
+        schema.addProperty("statut", new StringSchema().example("PLANIFIEE"));
+        schema.addProperty("plannedStart", new StringSchema().format("date-time").example("2026-06-01T08:00:00Z"));
+        schema.addProperty("notes", new StringSchema().example("Mission creee via Gateway"));
+        return schema;
+    }
+
+    private Schema<?> g7VehiculeSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Vehicule G7 route via la Gateway.");
+        schema.addProperty("id", new StringSchema().format("uuid").example("53c31262-591a-44d4-8872-51e84611ac5e"));
+        schema.addProperty("immatriculation", new StringSchema().example("BUS-G10-G7-DEMO"));
+        schema.addProperty("type", new StringSchema().example("BUS"));
+        schema.addProperty("ligne", new StringSchema().example("L1"));
+        schema.addProperty("statut", new StringSchema().example("DISPONIBLE"));
+        schema.addProperty("conducteurId", new StringSchema().format("uuid").example("550e8400-e29b-41d4-a716-446655440000"));
+        return schema;
+    }
+
+    private Schema<?> g7PositionSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Position GPS G7 routee via la Gateway.");
+        schema.addProperty("id", new StringSchema().format("uuid").example("98de3c7b-73a2-44a3-9020-0f760bfb3fd1"));
+        schema.addProperty("vehiculeId", new StringSchema().format("uuid").example("53c31262-591a-44d4-8872-51e84611ac5e"));
+        schema.addProperty("latitude", new NumberSchema().format("double").example(36.7372));
+        schema.addProperty("longitude", new NumberSchema().format("double").example(3.0865));
+        schema.addProperty("vitesse", new NumberSchema().format("double").example(45.5));
+        schema.addProperty("cap", new NumberSchema().format("double").example(180.0));
+        schema.addProperty("timestamp", new StringSchema().format("date-time").example("2026-06-01T08:00:00Z"));
+        return schema;
+    }
+
     private Schema<?> batchIngestionResponseSchema() {
         Schema<?> schema = new ObjectSchema();
         schema.addProperty("totalReceived", new IntegerSchema().example(1));
@@ -1103,6 +1683,61 @@ public class SwaggerConfig {
                         "phone", "+212611111111",
                         "address", "Rabat",
                         "birthDate", "2000-01-01"));
+    }
+
+    private Map<String, Object> planExample() {
+        return map(
+                "nomPlan", "Pass Mensuel Bus",
+                "description", "Abonnement mensuel bus pour passagers",
+                "prix", 120.0,
+                "duree", "MENSUEL",
+                "categorie", "ROLE_PASSENGER",
+                "transportType", "BUS",
+                "estActif", "ACTIF",
+                "maxDesactivation", 2,
+                "minJoursEntreDesactivation", 7,
+                "maxPeriodeDesactivation", 15);
+    }
+
+    private Map<String, Object> g4LineExample() {
+        return map(
+                "id", 1,
+                "code", "G10-G4-DEMO",
+                "nom", "Ligne integration G10 G4",
+                "description", "Creee via Gateway pour tester la coordination",
+                "active", true);
+    }
+
+    private Map<String, Object> g4MissionExample() {
+        return map(
+                "id", 1,
+                "vehiculeId", "VH-G10-G4-001",
+                "chauffeurId", "driver-demo",
+                "ligneId", 1,
+                "statut", "PLANIFIEE",
+                "plannedStart", "2026-06-01T08:00:00Z",
+                "notes", "Mission creee via Gateway");
+    }
+
+    private Map<String, Object> g7VehicleExample() {
+        return map(
+                "id", "53c31262-591a-44d4-8872-51e84611ac5e",
+                "immatriculation", "BUS-G10-G7-DEMO",
+                "type", "BUS",
+                "ligne", "L1",
+                "statut", "DISPONIBLE",
+                "conducteurId", "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    private Map<String, Object> g7PositionExample() {
+        return map(
+                "id", "98de3c7b-73a2-44a3-9020-0f760bfb3fd1",
+                "vehiculeId", "53c31262-591a-44d4-8872-51e84611ac5e",
+                "latitude", 36.7372,
+                "longitude", 3.0865,
+                "vitesse", 45.5,
+                "cap", 180.0,
+                "timestamp", "2026-06-01T08:00:00Z");
     }
 
     private Map<String, Object> statSnapshotExample() {

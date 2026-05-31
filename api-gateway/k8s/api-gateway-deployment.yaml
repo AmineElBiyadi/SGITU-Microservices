@@ -1,7 +1,13 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: sgitu
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: g10-api-gateway-secret
+  namespace: sgitu
 type: Opaque
 stringData:
   JWT_SECRET: "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!"
@@ -10,6 +16,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: g10-api-gateway-config
+  namespace: sgitu
 data:
   SPRING_PROFILES_ACTIVE: "docker"
   TOKEN_BLACKLIST_ENABLED: "true"
@@ -24,6 +31,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: g10-api-gateway
+  namespace: sgitu
   labels:
     app: g10-api-gateway
 spec:
@@ -71,6 +79,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: g10-api-gateway
+  namespace: sgitu
 spec:
   type: ClusterIP
   selector:

@@ -1,0 +1,947 @@
+{
+  "info": {
+    "name": "SGITU - G10 Integration G2 G3 G4 G7 G8",
+    "description": "Collection globale pour tester les integrations Client -> G10 -> G2/G3/G4/G7/G8. Elle couvre JWT, RBAC, routage, correlationId, monitoring et resilience.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const now = new Date();",
+          "pm.collectionVariables.set('today', now.toISOString().slice(0, 10));",
+          "pm.collectionVariables.set('isoNow', now.toISOString());",
+          "if (!pm.collectionVariables.get('runId')) { pm.collectionVariables.set('runId', String(Date.now())); }",
+          "pm.collectionVariables.set('testEmail', 'postman.g10.' + pm.collectionVariables.get('runId') + '@sgitu.ma');",
+          "",
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'true') { return; }",
+          "if (typeof CryptoJS === 'undefined') { throw new Error('CryptoJS indisponible dans Postman.'); }",
+          "",
+          "const secret = pm.collectionVariables.get('jwtSecret');",
+          "function b64url(input) {",
+          "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "}",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const nowSec = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: nowSec, exp: nowSec + ttlSeconds, jti: 'g10-int-' + Math.random().toString(36).slice(2) };",
+          "  const unsigned = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header))) + '.' + b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const signature = b64url(CryptoJS.HmacSHA256(unsigned, secret));",
+          "  return unsigned + '.' + signature;",
+          "}",
+          "",
+          "pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "pm.collectionVariables.set('passengerToken', makeJwt('passenger.g10@sgitu.ma', '2', ['ROLE_PASSENGER'], 3600));",
+          "pm.collectionVariables.set('operatorToken', makeJwt('operator.g10@sgitu.ma', '3', ['ROLE_OPERATOR'], 3600));",
+          "pm.collectionVariables.set('staffToken', makeJwt('staff.g10@sgitu.ma', '4', ['ROLE_STAFF'], 3600));",
+          "pm.collectionVariables.set('adminG2Token', makeJwt('admin.g2@sgitu.ma', '202', ['ROLE_ADMIN_G2'], 3600));",
+          "pm.collectionVariables.set('g4OperatorToken', makeJwt('operator.g4@sgitu.ma', '401', ['ROLE_G4_OPERATOR'], 3600));",
+          "pm.collectionVariables.set('dispatcherToken', makeJwt('dispatcher.g4@sgitu.ma', '402', ['ROLE_DISPATCHER'], 3600));",
+          "pm.collectionVariables.set('g4AdminToken', makeJwt('admin.g4@sgitu.ma', '403', ['ROLE_G4_ADMIN'], 3600));",
+          "pm.collectionVariables.set('adminG7Token', makeJwt('admin.g7@sgitu.ma', '705', ['ROLE_ADMIN_G7'], 3600));",
+          "pm.collectionVariables.set('driverToken', makeJwt('driver.g7@sgitu.ma', '704', ['ROLE_DRIVER'], 3600));",
+          "pm.collectionVariables.set('technicianToken', makeJwt('technician.g7@sgitu.ma', '703', ['ROLE_TECHNICIAN'], 3600));",
+          "pm.collectionVariables.set('expiredToken', makeJwt('expired.g10@sgitu.ma', '9', ['ROLE_ADMIN'], -60));",
+          "pm.collectionVariables.set('invalidToken', 'invalid.jwt.token');",
+          "pm.collectionVariables.set('planName', 'Plan G10 Integration ' + pm.collectionVariables.get('runId'));",
+          "pm.collectionVariables.set('lineCode', 'G10-G4-' + pm.collectionVariables.get('runId'));",
+          "pm.collectionVariables.set('vehiclePlate', 'BUS-G10-G7-' + pm.collectionVariables.get('runId'));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "prometheusUrl", "value": "http://localhost:9090" },
+    { "key": "grafanaUrl", "value": "http://localhost:3000" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!" },
+    { "key": "autoGenerateTokens", "value": "true" },
+    { "key": "runId", "value": "" },
+    { "key": "testEmail", "value": "" },
+    { "key": "createdUserId", "value": "1" },
+    { "key": "createdUserToken", "value": "" },
+    { "key": "g2PlanId", "value": "1" },
+    { "key": "g2SubscriptionId", "value": "1" },
+    { "key": "g4LineId", "value": "1" },
+    { "key": "g4MissionId", "value": "1" },
+    { "key": "g7VehicleId", "value": "53c31262-591a-44d4-8872-51e84611ac5e" },
+    { "key": "g7AlertId", "value": "36b01ab6-31f8-47cb-82f4-5ffad4a90b95" },
+    { "key": "reportId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preconditions G10 Monitoring",
+      "item": [
+        {
+          "name": "00.1 - G10 health UP",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/actuator/health" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 Gateway UP', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status UP', function () { pm.expect(pm.response.json().status).to.eql('UP'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.2 - G10 OpenAPI accessible",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/v3/api-docs" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OpenAPI', function () { pm.response.to.have.status(200); });",
+                  "pm.test('paths existent', function () { pm.expect(pm.response.json().paths).to.exist; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.3 - G10 Prometheus metrics accessible",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/actuator/prometheus" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 metrics', function () { pm.response.to.have.status(200); });",
+                  "pm.test('metrics text', function () { pm.expect(pm.response.text()).to.include('jvm'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.4 - Prometheus targets UP",
+          "request": { "method": "GET", "header": [], "url": "{{prometheusUrl}}/api/v1/targets" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 Prometheus API', function () { pm.response.to.have.status(200); });",
+                  "pm.test('G10 target up', function () {",
+                  "  const targets = pm.response.json().data.activeTargets;",
+                  "  const g10 = targets.find(t => t.labels.job === 'g10-api-gateway');",
+                  "  pm.expect(g10).to.exist;",
+                  "  pm.expect(g10.health).to.eql('up');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.5 - Grafana health",
+          "request": { "method": "GET", "header": [], "url": "{{grafanaUrl}}/api/health" },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 Grafana health', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - G3 Utilisateurs via G10",
+      "item": [
+        {
+          "name": "01.1 - Register user public via G10",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g3-register" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"Postman\",\n    \"lastName\": \"Integration\",\n    \"phone\": \"+212600000000\",\n    \"address\": \"Casablanca\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 ou 409 si deja cree', function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) { const j = pm.response.json(); pm.collectionVariables.set('createdUserId', String(j.id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.2 - Login G3 via G10 genere JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g3-login" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 login ou 401 si user deja modifie/supprime', function () { pm.expect([200, 401, 403]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) { const j = pm.response.json(); pm.expect(j.token).to.exist; pm.collectionVariables.set('createdUserToken', j.token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.3 - 401 route G3 protegee sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g3-no-jwt" }],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans JWT', function () { pm.response.to.have.status(401); });",
+                  "pm.test('UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.4 - 401 JWT invalide",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g3-invalid-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 JWT invalide', function () { pm.response.to.have.status(401); });",
+                  "pm.test('INVALID_TOKEN', function () { pm.expect(pm.response.json().code).to.eql('INVALID_TOKEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.5 - 401 JWT expire",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{expiredToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g3-expired-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 JWT expire', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.6 - Get user with admin JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g3-get-user" }
+            ],
+            "url": "{{baseUrl}}/api/users/{{createdUserId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('route G3 atteinte', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('pas bloque Gateway', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - G2 Abonnements via G10",
+      "item": [
+        {
+          "name": "02.1 - List plans public",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g2-list-plans" }],
+            "url": "{{baseUrl}}/api/plans?page=0&size=10"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 plans public', function () { pm.response.to.have.status(200); });",
+                  "pm.test('correlation id', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('int-g2-list-plans'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.2 - 401 create plan sans JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "int-g2-create-no-jwt" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan integration\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans JWT', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.3 - 403 create plan ROLE_PASSENGER",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g2-passenger-forbidden" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan integration\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 role insuffisant', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.4 - Create plan ROLE_ADMIN_G2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminG2Token}}" },
+              { "key": "X-Correlation-Id", "value": "int-g2-create-admin" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan integration G10 G2\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('plan cree ou conflit metier', function () { pm.expect([200, 201, 409]).to.include(pm.response.code); });",
+                  "if ([200, 201].includes(pm.response.code)) { const j = pm.response.json(); if (j.idPlan) pm.collectionVariables.set('g2PlanId', String(j.idPlan)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.5 - Subscribe passenger via G10",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g2-subscribe" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/souscrire?userId=2&planId={{g2PlanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('route G2 atteinte sans blocage G10', function () { pm.expect([200, 201, 400, 404, 409, 502]).to.include(pm.response.code); });",
+                  "pm.test('pas 401/403', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });",
+                  "if ([200, 201].includes(pm.response.code)) { const j = pm.response.json(); if (j.id) pm.collectionVariables.set('g2SubscriptionId', String(j.id)); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - G4 Coordination via G10",
+      "item": [
+        {
+          "name": "03.1 - G4 health public",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g4-health" }],
+            "url": "{{baseUrl}}/api/g4/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 G4 health', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.2 - 401 G4 lignes sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g4-no-jwt" }],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans JWT', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.3 - 403 G4 lignes ROLE_PASSENGER",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g4-passenger-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 role insuffisant', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.4 - G4 lignes ROLE_G4_OPERATOR",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g4-list-lines" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 lecture G4', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.5 - Create ligne ROLE_G4_OPERATOR",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g4-create-line" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{lineCode}}\",\n  \"nom\": \"Ligne integration G10 G4\",\n  \"description\": \"Creee par Postman via Gateway\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 ou 409 ligne', function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) { const j = pm.response.json(); pm.collectionVariables.set('g4LineId', String(j.id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.6 - 403 operator status sans ROLE_G4_ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g4-status-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/v1/operator/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 status admin reserve', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.7 - Operator status ROLE_G4_ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4AdminToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g4-status-admin" }
+            ],
+            "url": "{{baseUrl}}/api/v1/operator/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 status admin', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - G7 Suivi Vehicules via G10",
+      "item": [
+        {
+          "name": "04.1 - 401 G7 vehicules sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g7-no-jwt" }],
+            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans JWT', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.2 - 403 G7 vehicules ROLE_PASSENGER",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g7-passenger-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 role insuffisant', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.3 - G7 vehicules ROLE_OPERATOR",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g7-list-vehicles" }
+            ],
+            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 lecture G7', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.4 - Create vehicle ROLE_ADMIN_G7",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminG7Token}}" },
+              { "key": "X-Correlation-Id", "value": "int-g7-create-vehicle" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"immatriculation\": \"{{vehiclePlate}}\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 ou 409 vehicule', function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) { const j = pm.response.json(); pm.collectionVariables.set('g7VehicleId', String(j.id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.5 - 403 create position ROLE_OPERATOR",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g7-position-forbidden" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
+            },
+            "url": "{{baseUrl}}/api/suivi-vehicules/positions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 operator ne cree pas position', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.6 - Create position ROLE_DRIVER",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{driverToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g7-create-position" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
+            },
+            "url": "{{baseUrl}}/api/suivi-vehicules/positions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('route position G7 atteinte', function () { pm.expect([201, 400, 404]).to.include(pm.response.code); });",
+                  "pm.test('pas bloque Gateway', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - G8 Analytics ML via G10",
+      "item": [
+        {
+          "name": "05.1 - 401 analytics sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g8-no-jwt" }],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 sans JWT', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05.2 - 403 analytics ROLE_PASSENGER",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-passenger-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 role insuffisant', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05.3 - Analytics dashboard ROLE_OPERATOR",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-dashboard" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 analytics', function () { pm.response.to.have.status(200); });",
+                  "pm.test('json array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05.4 - Ingestion tickets ROLE_ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-ingest-tickets" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-1\",\n    \"userId\": \"USR-1\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"status\": \"validated\",\n    \"lineId\": \"L1\",\n    \"stationId\": \"S1\"\n  }\n]"
+            },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 ingestion tickets', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05.5 - Analytics trips summary ROLE_ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-trips-summary" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/trips/summary?period={{today}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 trips summary', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05.6 - ML peak hours ROLE_OPERATOR",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-ml-peak" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 },\n    { \"hour\": 17, \"validationCount\": 180 },\n    { \"hour\": 18, \"validationCount\": 160 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/predict/peak-hours"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 ML peak hours', function () { pm.response.to.have.status(200); });",
+                  "pm.test('prediction payload', function () { pm.expect(pm.response.json()).to.have.property('predicted_peak_hours'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Resilience manuelle Gateway",
+      "item": [
+        {
+          "name": "06.1 - G8 down retourne 503 si service arrete",
+          "description": "Avant ce test: docker stop sgitu-int-g8-analytics. Apres: docker start sgitu-int-g8-analytics.",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "int-g8-down" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('503 si G8 down, 200 si G8 up', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06.2 - G2 down retourne 503 si service arrete",
+          "description": "Avant ce test: docker stop sgitu-int-service-abonnement. Apres: docker start sgitu-int-service-abonnement.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "int-g2-down" }],
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('503 si G2 down, 200 si G2 up', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

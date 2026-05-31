@@ -1,0 +1,530 @@
+{
+  "info": {
+    "name": "SGITU - G10 Gateway x G2 Abonnements",
+    "description": "Tests Postman complets pour verifier la relation G10 -> G2. G10 valide le JWT, applique le RBAC et route /api/plans et /api/abonnements vers G2.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'true') { return; }",
+          "",
+          "const secret = pm.collectionVariables.get('jwtSecret');",
+          "function b64url(input) {",
+          "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "}",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'g2-postman-' + Math.random().toString(36).slice(2) };",
+          "  const unsigned = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header))) + '.' + b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const signature = b64url(CryptoJS.HmacSHA256(unsigned, secret));",
+          "  return unsigned + '.' + signature;",
+          "}",
+          "pm.collectionVariables.set('passengerToken', makeJwt('passenger.g2@sgitu.ma', '101', ['ROLE_PASSENGER'], 3600));",
+          "pm.collectionVariables.set('adminG2Token', makeJwt('admin.g2@sgitu.ma', '202', ['ROLE_ADMIN_G2'], 3600));",
+          "pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "pm.collectionVariables.set('invalidToken', 'invalid.jwt.token');",
+          "pm.collectionVariables.set('planName', 'Pass Mensuel Bus G10-' + Date.now());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!" },
+    { "key": "autoGenerateTokens", "value": "true" },
+    { "key": "passengerToken", "value": "" },
+    { "key": "adminG2Token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "invalidToken", "value": "" },
+    { "key": "planName", "value": "Pass Mensuel Bus G10" },
+    { "key": "g2PlanId", "value": "1" },
+    { "key": "g2SubscriptionId", "value": "1" },
+    { "key": "g2UserId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "00 - Verification Gateway",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Gateway UP', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Health body', function () { pm.expect(pm.response.json().status).to.eql('UP'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.2 - 200 Swagger contient routes G2",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/v3/api-docs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OpenAPI disponible', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Routes G2 documentees', function () {",
+                  "  const paths = pm.response.json().paths;",
+                  "  pm.expect(paths['/api/plans']).to.exist;",
+                  "  pm.expect(paths['/api/abonnements/souscrire']).to.exist;",
+                  "  pm.expect(paths['/api/abonnements/admin/{id}/suspendre']).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Routes publiques G2 via G10",
+      "item": [
+        {
+          "name": "01.1 - 200 list plans public via G10",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g2-list-plans" }
+            ],
+            "url": "{{baseUrl}}/api/plans?page=0&size=10"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Plans publics accessibles sans JWT', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Correlation id retourne', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g2-list-plans'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.2 - 200/404 get plan public via G10",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g2-get-plan" }
+            ],
+            "url": "{{baseUrl}}/api/plans/{{g2PlanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Route publique G2 atteinte', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('Pas bloque par Gateway', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.3 - 200/404 abonnements utilisateur public via G10",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g2-user-subscriptions" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/utilisateur/{{g2UserId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Route lecture abonnement atteinte', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('Pas de 401/403', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Securite et RBAC G2",
+      "item": [
+        {
+          "name": "02.1 - 401 create plan sans JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-create-plan-no-jwt" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan cree via Gateway\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT absent bloque par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.2 - 401 create plan JWT invalide",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-create-plan-invalid-jwt" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan cree via Gateway\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT invalide bloque par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code INVALID_TOKEN', function () { pm.expect(pm.response.json().code).to.eql('INVALID_TOKEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.3 - 403 create plan avec ROLE_PASSENGER",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-create-plan-passenger" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan cree via Gateway\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_PASSENGER refuse', function () { pm.response.to.have.status(403); });",
+                  "pm.test('Code FORBIDDEN', function () { pm.expect(pm.response.json().code).to.eql('FORBIDDEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.4 - 403 admin general sans ROLE_ADMIN_G2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-create-plan-admin-general" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan cree via Gateway\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_ADMIN seul refuse pour G2 admin', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Administration G2 avec ROLE_ADMIN_G2",
+      "item": [
+        {
+          "name": "03.1 - 200 create plan ROLE_ADMIN_G2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminG2Token}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-create-plan-admin-g2" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}}\",\n  \"description\": \"Plan cree via G10 pour test Postman\",\n  \"prix\": 120.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Plan cree via G10 -> G2', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Stocker idPlan', function () {",
+                  "  const body = pm.response.json();",
+                  "  if (body.idPlan) pm.collectionVariables.set('g2PlanId', String(body.idPlan));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.2 - 200 update plan ROLE_ADMIN_G2",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminG2Token}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-update-plan-admin-g2" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPlan\": \"{{planName}} Updated\",\n  \"description\": \"Plan mis a jour via G10\",\n  \"prix\": 135.0,\n  \"duree\": \"MENSUEL\",\n  \"categorie\": \"ROLE_PASSENGER\",\n  \"transportType\": \"BUS\",\n  \"estActif\": \"ACTIF\",\n  \"maxDesactivation\": 2,\n  \"minJoursEntreDesactivation\": 7,\n  \"maxPeriodeDesactivation\": 15\n}"
+            },
+            "url": "{{baseUrl}}/api/plans/{{g2PlanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Plan mis a jour ou absent selon DB', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('Pas bloque par G10', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.3 - 403 suspendre abonnement avec ROLE_PASSENGER",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-suspend-passenger" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/admin/{{g2SubscriptionId}}/suspendre?motif=test-rbac"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_PASSENGER refuse sur admin abonnement', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.4 - 200/400/404/409 suspendre abonnement ROLE_ADMIN_G2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminG2Token}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-suspend-admin-g2" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/admin/{{g2SubscriptionId}}/suspendre?motif=test-admin-g2"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Route admin G2 atteinte', function () { pm.expect([200, 400, 404, 409, 502]).to.include(pm.response.code); });",
+                  "pm.test('Pas bloque par G10', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Abonnements et callbacks",
+      "item": [
+        {
+          "name": "04.1 - 401 souscrire sans JWT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g2-subscribe-no-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/souscrire?userId={{g2UserId}}&planId={{g2PlanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Souscription protegee par JWT', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.2 - 201/400/404/502 souscrire avec ROLE_PASSENGER",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-subscribe-passenger" }
+            ],
+            "url": "{{baseUrl}}/api/abonnements/souscrire?userId={{g2UserId}}&planId={{g2PlanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Gateway route vers G2', function () { pm.expect([201, 400, 404, 409, 502]).to.include(pm.response.code); });",
+                  "pm.test('Pas bloque par G10', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });",
+                  "if (pm.response.code === 201 && pm.response.json().id) { pm.collectionVariables.set('g2SubscriptionId', String(pm.response.json().id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.3 - 200/404 callback paiement public",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-payment-callback" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionToken\": \"tx-demo-g10-g2\",\n  \"status\": \"SUCCESS\",\n  \"message\": \"Paiement accepte\"\n}"
+            },
+            "url": "{{baseUrl}}/api/abonnements/paiement/confirmation"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Callback public route vers G2', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('Pas de JWT requis', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.4 - 200/404 callback remboursement public",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g2-refund-callback" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"refund-demo-g10-g2\",\n  \"statut\": \"REMBOURSE\",\n  \"montantRembourse\": 25.0,\n  \"motif\": \"Annulation test\"\n}"
+            },
+            "url": "{{baseUrl}}/api/abonnements/remboursement/confirmation"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Callback remboursement route vers G2', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "pm.test('Pas de JWT requis', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Resilience manuelle",
+      "item": [
+        {
+          "name": "05.1 - 503 G2 indisponible via G10",
+          "description": "Pour ce test, arreter le conteneur service-abonnement puis executer la requete. Commande: docker stop service-abonnement",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g2-down" }
+            ],
+            "url": "{{baseUrl}}/api/plans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Si G2 est arrete, G10 retourne 503', function () {",
+                  "  if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }",
+                  "  else { pm.expect(pm.response.code).to.eql(200); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

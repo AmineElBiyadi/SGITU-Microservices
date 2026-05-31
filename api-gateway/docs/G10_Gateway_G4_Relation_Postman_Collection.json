@@ -1,0 +1,521 @@
+{
+  "info": {
+    "name": "SGITU - G10 Gateway x G4 Coordination",
+    "description": "Tests Postman complets pour verifier la relation G10 -> G4. G10 valide le JWT, applique le RBAC G4 et route /api/g4/** et /api/v1/operator/status vers le service Coordination.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'true') { return; }",
+          "",
+          "const secret = pm.collectionVariables.get('jwtSecret');",
+          "function b64url(input) {",
+          "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "}",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'g4-postman-' + Math.random().toString(36).slice(2) };",
+          "  const unsigned = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header))) + '.' + b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const signature = b64url(CryptoJS.HmacSHA256(unsigned, secret));",
+          "  return unsigned + '.' + signature;",
+          "}",
+          "pm.collectionVariables.set('passengerToken', makeJwt('passenger.g4@sgitu.ma', '301', ['ROLE_PASSENGER'], 3600));",
+          "pm.collectionVariables.set('g4OperatorToken', makeJwt('operator.g4@sgitu.ma', '401', ['ROLE_G4_OPERATOR'], 3600));",
+          "pm.collectionVariables.set('dispatcherToken', makeJwt('dispatcher.g4@sgitu.ma', '402', ['ROLE_DISPATCHER'], 3600));",
+          "pm.collectionVariables.set('g4AdminToken', makeJwt('admin.g4@sgitu.ma', '403', ['ROLE_G4_ADMIN'], 3600));",
+          "pm.collectionVariables.set('expiredToken', makeJwt('expired.g4@sgitu.ma', '499', ['ROLE_G4_ADMIN'], -60));",
+          "pm.collectionVariables.set('invalidToken', 'invalid.jwt.token');",
+          "pm.collectionVariables.set('lineCode', 'G10-G4-' + Date.now());",
+          "pm.collectionVariables.set('lineName', 'Ligne integration G10 G4');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!" },
+    { "key": "autoGenerateTokens", "value": "true" },
+    { "key": "passengerToken", "value": "" },
+    { "key": "g4OperatorToken", "value": "" },
+    { "key": "dispatcherToken", "value": "" },
+    { "key": "g4AdminToken", "value": "" },
+    { "key": "expiredToken", "value": "" },
+    { "key": "invalidToken", "value": "" },
+    { "key": "lineCode", "value": "G10-G4-DEMO" },
+    { "key": "lineName", "value": "Ligne integration G10 G4" },
+    { "key": "g4LineId", "value": "1" },
+    { "key": "g4MissionId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "00 - Verification Gateway et G4",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Gateway UP', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Health UP', function () { pm.expect(pm.response.json().status).to.eql('UP'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.2 - 200 health G4 via G10 public",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g4-health" }
+            ],
+            "url": "{{baseUrl}}/api/g4/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G4 health route via G10', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Correlation id propage', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g4-health'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.3 - 200 logs G4 via G10 public",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g4-logs" }
+            ],
+            "url": "{{baseUrl}}/api/g4/logs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G4 logs accessibles via G10', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reponse JSON', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Securite JWT G10 avant G4",
+      "item": [
+        {
+          "name": "01.1 - 401 lecture lignes sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g4-no-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT absent bloque par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.2 - 401 lecture lignes JWT invalide",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-invalid-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT invalide bloque par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code INVALID_TOKEN', function () { pm.expect(pm.response.json().code).to.eql('INVALID_TOKEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.3 - 401 lecture lignes JWT expire",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{expiredToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-expired-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT expire bloque par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Erreur de securite JSON', function () { pm.expect(pm.response.json().code).to.exist; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - RBAC lecture G4",
+      "item": [
+        {
+          "name": "02.1 - 403 ROLE_PASSENGER sur lecture lignes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-passenger-read" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_PASSENGER refuse par G10', function () { pm.response.to.have.status(403); });",
+                  "pm.test('Code FORBIDDEN', function () { pm.expect(pm.response.json().code).to.eql('FORBIDDEN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.2 - 200 ROLE_G4_OPERATOR lecture lignes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-operator-read" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_G4_OPERATOR peut lire G4', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reponse liste JSON', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.3 - 200 ROLE_DISPATCHER lecture missions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-dispatcher-read" }
+            ],
+            "url": "{{baseUrl}}/api/g4/missions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_DISPATCHER peut lire les missions', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Reponse liste JSON', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.4 - 403 operator status sans ROLE_G4_ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-status-operator" }
+            ],
+            "url": "{{baseUrl}}/api/v1/operator/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status supervision reserve a ROLE_G4_ADMIN', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02.5 - 200 operator status avec ROLE_G4_ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4AdminToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-status-admin" }
+            ],
+            "url": "{{baseUrl}}/api/v1/operator/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ROLE_G4_ADMIN peut consulter le statut operateur', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - RBAC ecriture reseau G4",
+      "item": [
+        {
+          "name": "03.1 - 403 ROLE_DISPATCHER creation ligne",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-dispatcher-create-line" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{lineCode}}-FORBIDDEN\",\n  \"nom\": \"Ligne interdite dispatcher\",\n  \"description\": \"Doit etre refuse par G10\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DISPATCHER ne gere pas les lignes', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.2 - 201 ROLE_G4_OPERATOR creation ligne",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-operator-create-line" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{lineCode}}\",\n  \"nom\": \"{{lineName}}\",\n  \"description\": \"Creee via G10 pour tester G4\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Ligne creee via G10 -> G4', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Stocker id ligne', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.exist;",
+                  "  pm.collectionVariables.set('g4LineId', String(body.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03.3 - 200 ROLE_G4_OPERATOR lecture ligne creee",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-get-created-line" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes/{{g4LineId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Ligne creee retrouvee', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Meme id', function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get('g4LineId')); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - RBAC flotte G4",
+      "item": [
+        {
+          "name": "04.1 - 403 ROLE_G4_OPERATOR creation mission",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-operator-create-mission" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculeId\": \"VH-G10-G4-001\",\n  \"ligneId\": {{g4LineId}},\n  \"statut\": \"PLANIFIEE\",\n  \"notes\": \"Doit etre refuse pour operator\"\n}"
+            },
+            "url": "{{baseUrl}}/api/g4/missions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G4_OPERATOR ne cree pas mission', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.2 - 201 ROLE_DISPATCHER creation mission",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-dispatcher-create-mission" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehiculeId\": \"VH-G10-G4-001\",\n  \"chauffeurId\": \"driver-demo\",\n  \"ligneId\": {{g4LineId}},\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-06-01T08:00:00Z\",\n  \"notes\": \"Mission creee via Gateway\"\n}"
+            },
+            "url": "{{baseUrl}}/api/g4/missions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mission creee via G10 -> G4', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Stocker id mission', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.id).to.exist;",
+                  "  pm.collectionVariables.set('g4MissionId', String(body.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04.3 - 200 ROLE_DISPATCHER status mission",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-dispatcher-mission-status" }
+            ],
+            "url": "{{baseUrl}}/api/g4/missions/{{g4MissionId}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status mission lu via Gateway', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Mission id coherent', function () { pm.expect(String(pm.response.json().missionId)).to.eql(pm.collectionVariables.get('g4MissionId')); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Resilience manuelle G4",
+      "item": [
+        {
+          "name": "05.1 - 503 G4 indisponible via G10",
+          "description": "Pour ce test, arreter le conteneur G4 puis executer la requete. Commande: docker stop sgitu-int-g4-coordination",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{g4OperatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g4-down" }
+            ],
+            "url": "{{baseUrl}}/api/g4/lignes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Si G4 est arrete, G10 retourne 503; sinon 200', function () {",
+                  "  if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }",
+                  "  else { pm.expect(pm.response.code).to.eql(200); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

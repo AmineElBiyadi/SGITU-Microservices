@@ -258,8 +258,11 @@ G3 & DELETE & \texttt{/api/users/\{id\}} & \texttt{ROLE\_ADMIN} & Suppression ut
 G1 & GET, POST, PUT, DELETE & \texttt{/api/v1/tickets/**} & JWT & Billetterie dematerialisee. \\
 G1 & GET, POST, PUT, DELETE & \texttt{/api/v1/admin/**} & \texttt{ROLE\_ADMIN} & Administration billetterie. \\
 \rowcolor{lightgray}
-G2 & GET, POST, PUT, DELETE & \texttt{/api/abonnements/**} & JWT & Gestion des abonnements. \\
-G2 & GET, POST, PUT, DELETE & \texttt{/api/plans/**} & JWT & Plans d'abonnement. \\
+G2 & GET & \texttt{/api/abonnements/**} & Public selon contrat G2 & Consultation des abonnements. \\
+G2 & POST, PUT, DELETE & \texttt{/api/abonnements/**} & JWT & Gestion du cycle de vie des abonnements. \\
+\rowcolor{lightgray}
+G2 & GET & \texttt{/api/plans/**} & Public & Consultation des plans d'abonnement. \\
+G2 & POST, PUT, DELETE & \texttt{/api/plans/**} & \texttt{ROLE\_ADMIN\_G2} & Administration des plans d'abonnement. \\
 \rowcolor{lightgray}
 G4 & GET, POST, PUT, DELETE & \texttt{/api/g4/**} & JWT & Coordination des transports. \\
 G4 & GET & \texttt{/api/v1/operator/status} & JWT & Statut operationnel. \\
@@ -475,6 +478,7 @@ Les tests Postman principaux se trouvent dans :
 \begin{lstlisting}[style=codeStyle]
 docs/G10_G3_G8_Integration_Postman_Collection.json
 docs/G10_Gateway_G3_Relation_Postman_Collection.json
+docs/G10_Gateway_G2_Relation_Postman_Collection.json
 docs/G10_Gateway_G8_Relation_Postman_Collection.json
 \end{lstlisting}
 
