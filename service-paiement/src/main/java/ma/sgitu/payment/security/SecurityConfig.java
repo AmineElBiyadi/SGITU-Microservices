@@ -1,6 +1,7 @@
 package ma.sgitu.payment.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,11 +18,13 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
 
+    @Value("${security.require-https:false}")
+    private boolean requireHttps;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .requiresChannel(channel -> channel.anyRequest().requiresSecure())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -33,6 +36,10 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        if (requireHttps) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
 
         return http.build();
     }

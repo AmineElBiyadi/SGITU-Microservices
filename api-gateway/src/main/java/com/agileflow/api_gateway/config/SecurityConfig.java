@@ -55,6 +55,8 @@ public class SecurityConfig {
                         ).permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/users").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/g4/health", "/api/g4/logs").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/notifications/health").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/plans", "/api/plans/*").permitAll()
                         .pathMatchers(HttpMethod.GET, "/api/abonnements/**").permitAll()
                         .pathMatchers(
@@ -85,6 +87,7 @@ public class SecurityConfig {
                                 "/api/v1/analytics/**",
                                 "/predict/**"
                         ).hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR", "ROLE_STAFF")
+                        .pathMatchers("/api/notifications/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/v1/operator/status")
                                 .hasAuthority("ROLE_G4_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/v1/**", "/api/g4/**")

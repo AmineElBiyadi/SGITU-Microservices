@@ -1,0 +1,580 @@
+{
+  "info": {
+    "name": "SGITU - G10 Gateway x G6 Paiement",
+    "description": "Collection Postman complete pour verifier la relation Client -> G10 -> G6 Paiement. Elle couvre health public, JWT, routage, comptes de paiement, transactions, factures, remboursements, erreurs 400/401 et resilience 503.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const secret = pm.collectionVariables.get('jwtSecret') || 'SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!';",
+          "function b64url(input) { return CryptoJS.enc.Base64.stringify(input).replace(/=+$/,'').replace(/\\+/g,'-').replace(/\\//g,'_'); }",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'g6-postman-' + Math.random().toString(36).slice(2) };",
+          "  const h = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "  const p = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const s = b64url(CryptoJS.HmacSHA256(h + '.' + p, secret));",
+          "  return h + '.' + p + '.' + s;",
+          "}",
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'false') {",
+          "  pm.collectionVariables.set('passengerToken', makeJwt('passenger.g6@sgitu.ma', '6', ['ROLE_PASSENGER'], 3600));",
+          "  pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "  pm.collectionVariables.set('expiredToken', makeJwt('expired.g6@sgitu.ma', '99', ['ROLE_PASSENGER'], -60));",
+          "  pm.collectionVariables.set('invalidToken', pm.collectionVariables.get('passengerToken') + 'invalid');",
+          "}",
+          "if (!pm.collectionVariables.get('runId')) { pm.collectionVariables.set('runId', Date.now().toString()); }",
+          "pm.collectionVariables.set('sourceId', pm.collectionVariables.get('runId').slice(-6));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "g6DirectUrl", "value": "http://localhost:8086", "type": "string" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!", "type": "string" },
+    { "key": "autoGenerateTokens", "value": "true", "type": "string" },
+    { "key": "passengerToken", "value": "", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "expiredToken", "value": "", "type": "string" },
+    { "key": "invalidToken", "value": "", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" },
+    { "key": "sourceId", "value": "1001", "type": "string" },
+    { "key": "paymentId", "value": "1", "type": "string" },
+    { "key": "refundId", "value": "1", "type": "string" },
+    { "key": "paymentAccountId", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preconditions G10 et G6",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G10 UP', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body contains UP', function () { pm.expect(pm.response.text()).to.include('UP'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "g10-g6-health-gateway" }],
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "00.2 - 200 health G6 via G10 public",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G6 health via G10', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Payment service UP', function () { pm.expect(pm.response.text()).to.include('UP'); });",
+                  "pm.test('Correlation id returned', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g6-health'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "g10-g6-health" }],
+            "url": "{{baseUrl}}/api/health"
+          }
+        },
+        {
+          "name": "00.3 - 200 OpenAPI G10 contient routes G6",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OpenAPI accessible', function () { pm.response.to.have.status(200); });",
+                  "pm.test('G6 paths documented/routed', function () { const text = pm.response.text(); pm.expect(text).to.include('/api/payments'); pm.expect(text).to.include('/api/payment-accounts'); });"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/v3/api-docs" }
+        }
+      ]
+    },
+    {
+      "name": "01 - Securite JWT avant G6",
+      "item": [
+        {
+          "name": "01.1 - 401 payments sans JWT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sans JWT refuse par G10', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code coherent', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "g10-g6-no-jwt" }],
+            "url": "{{baseUrl}}/api/payments/1"
+          }
+        },
+        {
+          "name": "01.2 - 401 payments JWT invalide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT invalide refuse', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code coherent', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-invalid-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/payments/1"
+          }
+        },
+        {
+          "name": "01.3 - 401 payments JWT expire",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('JWT expire refuse', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Code coherent', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{expiredToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-expired-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/payments/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Donnees de test G6 via G10",
+      "item": [
+        {
+          "name": "02.1 - 200 test cards ROLE_PASSENGER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Test cards accessibles avec JWT', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Array response', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-test-cards" }
+            ],
+            "url": "{{baseUrl}}/api/test-cards"
+          }
+        },
+        {
+          "name": "02.2 - 200 test mobile money ROLE_PASSENGER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Test mobile money accessible avec JWT', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Array response', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-test-mobile-money" }
+            ],
+            "url": "{{baseUrl}}/api/test-mobile-money-accounts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Comptes paiement G6 via G10",
+      "item": [
+        {
+          "name": "03.1 - 200 list payment accounts user 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Accounts user 1 accessibles', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Save first account id', function () { const arr = pm.response.json(); pm.expect(arr).to.be.an('array'); if (arr.length > 0) { pm.collectionVariables.set('paymentAccountId', String(arr[0].id)); } });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-accounts-user" }
+            ],
+            "url": "{{baseUrl}}/api/payment-accounts/user/1"
+          }
+        },
+        {
+          "name": "03.2 - 200 get payment account by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account found', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Contains paymentToken', function () { pm.expect(pm.response.json()).to.have.property('paymentToken'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-account-by-id" }
+            ],
+            "url": "{{baseUrl}}/api/payment-accounts/id/{{paymentAccountId}}"
+          }
+        },
+        {
+          "name": "03.3 - 400 add card invalide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Carte invalide refusee', function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-add-card-invalid" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 6,\n  \"cardNumber\": \"1234567890123\",\n  \"cvv\": \"000\",\n  \"expiryMonth\": 12,\n  \"expiryYear\": 2027,\n  \"email\": \"passenger.g6@sgitu.ma\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payment-accounts/card"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Paiements et factures G6 via G10",
+      "item": [
+        {
+          "name": "04.1 - 200 payments user 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payments user 1 accessibles', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Save first payment id', function () { const arr = pm.response.json(); pm.expect(arr).to.be.an('array'); if (arr.length > 0) { pm.collectionVariables.set('paymentId', String(arr[0].paymentId || arr[0].id)); } });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-payments-user" }
+            ],
+            "url": "{{baseUrl}}/api/payments/user/1"
+          }
+        },
+        {
+          "name": "04.2 - 200 payment by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment found', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Payment details body', function () { pm.expect(pm.response.json()).to.be.an('object'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-payment-by-id" }
+            ],
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}"
+          }
+        },
+        {
+          "name": "04.3 - 200 invoice by payment id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invoice found or business error', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-invoice-by-payment" }
+            ],
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}/invoice"
+          }
+        },
+        {
+          "name": "04.4 - 201/200 process payment success seeded token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment processed', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "pm.test('Payment response has id/status', function () { const json = pm.response.json(); pm.expect(json).to.have.property('paymentId'); pm.expect(json).to.have.property('status'); pm.collectionVariables.set('paymentId', String(json.paymentId)); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-payment-success" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 6,\n  \"sourceType\": \"TICKET\",\n  \"sourceId\": {{sourceId}},\n  \"amount\": 10.00,\n  \"paymentMethod\": \"CARD\",\n  \"savedPaymentToken\": \"CARD-TOKEN-006\",\n  \"email\": \"passenger.g6@sgitu.ma\",\n  \"description\": \"Paiement test via G10 vers G6\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payments"
+          }
+        },
+        {
+          "name": "04.5 - 200 process payment failed invalid token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Business failure returned cleanly', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test('Status FAILED', function () { pm.expect(pm.response.json().status).to.eql('FAILED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-payment-invalid-token" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 6,\n  \"sourceType\": \"TICKET\",\n  \"sourceId\": 999001,\n  \"amount\": 10.00,\n  \"paymentMethod\": \"CARD\",\n  \"savedPaymentToken\": \"BAD-TOKEN-G10\",\n  \"email\": \"passenger.g6@sgitu.ma\",\n  \"description\": \"Paiement invalide test\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payments"
+          }
+        },
+        {
+          "name": "04.6 - 400 process payment payload invalide",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payload invalide refuse', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-payment-invalid-payload" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 6,\n  \"sourceType\": \"TICKET\",\n  \"sourceId\": 999002,\n  \"amount\": -10.00,\n  \"paymentMethod\": \"CARD\",\n  \"savedPaymentToken\": \"CARD-TOKEN-006\",\n  \"email\": \"not-an-email\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Remboursements G6 via G10",
+      "item": [
+        {
+          "name": "05.1 - 201/200/400 refund payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refund endpoint routed', function () { pm.expect([200, 201, 400, 404]).to.include(pm.response.code); });",
+                  "if ([200, 201].includes(pm.response.code)) { const json = pm.response.json(); if (json.refundId || json.id) { pm.collectionVariables.set('refundId', String(json.refundId || json.id)); } }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-refund" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 5.00,\n  \"reason\": \"Test remboursement via G10\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}/refund"
+          }
+        },
+        {
+          "name": "05.2 - 200/400/404 refunds by payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refund list routed', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-refunds-payment" }
+            ],
+            "url": "{{baseUrl}}/api/refunds/payment/{{paymentId}}"
+          }
+        },
+        {
+          "name": "05.3 - 200 refunds by user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refunds by user accessible', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Array response', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g6-refunds-user" }
+            ],
+            "url": "{{baseUrl}}/api/refunds/user/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Resilience manuelle G6",
+      "item": [
+        {
+          "name": "06.1 - G6 down -> 503 via G10",
+          "description": "Avant ce test manuel : docker stop sgitu-int-payment-service. Si G6 tourne encore, la reponse peut etre 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G6 up ou indisponible gere proprement', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 503) { pm.test('Gateway error code coherent', function () { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "g10-g6-down" }],
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
+    }
+  ]
+}

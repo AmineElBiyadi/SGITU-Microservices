@@ -20,6 +20,8 @@
 #   G2 : http://service-abonnement:8082
 #   G3 : http://user-service:8083
 #   G4 : http://coordination-service:8084
+#   G5 : http://notification-service:8085
+#   G6 : http://payment-service:8086
 #   G7 : http://g7-suivi-vehicules:8087
 #   G8 : http://g8-analytics:8088
 #   ML : http://ml-service:5000
@@ -58,6 +60,10 @@ services:
       service-abonnement:
         condition: service_started
       g4-coordination:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      payment-service:
         condition: service_started
       g7-service:
         condition: service_started
@@ -264,6 +270,135 @@ services:
           - postgres
 
   # ---------------------------------------------------------------------------
+  # G5 - Service Notifications
+  # ---------------------------------------------------------------------------
+  notification-service:
+    build:
+      context: ./service-notification
+      dockerfile: Dockerfile.integration
+    image: sgitu-int/notification-service:latest
+    container_name: sgitu-int-notification-service
+    expose:
+      - "8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      MYSQL_PASSWORD: ${G5_MYSQL_PASSWORD:-notification}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-notification:3306/notifications_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Africa/Casablanca
+      SPRING_DATASOURCE_USERNAME: sgitu
+      SPRING_DATASOURCE_PASSWORD: ${G5_MYSQL_PASSWORD:-notification}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_CONSUMER_GROUP_ID: notification-group
+      MAIL_HOST: ${G5_MAIL_HOST:-localhost}
+      MAIL_PORT: ${G5_MAIL_PORT:-1025}
+      MAIL_USERNAME: ${G5_MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${G5_MAIL_PASSWORD:-}
+      MAIL_FROM: ${G5_MAIL_FROM:-noreply@sgitu.ma}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_PHONE: ${TWILIO_FROM_PHONE:-}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+    depends_on:
+      mysql-notification:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      sgitu-network:
+        aliases:
+          - notification-service
+          - g5-notification-service
+          - service-notification
+    restart: unless-stopped
+
+  mysql-notification:
+    image: mysql:8.0
+    container_name: sgitu-int-mysql-notification
+    expose:
+      - "3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${G5_MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: notifications_db
+      MYSQL_USER: sgitu
+      MYSQL_PASSWORD: ${G5_MYSQL_PASSWORD:-notification}
+    volumes:
+      - sgitu_int_notification_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${G5_MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      sgitu-network:
+        aliases:
+          - mysql-notification
+
+  # ---------------------------------------------------------------------------
+  # G6 - Service Paiement
+  # ---------------------------------------------------------------------------
+  payment-service:
+    build:
+      context: ./service-paiement
+      dockerfile: Dockerfile.integration
+    image: sgitu-int/payment-service:latest
+    container_name: sgitu-int-payment-service
+    expose:
+      - "8086"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8086
+      SERVER_SSL_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: sgitu
+      SPRING_DATASOURCE_PASSWORD: ${G6_MYSQL_PASSWORD:-payment}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SQL_INIT_MODE: always
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      SECURITY_REQUIRE_HTTPS: "false"
+      SUBSCRIPTION_SERVICE_URL: http://service-abonnement:8082
+      TICKET_SERVICE_URL: http://service-billetterie:8081
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      notification-service:
+        condition: service_started
+    networks:
+      sgitu-network:
+        aliases:
+          - payment-service
+          - g6-payment-service
+          - service-paiement
+    restart: unless-stopped
+
+  payment-db:
+    image: mysql:8.0
+    container_name: sgitu-int-payment-db
+    expose:
+      - "3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${G6_MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: sgitu
+      MYSQL_PASSWORD: ${G6_MYSQL_PASSWORD:-payment}
+    volumes:
+      - sgitu_int_payment_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${G6_MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      sgitu-network:
+        aliases:
+          - payment-db
+
+  # ---------------------------------------------------------------------------
   # G7 - Suivi des vehicules
   # ---------------------------------------------------------------------------
   g7-service:
@@ -455,6 +590,8 @@ volumes:
   sgitu_int_users_data:
   sgitu_int_abonnement_data:
   sgitu_int_g4_data:
+  sgitu_int_notification_data:
+  sgitu_int_payment_data:
   sgitu_int_g7_data:
   sgitu_int_g8_mongo_data:
   sgitu_int_grafana_data:

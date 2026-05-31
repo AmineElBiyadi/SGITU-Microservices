@@ -111,6 +111,12 @@ public class SwaggerConfig {
                         .name("G4 - Coordination via Gateway")
                         .description("Lignes, missions et supervision G4 routees par G10 avec RBAC dedie."),
                 new Tag()
+                        .name("G5 - Notifications via Gateway")
+                        .description("Envoi, consultation et administration des notifications G5 routees par G10."),
+                new Tag()
+                        .name("G6 - Paiement via Gateway")
+                        .description("Paiements, moyens de paiement, factures et remboursements G6 routes par G10."),
+                new Tag()
                         .name("G7 - Suivi vehicules via Gateway")
                         .description("Vehicules, positions GPS et alertes G7 routes par G10 avec RBAC dedie."),
                 new Tag()
@@ -157,6 +163,8 @@ public class SwaggerConfig {
                 .addSchemas("PlanAbonnement", planAbonnementSchema())
                 .addSchemas("G4Ligne", g4LigneSchema())
                 .addSchemas("G4Mission", g4MissionSchema())
+                .addSchemas("G5NotificationRequest", g5NotificationRequestSchema())
+                .addSchemas("G5NotificationResponse", g5NotificationResponseSchema())
                 .addSchemas("G7Vehicule", g7VehiculeSchema())
                 .addSchemas("G7Position", g7PositionSchema())
                 .addSchemas("BatchIngestionResponse", batchIngestionResponseSchema())
@@ -208,6 +216,24 @@ public class SwaggerConfig {
                 .addPathItem("/api/g4/missions", g4MissionsPath())
                 .addPathItem("/api/g4/missions/{id}/status", g4MissionStatusPath())
                 .addPathItem("/api/v1/operator/status", g4OperatorStatusPath())
+                .addPathItem("/api/notifications/health", g5HealthPath())
+                .addPathItem("/api/notifications/send", g5SendNotificationPath())
+                .addPathItem("/api/notifications", g5NotificationsPath())
+                .addPathItem("/api/notifications/{notificationId}", g5NotificationByIdPath())
+                .addPathItem("/api/notifications/{notificationId}/retry", g5RetryNotificationPath())
+                .addPathItem("/api/notifications/admin/stats", g5AdminStatsPath())
+                .addPathItem("/api/health", g6HealthPath())
+                .addPathItem("/api/test-cards", g6TestCardsPath())
+                .addPathItem("/api/test-mobile-money-accounts", g6TestMobileMoneyPath())
+                .addPathItem("/api/payment-accounts/user/{userId}", g6PaymentAccountsByUserPath())
+                .addPathItem("/api/payment-accounts/id/{id}", g6PaymentAccountByIdPath())
+                .addPathItem("/api/payment-accounts/card", g6AddCardPath())
+                .addPathItem("/api/payments", g6PaymentsPath())
+                .addPathItem("/api/payments/{paymentId}", g6PaymentByIdPath())
+                .addPathItem("/api/payments/{paymentId}/invoice", g6InvoiceByPaymentPath())
+                .addPathItem("/api/payments/{paymentId}/refund", g6RefundPaymentPath())
+                .addPathItem("/api/refunds/payment/{paymentId}", g6RefundsByPaymentPath())
+                .addPathItem("/api/refunds/user/{userId}", g6RefundsByUserPath())
                 .addPathItem("/api/suivi-vehicules/health", g7HealthPath())
                 .addPathItem("/api/suivi-vehicules/vehicules", g7VehiculesPath())
                 .addPathItem("/api/suivi-vehicules/vehicules/{id}", g7VehiculeByIdPath())
@@ -891,6 +917,312 @@ public class SwaggerConfig {
         return new PathItem().get(operation);
     }
 
+    private PathItem g5HealthPath() {
+        Operation operation = publicOperation(
+                "G5 - Notifications via Gateway",
+                "getG5HealthViaGateway",
+                "Health G5 route vers Notifications",
+                "Verifie l'etat du service G5 via la Gateway. Acces public pour faciliter les tests d'integration."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("G5 disponible", new ObjectSchema(), "g5Health",
+                        map("status", "UP", "timestamp", "2026-05-31T12:00:00")))
+                .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g5SendNotificationPath() {
+        Operation operation = securedOperation(
+                "G5 - Notifications via Gateway",
+                "sendG5NotificationViaGateway",
+                "Send G5 notification",
+                """
+                        Route Gateway vers G5 Notifications (`notification-service:8085`).
+                        Acces : JWT valide. Les endpoints admin G5 sont separement reserves a ROLE_ADMIN.
+                        """
+        ).requestBody(jsonRequest("Notification a envoyer", ref("G5NotificationRequest"), "g5NotificationRequest",
+                        g5NotificationRequestExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("202", jsonResponse("Notification acceptee", ref("G5NotificationResponse"),
+                                "g5NotificationResponse", g5NotificationResponseExample()))
+                        .addApiResponse("400", errorResponse("Payload notification invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g5NotificationsPath() {
+        Operation operation = securedOperation(
+                "G5 - Notifications via Gateway",
+                "listG5NotificationsViaGateway",
+                "List G5 notifications",
+                "Liste paginee des notifications G5. Acces : JWT valide."
+        ).addParametersItem(queryParameter("userId", "Filtre optionnel par utilisateur", "501"))
+                .addParametersItem(queryParameter("status", "Filtre optionnel : PENDING, SENT ou FAILED", "PENDING"))
+                .addParametersItem(queryParameter("sourceService", "Filtre optionnel par service source", "G10_GATEWAY"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Notifications G5", new ObjectSchema(), "g5Notifications",
+                                map("content", List.of(g5NotificationResponseExample()), "totalElements", 1)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g5NotificationByIdPath() {
+        Operation operation = securedOperation(
+                "G5 - Notifications via Gateway",
+                "getG5NotificationByIdViaGateway",
+                "Get G5 notification by id",
+                "Consulte une notification G5 par son identifiant fonctionnel. Acces : JWT valide."
+        ).addParametersItem(pathParameter("notificationId", "Identifiant notification G5", "g10-g5-demo"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Notification G5", ref("G5NotificationResponse"),
+                                "g5NotificationResponse", g5NotificationResponseExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Notification introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g5RetryNotificationPath() {
+        Operation operation = securedOperation(
+                "G5 - Notifications via Gateway",
+                "retryG5NotificationViaGateway",
+                "Retry G5 notification",
+                "Relance une notification G5. Acces : JWT valide."
+        ).addParametersItem(pathParameter("notificationId", "Identifiant notification G5", "g10-g5-demo"))
+                .responses(new ApiResponses()
+                        .addApiResponse("202", jsonResponse("Retry accepte", ref("G5NotificationResponse"),
+                                "g5NotificationResponse", g5NotificationResponseExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Notification introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g5AdminStatsPath() {
+        Operation operation = securedOperation(
+                "G5 - Notifications via Gateway",
+                "getG5AdminStatsViaGateway",
+                "Get G5 admin stats",
+                "Retourne les statistiques G5. Acces : ROLE_ADMIN."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Stats G5", new ObjectSchema(), "g5AdminStats",
+                        map("total", 12, "byStatus", map("PENDING", 2, "SENT", 9, "FAILED", 1))))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G5 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6HealthPath() {
+        Operation operation = publicOperation(
+                "G6 - Paiement via Gateway",
+                "getG6HealthViaGateway",
+                "Health G6 route vers Paiement",
+                "Verifie l'etat du service G6 via la Gateway. Acces public pour les tests d'integration."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("G6 disponible", new StringSchema().example("G6 Payment Service - UP"),
+                        "g6Health", "G6 Payment Service - UP"))
+                .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6TestCardsPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "listG6TestCardsViaGateway",
+                "List G6 test cards",
+                "Retourne les cartes de test G6. Acces : JWT valide."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Cartes de test", arrayOf(new ObjectSchema()), "g6TestCards",
+                        List.of(map("id", 1, "last4", "0366", "provider", "VISA", "balance", 1000.0, "status", "ACTIVE"))))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6TestMobileMoneyPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "listG6TestMobileMoneyViaGateway",
+                "List G6 test mobile money accounts",
+                "Retourne les comptes Mobile Money de test G6. Acces : JWT valide."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Comptes Mobile Money", arrayOf(new ObjectSchema()), "g6MobileMoney",
+                        List.of(map("id", 1, "maskedPhone", "0612****78", "provider", "INWI", "balance", 500.0, "status", "ACTIVE"))))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6PaymentAccountsByUserPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "listG6PaymentAccountsByUserViaGateway",
+                "List G6 payment accounts by user",
+                "Retourne les moyens de paiement enregistres pour un utilisateur. Acces : JWT valide."
+        ).addParametersItem(pathParameter("userId", "Identifiant utilisateur", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Moyens de paiement", arrayOf(new ObjectSchema()), "g6PaymentAccounts",
+                                List.of(g6PaymentAccountExample())))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6PaymentAccountByIdPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "getG6PaymentAccountByIdViaGateway",
+                "Get G6 payment account by id",
+                "Consulte un moyen de paiement G6. Acces : JWT valide."
+        ).addParametersItem(pathParameter("id", "Identifiant du moyen de paiement", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Moyen de paiement", new ObjectSchema(), "g6PaymentAccount",
+                                g6PaymentAccountExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Moyen de paiement introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6AddCardPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "addG6CardViaGateway",
+                "Add G6 card",
+                "Ajoute une carte bancaire de test G6. Acces : JWT valide."
+        ).requestBody(jsonRequest("Carte a ajouter", new ObjectSchema(), "g6AddCard", map(
+                        "userId", 6,
+                        "cardNumber", "5500000000000004",
+                        "cvv", "999",
+                        "expiryMonth", 6,
+                        "expiryYear", 2028,
+                        "email", "passenger.g6@sgitu.ma")))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Carte creee", new ObjectSchema(), "g6PaymentAccount",
+                                g6PaymentAccountExample()))
+                        .addApiResponse("400", errorResponse("Carte invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g6PaymentsPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "processG6PaymentViaGateway",
+                "Process G6 payment",
+                "Cree et traite un paiement G6. Acces : JWT valide."
+        ).requestBody(jsonRequest("Paiement a traiter", new ObjectSchema(), "g6PaymentRequest", g6PaymentRequestExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Paiement traite", new ObjectSchema(), "g6PaymentResponse",
+                                g6PaymentResponseExample("FAILED")))
+                        .addApiResponse("201", jsonResponse("Paiement valide", new ObjectSchema(), "g6PaymentResponseSuccess",
+                                g6PaymentResponseExample("SUCCESS")))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g6PaymentByIdPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "getG6PaymentByIdViaGateway",
+                "Get G6 payment by id",
+                "Consulte un paiement G6 par son ID. Acces : JWT valide."
+        ).addParametersItem(pathParameter("paymentId", "Identifiant paiement", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Paiement", new ObjectSchema(), "g6Payment", g6PaymentDetailsExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Paiement introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6InvoiceByPaymentPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "getG6InvoiceByPaymentViaGateway",
+                "Get G6 invoice by payment",
+                "Retourne la facture associee a un paiement G6. Acces : JWT valide."
+        ).addParametersItem(pathParameter("paymentId", "Identifiant paiement", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Facture", new ObjectSchema(), "g6Invoice",
+                                map("invoiceId", 1, "paymentId", 1, "invoiceNumber", "INV-2026-0001", "amount", 25.0)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Facture introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6RefundPaymentPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "refundG6PaymentViaGateway",
+                "Refund G6 payment",
+                "Demande un remboursement sur un paiement G6. Acces : JWT valide."
+        ).addParametersItem(pathParameter("paymentId", "Identifiant paiement", "1"))
+                .requestBody(jsonRequest("Remboursement", new ObjectSchema(), "g6RefundRequest",
+                        map("amount", 5.0, "reason", "Test remboursement via G10")))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Remboursement cree", new ObjectSchema(), "g6Refund",
+                                map("refundId", 1, "paymentId", 1, "status", "REFUNDED", "amount", 5.0)))
+                        .addApiResponse("400", errorResponse("Remboursement impossible", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g6RefundsByPaymentPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "listG6RefundsByPaymentViaGateway",
+                "List G6 refunds by payment",
+                "Liste les remboursements d'un paiement G6. Acces : JWT valide."
+        ).addParametersItem(pathParameter("paymentId", "Identifiant paiement", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Remboursements", arrayOf(new ObjectSchema()), "g6Refunds",
+                                List.of(map("refundId", 1, "paymentId", 1, "status", "REFUNDED", "amount", 5.0))))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g6RefundsByUserPath() {
+        Operation operation = securedOperation(
+                "G6 - Paiement via Gateway",
+                "listG6RefundsByUserViaGateway",
+                "List G6 refunds by user",
+                "Liste les remboursements d'un utilisateur G6. Acces : JWT valide."
+        ).addParametersItem(pathParameter("userId", "Identifiant utilisateur", "1"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Remboursements utilisateur", arrayOf(new ObjectSchema()), "g6Refunds",
+                                List.of(map("refundId", 1, "paymentId", 1, "status", "REFUNDED", "amount", 5.0))))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G6 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
     private PathItem g7HealthPath() {
         Operation operation = securedOperation(
                 "G7 - Suivi vehicules via Gateway",
@@ -1269,6 +1601,15 @@ public class SwaggerConfig {
                 .schema(new StringSchema().example("2026-05-08"));
     }
 
+    private Parameter queryParameter(String name, String description, String example) {
+        return new Parameter()
+                .name(name)
+                .in("query")
+                .required(false)
+                .description(description)
+                .schema(new StringSchema().example(example));
+    }
+
     private Parameter pathParameter(String name, String description, String example) {
         return new Parameter()
                 .name(name)
@@ -1473,6 +1814,40 @@ public class SwaggerConfig {
         schema.addProperty("statut", new StringSchema().example("PLANIFIEE"));
         schema.addProperty("plannedStart", new StringSchema().format("date-time").example("2026-06-01T08:00:00Z"));
         schema.addProperty("notes", new StringSchema().example("Mission creee via Gateway"));
+        return schema;
+    }
+
+    private Schema<?> g5NotificationRequestSchema() {
+        Schema<?> recipient = new ObjectSchema();
+        recipient.addProperty("userId", new StringSchema().example("501"));
+        recipient.addProperty("email", new StringSchema().format("email").example("passenger.g5@sgitu.ma"));
+        recipient.addProperty("phone", new StringSchema().example("+212600000000"));
+        recipient.addProperty("deviceToken", new StringSchema().example("fcm-token-demo"));
+
+        Schema<?> schema = new ObjectSchema()
+                .description("Payload G5 pour envoyer une notification routee via la Gateway.");
+        schema.addProperty("notificationId", new StringSchema().example("g10-g5-demo"));
+        schema.addProperty("sourceService", new StringSchema().example("G10_GATEWAY"));
+        schema.addProperty("eventType", new StringSchema().example("AUTH_LOGIN_SUCCESS"));
+        schema.addProperty("channel", new StringSchema().example("LOG"));
+        schema.addProperty("priority", new StringSchema().example("NORMAL"));
+        schema.addProperty("recipient", recipient);
+        schema.addProperty("metadata", new MapSchema().example(map(
+                "email", "passenger.g5@sgitu.ma",
+                "source", "Swagger G10-G5")));
+        return schema;
+    }
+
+    private Schema<?> g5NotificationResponseSchema() {
+        Schema<?> schema = new ObjectSchema()
+                .description("Reponse G5 apres acceptation ou consultation d'une notification.");
+        schema.addProperty("notificationId", new StringSchema().example("g10-g5-demo"));
+        schema.addProperty("status", new StringSchema().example("QUEUED"));
+        schema.addProperty("message", new StringSchema().example("Notification prise en charge"));
+        schema.addProperty("channel", new StringSchema().example("LOG"));
+        schema.addProperty("queuedAt", new StringSchema().format("date-time").example("2026-05-31T12:00:00"));
+        schema.addProperty("currentStatus", new StringSchema().example("PENDING"));
+        schema.addProperty("originalSourceService", new StringSchema().example("G10_GATEWAY"));
         return schema;
     }
 
@@ -1717,6 +2092,83 @@ public class SwaggerConfig {
                 "statut", "PLANIFIEE",
                 "plannedStart", "2026-06-01T08:00:00Z",
                 "notes", "Mission creee via Gateway");
+    }
+
+    private Map<String, Object> g5NotificationRequestExample() {
+        return map(
+                "notificationId", "g10-g5-demo",
+                "sourceService", "G10_GATEWAY",
+                "eventType", "AUTH_LOGIN_SUCCESS",
+                "channel", "LOG",
+                "priority", "NORMAL",
+                "recipient", map(
+                        "userId", "501",
+                        "email", "passenger.g5@sgitu.ma"),
+                "metadata", map(
+                        "email", "passenger.g5@sgitu.ma",
+                        "source", "Swagger G10-G5"));
+    }
+
+    private Map<String, Object> g5NotificationResponseExample() {
+        return map(
+                "notificationId", "g10-g5-demo",
+                "status", "QUEUED",
+                "message", "Notification prise en charge",
+                "channel", "LOG",
+                "queuedAt", "2026-05-31T12:00:00");
+    }
+
+    private Map<String, Object> g6PaymentAccountExample() {
+        return map(
+                "id", 1,
+                "userId", 1,
+                "paymentMethod", "CARD",
+                "paymentToken", "CARD-TOKEN-001",
+                "maskedIdentifier", "****0366",
+                "provider", "VISA",
+                "balance", 1000.0,
+                "status", "ACTIVE",
+                "expiryMonth", 12,
+                "expiryYear", 2027);
+    }
+
+    private Map<String, Object> g6PaymentRequestExample() {
+        return map(
+                "userId", 6,
+                "sourceType", "TICKET",
+                "sourceId", 1001,
+                "amount", 10.0,
+                "paymentMethod", "CARD",
+                "savedPaymentToken", "CARD-TOKEN-006",
+                "email", "passenger.g6@sgitu.ma",
+                "description", "Paiement test via G10 vers G6");
+    }
+
+    private Map<String, Object> g6PaymentResponseExample(String status) {
+        boolean success = "SUCCESS".equals(status);
+        return map(
+                "paymentId", 12,
+                "transactionToken", "TXN-2026-DEMO",
+                "status", status,
+                "message", success ? "Paiement valide avec succes" : "Paiement echoue",
+                "invoiceId", success ? 1 : null,
+                "invoiceNumber", success ? "INV-2026-0001" : null,
+                "failureReason", success ? null : "INVALID_TOKEN");
+    }
+
+    private Map<String, Object> g6PaymentDetailsExample() {
+        return map(
+                "paymentId", 1,
+                "userId", 1,
+                "sourceType", "TICKET",
+                "sourceId", 101,
+                "amount", 25.0,
+                "paymentMethod", "CARD",
+                "savedPaymentToken", "CARD-TOKEN-001",
+                "status", "SUCCESS",
+                "transactionToken", "TXN-2026-DEMO",
+                "invoiceId", 1,
+                "invoiceNumber", "INV-2026-0001");
     }
 
     private Map<String, Object> g7VehicleExample() {
