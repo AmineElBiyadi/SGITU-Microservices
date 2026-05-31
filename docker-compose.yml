@@ -40,8 +40,8 @@ services:
       target: runner
 
     container_name: service-abonnement
-    ports:
-      - "8082:8082"
+    expose:
+      - "8082"
     depends_on:
       db-abonnement:
         condition: service_healthy
@@ -57,8 +57,11 @@ services:
       - ANALYSE_SERVICE_URL=${G8_BASE_URL}
       - JWT_SECRET=${JWT_SECRET}
     networks:
-      - sgitu-network
-      - abonnement-db-network
+      sgitu-network:
+        aliases:
+          - service-abonnement
+          - abonnement-service
+      abonnement-db-network: {}
   db-abonnement:
     image: mysql:8.0
     container_name: db-abonnement
@@ -98,8 +101,8 @@ services:
       dockerfile: Dockerfile
     image: g3-user-service:1.0
     container_name: g3-user-service
-    ports:
-      - "8083:8083"
+    expose:
+      - "8083"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://g3-users-db:5432/${users_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${users_DB_USER}
@@ -116,8 +119,11 @@ services:
       redis:
         condition: service_started
     networks:
-      - sgitu-network
-      - users-db-network
+      sgitu-network:
+        aliases:
+          - user-service
+          - g3-user-service
+      users-db-network: {}
   g3-users-db:
     image: postgres:15-alpine
     container_name: g3-users-db
@@ -140,10 +146,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: g3-redis
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     networks:
-      - sgitu-network
+      sgitu-network:
+        aliases:
+          - redis
+          - g3-redis
 
   # ---------------------------------------------------------------
   #  G4 — Service Coordination Transport (port 8084)
@@ -154,8 +163,8 @@ services:
       dockerfile: Dockerfile
     container_name: g4-coordination-service
     hostname: g4-coordination
-    ports:
-      - "8084:8084"
+    expose:
+      - "8084"
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: "8084"
@@ -168,7 +177,7 @@ services:
       SGITU_JWT_SECRET: ${JWT_SECRET:-SGlUVS1HNC1KV1QtU0VDUkVOLURFVl8xMjhCaXRzX19VU0VfRU5WX1ZBUiMjIw==}
       SGITU_G3_URL: http://g3-user-service:8083
       SGITU_G5_URL: http://notification-service:8085
-      SGITU_G10_URL: ${G10_BASE_URL:-http://g10-service:8090}
+      SGITU_G10_URL: ${G10_BASE_URL:-http://api-gateway:8080}
       SGITU_G7_URL: http://g7-service:8087
       SGITU_G1_URL: ${G1_BASE_URL:-http://g1-billetterie:8081}
       SGITU_G9_URL: ${G9_BASE_URL:-http://g9-incidents:8089}
@@ -179,8 +188,11 @@ services:
       kafka:
         condition: service_healthy
     networks:
-      - sgitu-network
-      - g4-db-network
+      sgitu-network:
+        aliases:
+          - coordination-service
+          - g4-coordination
+      g4-db-network: {}
 
   g4-postgres:
     image: postgres:16-alpine
@@ -218,8 +230,8 @@ services:
       dockerfile: Dockerfile
     image: service-suivi-vehicule:1.0.0
     container_name: g7-service
-    ports:
-      - "8087:8087"
+    expose:
+      - "8087"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db-g7:5432/${suivi_vehicule_DB_NAME}
       SPRING_DATASOURCE_USERNAME: ${suivi_vehicule_DB_USER}
@@ -235,8 +247,11 @@ services:
       kafka:
         condition: service_started
     networks:
-      - sgitu-network
-      - g7-db-network
+      sgitu-network:
+        aliases:
+          - g7-suivi-vehicules
+          - g7-service
+      g7-db-network: {}
 
   db-g7:
     image: postgres:15-alpine
@@ -266,8 +281,44 @@ services:
   # ---------------------------------------------------------------
 
   # ---------------------------------------------------------------
-  #  G10 — (ajoutez votre service ici)
+  #  G10 — API Gateway & Securite (seul point d'entree HTTP expose)
   # ---------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: sgitu-g10-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      TOKEN_BLACKLIST_ENABLED: ${TOKEN_BLACKLIST_ENABLED:-true}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-3000}
+      GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-5s}
+      G8_ANALYTICS_URI: ${G8_ANALYTICS_URI:-http://g8-analytics:8088}
+      G8_ML_URI: ${G8_ML_URI:-http://ml-service:5000}
+    depends_on:
+      redis:
+        condition: service_started
+      user-service:
+        condition: service_started
+    networks:
+      sgitu-network:
+        aliases:
+          - api-gateway
+          - g10-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # ---------------------------------------------------------------
   # Observabilité transverse (alignement repo promo — prometheus.yml racine)
@@ -342,6 +393,7 @@ services:
 
 networks:
   sgitu-network:
+    name: sgitu-network
     driver: bridge
   abonnement-db-network:
     driver: bridge

@@ -133,6 +133,7 @@ public class SwaggerConfig {
                 .addSchemas("ApiError", apiErrorSchema())
                 .addSchemas("HealthResponse", healthSchema())
                 .addSchemas("LoginRequest", loginRequestSchema())
+                .addSchemas("RefreshRequest", refreshRequestSchema())
                 .addSchemas("UserRegistrationRequest", userRegistrationRequestSchema())
                 .addSchemas("UserUpdateRequest", userUpdateRequestSchema())
                 .addSchemas("PasswordChangeRequest", passwordChangeRequestSchema())
@@ -156,7 +157,11 @@ public class SwaggerConfig {
         return new Paths()
                 .addPathItem("/actuator/health", healthPath())
                 .addPathItem("/auth/login", loginPath())
+                .addPathItem("/auth/refresh", refreshPath())
+                .addPathItem("/auth/logout", logoutPath())
                 .addPathItem("/api/users", registerPath())
+                .addPathItem("/api/users/roles/{roleName}", usersByRolePath())
+                .addPathItem("/api/users/drivers/ids", driverIdsPath())
                 .addPathItem("/api/users/{id}", userByIdPath())
                 .addPathItem("/api/users/{id}/exists", userExistsPath())
                 .addPathItem("/api/users/{id}/password", changePasswordPath())
@@ -249,10 +254,65 @@ public class SwaggerConfig {
                                 "loginResponse",
                                 map(
                                         "token", "eyJhbGciOiJIUzI1NiJ9...",
+                                        "refreshToken", "550e8400-e29b-41d4-a716-446655440000",
                                         "userId", 1,
                                         "email", "admin.g10@sgitu.ma",
                                         "roles", List.of("ROLE_ADMIN"))))
                         .addApiResponse("401", errorResponse("Identifiants invalides", "UNAUTHORIZED", 401)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem refreshPath() {
+        Operation operation = publicOperation(
+                "G3 - Auth routee",
+                "refreshViaGateway",
+                "Refresh token route vers G3",
+                """
+                        Echange un refresh token opaque stocke dans Redis cote G3 contre
+                        un nouveau couple access token + refresh token. G3 effectue une
+                        rotation du refresh token.
+                        """
+        ).requestBody(jsonRequest(
+                "Refresh token emis par G3",
+                ref("RefreshRequest"),
+                "refreshRequest",
+                map("refreshToken", "550e8400-e29b-41d4-a716-446655440000")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Nouveaux tokens emis par G3",
+                                ref("LoginResponse"),
+                                "refreshResponse",
+                                map(
+                                        "token", "eyJhbGciOiJIUzI1NiJ9...",
+                                        "refreshToken", "7d0f450d-1c6c-4d33-b0a7-bf856d3f21aa",
+                                        "userId", 1,
+                                        "email", "admin.g10@sgitu.ma",
+                                        "roles", List.of("ROLE_ADMIN"))))
+                        .addApiResponse("401", errorResponse("Refresh token invalide ou expire", "UNAUTHORIZED", 401)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem logoutPath() {
+        Operation operation = securedOperation(
+                "G3 - Auth routee",
+                "logoutViaGateway",
+                "Logout route vers G3",
+                """
+                        Revoque le JWT courant dans Redis cote G3. G10 consulte cette
+                        blacklist Redis lorsqu'elle est active afin de refuser les tokens
+                        deja revoques apres logout.
+                        """
+        ).requestBody(jsonRequest(
+                "Refresh token optionnel a revoquer",
+                ref("RefreshRequest"),
+                "logoutRequest",
+                map("refreshToken", "550e8400-e29b-41d4-a716-446655440000")))
+                .responses(new ApiResponses()
+                        .addApiResponse("204", noContentResponse("Deconnexion reussie"))
+                        .addApiResponse("400", errorResponse("Authorization header manquant ou incorrect", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent, invalide ou revoque", "UNAUTHORIZED", 401)));
 
         return new PathItem().post(operation);
     }
@@ -307,6 +367,47 @@ public class SwaggerConfig {
         return new PathItem()
                 .post(createOperation)
                 .get(listOperation);
+    }
+
+    private PathItem usersByRolePath() {
+        Operation operation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "getUsersByRoleViaGateway",
+                "Get users by role",
+                """
+                        Retourne les utilisateurs possedant un role donne.
+                        Acces aligne avec G3 : ROLE_SUPERVISOR ou ROLE_DISPATCHER.
+                        """
+        ).addParametersItem(pathParameter("roleName", "Role recherche", "ROLE_DRIVER"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Liste utilisateurs par role",
+                                arrayOf(ref("UserResponse")),
+                                "usersByRole",
+                                List.of(userExample())))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_SUPERVISOR ou ROLE_DISPATCHER requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem driverIdsPath() {
+        Operation operation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "getDriverIdsViaGateway",
+                "Get driver ids",
+                "Retourne les identifiants des utilisateurs avec ROLE_DRIVER. Acces : JWT valide."
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse(
+                        "Liste des ids chauffeurs",
+                        arrayOf(new IntegerSchema().format("int64").example(1)),
+                        "driverIds",
+                        List.of(1, 2, 3)))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
     }
 
     private PathItem userByIdPath() {
@@ -740,6 +841,12 @@ public class SwaggerConfig {
         return schema;
     }
 
+    private Schema<?> refreshRequestSchema() {
+        Schema<?> schema = new ObjectSchema();
+        schema.addProperty("refreshToken", new StringSchema().example("550e8400-e29b-41d4-a716-446655440000"));
+        return schema;
+    }
+
     private Schema<?> userRegistrationRequestSchema() {
         Schema<?> profile = new ObjectSchema();
         profile.addProperty("firstName", new StringSchema().example("Nouveau"));
@@ -807,6 +914,7 @@ public class SwaggerConfig {
         Schema<?> schema = new ObjectSchema()
                 .description("Reponse retournee par G3 apres authentification.");
         schema.addProperty("token", new StringSchema().example("eyJhbGciOiJIUzI1NiJ9..."));
+        schema.addProperty("refreshToken", new StringSchema().example("550e8400-e29b-41d4-a716-446655440000"));
         schema.addProperty("userId", new IntegerSchema().example(1));
         schema.addProperty("email", new StringSchema().format("email").example("admin.g10@sgitu.ma"));
         schema.addProperty("roles", arrayOf(new StringSchema().example("ROLE_ADMIN")));

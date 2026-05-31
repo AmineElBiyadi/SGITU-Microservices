@@ -37,6 +37,12 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- ===== REDIS: lecture de la blacklist des JWT revoques par G3 ===== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
         <!-- ===== ACTUATOR ===== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

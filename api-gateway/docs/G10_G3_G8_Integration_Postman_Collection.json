@@ -59,6 +59,8 @@
     { "key": "passengerToken", "value": "", "type": "string" },
     { "key": "expiredToken", "value": "", "type": "string" },
     { "key": "createdUserToken", "value": "", "type": "string" },
+    { "key": "createdUserRefreshToken", "value": "", "type": "string" },
+    { "key": "revokedToken", "value": "", "type": "string" },
     { "key": "createdUserId", "value": "1", "type": "string" },
     { "key": "testEmail", "value": "", "type": "string" },
     { "key": "runId", "value": "", "type": "string" },
@@ -156,7 +158,7 @@
           "name": "01.4 - 200 login G3 via G10",
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('G3 returns JWT', function () { const j = pm.response.json(); pm.expect(j.token).to.be.a('string'); pm.collectionVariables.set('createdUserToken', j.token); });"
+            "pm.test('G3 returns JWT and refresh token', function () { const j = pm.response.json(); pm.expect(j.token).to.be.a('string'); pm.expect(j.refreshToken).to.be.a('string'); pm.collectionVariables.set('createdUserToken', j.token); pm.collectionVariables.set('createdUserRefreshToken', j.refreshToken); });"
           ] } }],
           "request": {
             "method": "POST",
@@ -266,6 +268,47 @@
             "pm.test('ROUTE_NOT_FOUND', function () { pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND'); });"
           ] } }],
           "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/api/unknown/integration" }
+        },
+        {
+          "name": "02.7 - 200 refresh token G3 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('G3 rotates refresh token', function () { const j = pm.response.json(); pm.expect(j.token).to.be.a('string'); pm.expect(j.refreshToken).to.be.a('string'); pm.collectionVariables.set('createdUserToken', j.token); pm.collectionVariables.set('createdUserRefreshToken', j.refreshToken); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{createdUserRefreshToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "02.8 - 204 logout G3 via G10",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.collectionVariables.set('revokedToken', pm.collectionVariables.get('adminToken'));"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status 204', function () { pm.response.to.have.status(204); });"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        },
+        {
+          "name": "02.9 - 401 JWT revoque apres logout",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Status 401', function () { pm.response.to.have.status(401); });",
+            "pm.test('TOKEN_REVOKED or INVALID_TOKEN', function () { pm.expect(['TOKEN_REVOKED', 'INVALID_TOKEN']).to.include(pm.response.json().code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{revokedToken}}" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
         }
       ]
     },

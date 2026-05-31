@@ -26,6 +26,8 @@ http://api-gateway:8080
 
 Le JWT est emis par G3 et valide par G10.
 
+Dans l'etat actuel du projet, G3 signe les tokens en HS256 avec un secret partage par variable d'environnement. G10 utilise ce secret uniquement pour verifier la signature. Une evolution finale possible est RS256 : G3 garderait la cle privee et G10 verifierait avec la cle publique.
+
 Claims minimaux :
 
 ```json
@@ -69,10 +71,13 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | POST | `/api/users` | G3 |
 | POST | `/auth/login` | G3 |
 | POST | `/auth/refresh` | G3 |
+| POST | `/auth/logout` | G3, protege par G10 avec JWT valide |
 | POST | `/auth/forgot-password` | G3 |
 | POST | `/auth/reset-password` | G3 |
 | GET | `/auth/verify-email?token=...` | G3 |
 | GET | `/api/users` | G3, protege par G10 avec `ROLE_ADMIN` |
+| GET | `/api/users/roles/{roleName}` | G3, protege par G10 avec `ROLE_SUPERVISOR` ou `ROLE_DISPATCHER` |
+| GET | `/api/users/drivers/ids` | G3, protege par G10 avec JWT valide |
 | PUT | `/api/users/{id}/roles` | G3, protege par G10 avec `ROLE_ADMIN` |
 | PUT | `/api/users/{id}/deactivate` | G3, protege par G10 avec `ROLE_ADMIN` |
 
@@ -97,9 +102,11 @@ Ces endpoints sont **routes vers G3**, pas traites localement par G10.
 | --- | --- | --- |
 | 401 | `UNAUTHORIZED` | JWT absent sur une route protegee |
 | 401 | `INVALID_TOKEN` | JWT invalide, expire ou sans claim role/roles |
+| 401 | `TOKEN_REVOKED` | JWT revoque apres logout et present dans la blacklist Redis G3 |
 | 403 | `FORBIDDEN` | Role insuffisant |
 | 404 | `ROUTE_NOT_FOUND` | Aucune route Gateway ne correspond |
 | 503 | `SERVICE_UNAVAILABLE` | Service cible indisponible |
+| 504 | `GATEWAY_TIMEOUT` | Delai depasse lors de l'appel du microservice cible |
 
 Format :
 
@@ -140,7 +147,22 @@ Les logs contiennent :
 - roles ;
 - `X-Correlation-Id`.
 
-## 10. Ce que G10 ne fait plus
+## 10. Resilience minimale Gateway
+
+G10 configure des timeouts HTTP pour eviter qu'une panne d'un microservice bloque indefiniment le client :
+
+```text
+GATEWAY_CONNECT_TIMEOUT_MS=3000
+GATEWAY_RESPONSE_TIMEOUT=5s
+```
+
+Si le service cible est eteint ou introuvable, G10 retourne une reponse JSON standardisee `503 SERVICE_UNAVAILABLE`. Si le service ne repond pas dans le delai, G10 retourne `504 GATEWAY_TIMEOUT`.
+
+## 11. Blacklist logout
+
+Apres logout, G3 enregistre le JWT revoque dans Redis. Quand `TOKEN_BLACKLIST_ENABLED=true`, G10 consulte Redis avant d'accepter le token. Un token present dans la blacklist est refuse avec `401 TOKEN_REVOKED`.
+
+## 12. Ce que G10 ne fait plus
 
 G10 ne fait plus :
 

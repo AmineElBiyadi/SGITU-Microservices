@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/api/users").permitAll()
                         .pathMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/users").hasAuthority("ROLE_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/users/roles/*")
+                                .hasAnyAuthority("ROLE_SUPERVISOR", "ROLE_DISPATCHER")
                         .pathMatchers(
                                 "/api/users/*/roles",
                                 "/api/users/*/activate",

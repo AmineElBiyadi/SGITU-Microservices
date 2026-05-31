@@ -1,0 +1,28 @@
+@startuml
+title Sequence - Flux G5 vers G8 via G10
+
+autonumber
+participant "G5 Notifications" as G5
+participant "G10 Gateway" as G10
+participant "JWT Auth Filter" as JwtFilter
+participant "G8 Analytics" as G8
+
+G5 -> G10 : POST /api/v1/ingestion/notifications\nAuthorization: Bearer JWT_SERVICE\nX-Correlation-Id
+activate G10
+G10 -> JwtFilter : valider JWT et roles
+
+alt JWT invalide
+  JwtFilter --> G10 : erreur 401
+  G10 --> G5 : 401 Unauthorized
+else JWT valide
+  JwtFilter --> G10 : principal authentifie
+  G10 -> G8 : route evenement notification\nX-User-Id, X-User-Email, X-Roles,\nX-Correlation-Id
+  activate G8
+  G8 --> G10 : 201 Created ou 207 Multi-Status
+  deactivate G8
+  G10 --> G5 : resultat ingestion
+end
+
+deactivate G10
+
+@enduml

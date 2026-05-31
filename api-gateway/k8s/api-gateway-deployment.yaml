@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: g10-api-gateway-secret
+type: Opaque
+stringData:
+  JWT_SECRET: "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: g10-api-gateway-config
+data:
+  SPRING_PROFILES_ACTIVE: "docker"
+  TOKEN_BLACKLIST_ENABLED: "true"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  GATEWAY_CONNECT_TIMEOUT_MS: "3000"
+  GATEWAY_RESPONSE_TIMEOUT: "5s"
+  G8_ANALYTICS_URI: "http://g8-analytics:8088"
+  G8_ML_URI: "http://ml-service:5000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g10-api-gateway
+  labels:
+    app: g10-api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g10-api-gateway
+  template:
+    metadata:
+      labels:
+        app: g10-api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: sgitu-g10-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: g10-api-gateway-config
+            - secretRef:
+                name: g10-api-gateway-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g10-api-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: g10-api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

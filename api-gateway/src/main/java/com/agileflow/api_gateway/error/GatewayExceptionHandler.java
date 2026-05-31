@@ -12,6 +12,8 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.ConnectException;
+import java.net.UnknownHostException;
+import java.util.concurrent.TimeoutException;
 
 @Component
 @Order(-2)
@@ -46,6 +48,14 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             return HttpStatus.SERVICE_UNAVAILABLE;
         }
 
+        if (hasCause(ex, UnknownHostException.class)) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
+
+        if (hasCause(ex, TimeoutException.class) || hasCauseBySimpleName(ex, "ReadTimeoutException")) {
+            return HttpStatus.GATEWAY_TIMEOUT;
+        }
+
         return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
@@ -53,6 +63,17 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
         Throwable current = ex;
         while (current != null) {
             if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean hasCauseBySimpleName(Throwable ex, String simpleName) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current.getClass().getSimpleName().equals(simpleName)) {
                 return true;
             }
             current = current.getCause();
@@ -68,6 +89,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             case UNAUTHORIZED -> "UNAUTHORIZED";
             case FORBIDDEN -> "FORBIDDEN";
             case SERVICE_UNAVAILABLE -> "SERVICE_UNAVAILABLE";
+            case GATEWAY_TIMEOUT -> "GATEWAY_TIMEOUT";
             default -> "GATEWAY_ERROR";
         };
     }
@@ -86,6 +108,7 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
             case UNAUTHORIZED -> "Authentification requise ou token invalide";
             case FORBIDDEN -> "Acces refuse pour ce role";
             case SERVICE_UNAVAILABLE -> "Microservice cible indisponible";
+            case GATEWAY_TIMEOUT -> "Delai depasse lors de l'appel du microservice cible";
             default -> "Erreur technique au niveau de la gateway";
         };
     }
