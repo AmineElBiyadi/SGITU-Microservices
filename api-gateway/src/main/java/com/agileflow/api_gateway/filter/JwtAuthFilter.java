@@ -3,6 +3,7 @@ package com.agileflow.api_gateway.filter;
 import com.agileflow.api_gateway.error.ApiErrorWriter;
 import com.agileflow.api_gateway.security.JwtPrincipal;
 import com.agileflow.api_gateway.service.JwtService;
+import com.agileflow.api_gateway.service.TokenRevocationService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +24,7 @@ import java.util.List;
 public class JwtAuthFilter implements WebFilter {
 
     private final JwtService jwtService;
+    private final TokenRevocationService tokenRevocationService;
     private final ApiErrorWriter errorWriter;
 
     @Override
@@ -33,32 +35,44 @@ public class JwtAuthFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        try {
-            Claims claims = jwtService.validateAndExtractClaims(token);
-            String email = claims.getSubject();
-            String userId = jwtService.extractUserId(claims);
-            List<SimpleGrantedAuthority> authorities = jwtService.extractRoles(claims)
-                    .stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
+        return tokenRevocationService.isRevoked(token)
+                .flatMap(revoked -> {
+                    if (revoked) {
+                        return errorWriter.write(
+                                exchange,
+                                HttpStatus.UNAUTHORIZED,
+                                "TOKEN_REVOKED",
+                                "JWT revoque apres logout"
+                        );
+                    }
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            new JwtPrincipal(userId, email),
-                            token,
-                            authorities
-                    );
+                    try {
+                        Claims claims = jwtService.validateAndExtractClaims(token);
+                        String email = claims.getSubject();
+                        String userId = jwtService.extractUserId(claims);
+                        List<SimpleGrantedAuthority> authorities = jwtService.extractRoles(claims)
+                                .stream()
+                                .map(SimpleGrantedAuthority::new)
+                                .toList();
 
-            return chain.filter(exchange)
-                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
-        } catch (Exception ignored) {
-            return errorWriter.write(
-                    exchange,
-                    HttpStatus.UNAUTHORIZED,
-                    "INVALID_TOKEN",
-                    "JWT invalide ou expire"
-            );
-        }
+                        UsernamePasswordAuthenticationToken auth =
+                                new UsernamePasswordAuthenticationToken(
+                                        new JwtPrincipal(userId, email),
+                                        token,
+                                        authorities
+                                );
+
+                        return chain.filter(exchange)
+                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                    } catch (Exception ignored) {
+                        return errorWriter.write(
+                                exchange,
+                                HttpStatus.UNAUTHORIZED,
+                                "INVALID_TOKEN",
+                                "JWT invalide ou expire"
+                        );
+                    }
+                });
     }
 
     public String extractToken(ServerWebExchange exchange) {

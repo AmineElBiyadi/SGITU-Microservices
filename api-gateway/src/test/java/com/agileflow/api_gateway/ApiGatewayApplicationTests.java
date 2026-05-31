@@ -102,6 +102,31 @@ class ApiGatewayApplicationTests {
     }
 
     @Test
+    void g3RoleLookupRequiresSupervisorOrDispatcher() {
+        webTestClient.get()
+                .uri("/api/users/roles/ROLE_DRIVER")
+                .headers(headers -> headers.setBearerAuth(jwt("operator@sgitu.ma", "ROLE_OPERATOR", "12")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/users/roles/ROLE_DRIVER")
+                .headers(headers -> headers.setBearerAuth(jwt("supervisor@sgitu.ma", "ROLE_SUPERVISOR", "13")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+    }
+
+    @Test
+    void g3LogoutRequiresJwtBecauseItRevokesCurrentAccessToken() {
+        webTestClient.post()
+                .uri("/auth/logout")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("UNAUTHORIZED");
+    }
+
+    @Test
     void g2AdminRoutesRequireRoleAdminFromJwtClaims() {
         webTestClient.post()
                 .uri("/api/abonnements/admin/1/suspendre?motif=test")
@@ -152,8 +177,12 @@ class ApiGatewayApplicationTests {
                 .jsonPath("$.info.title").isEqualTo("SGITU - API Gateway G10")
                 .jsonPath("$.components.securitySchemes.bearerAuth.type").isEqualTo("http")
                 .jsonPath("$.components.securitySchemes.bearerAuth.scheme").isEqualTo("bearer")
+                .jsonPath("$.paths['/auth/refresh'].post.summary").isEqualTo("Refresh token route vers G3")
+                .jsonPath("$.paths['/auth/logout'].post.summary").isEqualTo("Logout route vers G3")
                 .jsonPath("$.paths['/api/users'].post.summary").isEqualTo("Create user route vers G3")
                 .jsonPath("$.paths['/api/users'].get.summary").isEqualTo("List users")
+                .jsonPath("$.paths['/api/users/roles/{roleName}'].get.summary").isEqualTo("Get users by role")
+                .jsonPath("$.paths['/api/users/drivers/ids'].get.summary").isEqualTo("Get driver ids")
                 .jsonPath("$.paths['/api/users/{id}'].get.summary").isEqualTo("Get user by id")
                 .jsonPath("$.paths['/api/users/{id}'].put.summary").isEqualTo("Update user profile")
                 .jsonPath("$.paths['/api/users/{id}'].delete.summary").isEqualTo("Delete user")
