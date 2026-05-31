@@ -3,11 +3,11 @@ package com.sgitu.userservice.service;
 import com.sgitu.userservice.dto.UserStatusEventDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,10 +28,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserEventPublisher {
 
-    private final RestTemplate restTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
-    @Value("${events.user-status.url:}")
-    private String eventUrl;
+    @Value("${events.user-status.topic:g8-user-events}")
+    private String topic;
 
     /**
      * Sends a single status-change event wrapped in a list (batch of one).
@@ -46,21 +47,24 @@ public class UserEventPublisher {
     }
 
     /**
-     * Sends multiple status-change events in a single HTTP request.
+     * Publishes multiple status-change events to Kafka.
      */
     @Async
     public void publishBatch(List<UserStatusEventDTO> events) {
-        if (eventUrl == null || eventUrl.isBlank()) {
-            log.debug("events.user-status.url not configured — skipping event publication.");
+        if (topic == null || topic.isBlank()) {
+            log.debug("events.user-status.topic not configured — skipping event publication.");
             return;
         }
-        try {
-            ResponseEntity<Void> response = restTemplate.postForEntity(eventUrl, events, Void.class);
-            log.info("Published {} user-status event(s) → {} (HTTP {})",
-                    events.size(), eventUrl, response.getStatusCode());
-        } catch (Exception ex) {
-            // Notification failure must not break the main flow
-            log.warn("Failed to publish user-status events to {}: {}", eventUrl, ex.getMessage());
+
+        for (UserStatusEventDTO event : events) {
+            try {
+                String payload = objectMapper.writeValueAsString(event);
+                kafkaTemplate.send(topic, payload);
+                log.info("Published user-status event to Kafka topic {}: {}", topic, payload);
+            } catch (Exception ex) {
+                // Event publication failure must not break the main flow
+                log.warn("Failed to publish user-status event to Kafka topic {}: {}", topic, ex.getMessage());
+            }
         }
     }
 

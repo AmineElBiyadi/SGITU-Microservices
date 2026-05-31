@@ -61,7 +61,7 @@ public class UserServiceImpl implements UserService {
 
         User saved = userRepository.save(user);
         
-        // Notify Group 8 (Analytics) via HTTP
+        // Notify Group 8 (Analytics) via Kafka
         eventPublisher.publish(saved.getId(), "active");
         
         // Notify Group 5 (Notifications) via Kafka
@@ -169,7 +169,7 @@ public class UserServiceImpl implements UserService {
         User saved = userRepository.save(user);
         UserResponseDTO result = toResponseDTO(saved);
         
-        // Notify Group 8 (Analytics) via HTTP
+        // Notify Group 8 (Analytics) via Kafka
         eventPublisher.publish(id, "inactive");
         
         // Notify Group 5 (Notifications) via Kafka
