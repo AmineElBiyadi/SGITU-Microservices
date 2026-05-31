@@ -26,16 +26,32 @@ spring:
   # ── Kafka ─────────────────────────────────────────────────
   kafka:
     bootstrap-servers: localhost:9093
+
+    # ── Consommateur : résilience ───────────────────────────
     consumer:
       group-id: notification-group
-      auto-offset-reset: earliest
+      auto-offset-reset: earliest          # Rejouer depuis le début si pas d'offset
+      enable-auto-commit: false            # Commit manuel — AckMode.MANUAL dans KafkaConfig.java
+      max-poll-records: 10                 # Max messages par poll (évite la surcharge)
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "ma.sgitu.g5.notifications.dto.kafka"
+        session.timeout.ms: 30000          # Délai avant que le broker considère le consumer mort
+        heartbeat.interval.ms: 10000       # Fréquence des heartbeats (doit être < session.timeout)
+
+    # ── Producteur : fiabilité pour les DLT ─────────────────
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 3                           # Nombre de retentatives en cas d'erreur réseau
+      acks: all                            # Attendre l'ACK de tous les réplicas (durabilité max)
+      properties:
+        enable.idempotence: true           # Garantit exactly-once delivery côté producteur
+        max.in.flight.requests.per.connection: 5  # Compatible avec l'idempotence
+
+    template:
+      default-topic: token-validation
 
   # ── Mail (MailHog en dev) ─────────────────────────────────
   mail:
@@ -58,6 +74,17 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000  # 24 heures en millisecondes
 
+# ── Firebase (FCM) ─────────────────────────────────────────
+firebase:
+  credentials:
+    path: ${FIREBASE_CREDENTIALS_PATH:}
+
+# ── Twilio (SMS) ───────────────────────────────────────────
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-phone: ${TWILIO_FROM_PHONE:}
+
 # ── Configuration G5 ────────────────────────────────────────
 g5:
   # Retry configuration
@@ -74,14 +101,47 @@ g5:
   templates:
     default-language: fr
 
+  # Kafka topics G5
+  kafka:
+    g7-log-topic: g7.log-alerts
+    g9-notifications-topic: notifications
+
+# ── Resilience4j — Circuit Breaker ──────────────────────────
+resilience4j:
+  circuitbreaker:
+    instances:
+      notificationProvider:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10            # Fenêtre de 10 appels pour calculer le taux d'échec
+        failure-rate-threshold: 50         # Ouvrir le circuit si ≥ 50% d'échecs
+        wait-duration-in-open-state: 30s   # Attendre 30s avant de passer en HALF_OPEN
+        permitted-number-of-calls-in-half-open-state: 3  # Appels test en HALF_OPEN
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+
 # ── Logging ─────────────────────────────────────────────────
 logging:
   level:
-    ma.sgitu.g5.notifications: DEBUG
+    ma.sgitu.g5: DEBUG
+    ma.sgitu.g5.admin: INFO
+    ma.sgitu.g5.security: INFO
+    ma.sgitu.g5.service.TracingServiceImpl: INFO
+    ma.sgitu.g5.service.RetryServiceImpl: INFO
+    ma.sgitu.g5.service.RetryScheduler: INFO
+    ma.sgitu.g5.provider.LogFileAdapter: INFO
+    ma.sgitu.g5.notifications.log: INFO
     org.springframework.kafka: INFO
     org.springframework.mail: DEBUG
+    org.springframework.security: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/notification-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+  config: classpath:logback-admin.xml
 
 # ── Server ──────────────────────────────────────────────────
 server:
@@ -101,6 +161,19 @@ springdoc:
     operationsSorter: method
   show-actuator: true
 
+# ── Observabilité & Monitoring (Actuator + Prometheus) ──────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 ---
 # =============================================================
 #  PROFIL DOCKER (activé via SPRING_PROFILES_ACTIVE=docker)
@@ -117,10 +190,31 @@ spring:
 
   kafka:
     bootstrap-servers: kafka:9092
+    consumer:
+      enable-auto-commit: false
+      max-poll-records: 10
+      properties:
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+    producer:
+      retries: 3
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
 
   mail:
-    host: mailhog
-    port: 1025
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    from: ${MAIL_FROM}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 jwt:
   secret: ${JWT_SECRET}

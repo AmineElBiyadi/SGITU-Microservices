@@ -1,5 +1,7 @@
 package ma.sgitu.g5.provider;
 
-public interface ISMSProvider {
+import ma.sgitu.g5.dto.response.SendResultDTO;
 
+public interface ISMSProvider {
+    SendResultDTO send(String phone, String message);
 }

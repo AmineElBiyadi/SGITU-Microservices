@@ -32,9 +32,12 @@ scrape_configs:
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
-  #  G5 — (ajoutez votre bloc ici)
+  #  G5 — Service de Notifications (SGITU)
   # ---------------------------------------------------------------
-
+  - job_name: 'g5-notification'
+    static_configs:
+      - targets: ['notification-service:8085']
+    metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
   #  G6 — (ajoutez votre bloc ici)
   # ---------------------------------------------------------------

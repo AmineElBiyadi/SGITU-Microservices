@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app: notification-service
+spec:
+  type: ClusterIP # Restreint l'acces a l'interieur du cluster
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: 8085
+      targetPort: 8085
