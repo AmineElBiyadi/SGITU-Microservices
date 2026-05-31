@@ -22,12 +22,11 @@ public class Vehicule {
     @Column(nullable = false)
     private TypeVehicule type; // BUS ou TRAM
 
-    @Column(nullable = false)
     private String ligne;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private StatutVehicule statut; // ACTIF ou INACTIF
+    private StatutVehicule statut; 
 
     private UUID conducteurId;
 
@@ -36,6 +35,7 @@ public class Vehicule {
     }
 
     public enum StatutVehicule {
+        DISPONIBLE,       // Nouveau véhicule prêt à être affecté
         EN_SERVICE,       // circulation normale
         EN_PAUSE,         // arrêt court planifié
         ARRET_PROLONGE,   // vitesse nulle > 5min → alerte G9
@@ -44,3 +44,4 @@ public class Vehicule {
         HORS_SERVICE      // retiré manuellement
     }
 }
+

@@ -1,0 +1,26 @@
+@startuml mission-coordination-events
+title G4 — Mission et événements de coordination
+
+class Mission {
+  +id: Long
+  +vehiculeId: String
+  +chauffeurId: String
+  +statut: StatutMission
+}
+
+class CoordinationEventEntity {
+  +id: Long
+  +type: CoordinationEventType
+  +status: CoordinationEventStatus
+  +mission_id: Long
+}
+
+Mission "1" -- "0..*" CoordinationEventEntity : génère / subit
+
+note right of CoordinationEventEntity
+  RETARD, DEVIATION, PANNE, ANNULATION_MISSION
+  (incidents G9 : voir MissionIncidentImpact)
+  Ne bloque pas automatiquement la mission
+end note
+
+@enduml

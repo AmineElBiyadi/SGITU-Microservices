@@ -1,0 +1,8 @@
+{
+  "vehiculeId": "VH-001",
+  "ligneId": "L12",
+  "lat": 35.578,
+  "long": -5.368,
+  "vitesse": 42.5,
+  "timestamp": "2026-05-20T14:30:00Z"
+}

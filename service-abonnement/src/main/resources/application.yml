@@ -1,12 +1,15 @@
 server:
   port: 8082
 
+jwt:
+  secret: ${JWT_SECRET:your_jwt_secret_here_min_256_bits}
+
 spring:
   application:
     name: service-abonnement
 
   datasource:
-    url: jdbc:mysql://localhost:3306/${DB_NAME}?createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3307/${DB_NAME}?createDatabaseIfNotExist=true
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -25,14 +28,17 @@ spring:
     baseline-on-migrate: true
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: localhost:9093
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
     consumer:
       group-id: abonnement-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      enable-auto-commit: false
+      auto-offset-reset: earliest
       properties:
         spring.json.trusted.packages: "*"
 
@@ -40,15 +46,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health, info, prometheus, metrics
   endpoint:
     health:
       show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: service-abonnement
 
 application:
   config:
-    utilisateur-service-url: http://localhost:8081
-    paiement-service-url: http://localhost:8083
+    utilisateur-service-url: http://localhost:8083
+    paiement-service-url: http://localhost:8086
+    analyse-service-url: http://localhost:8088
   topics:
     souscription: abonnement.souscription
     rappel: abonnement.rappel
@@ -57,6 +69,58 @@ application:
     suspension: abonnement.suspension
     desactivation: abonnement.desactivation
     modification: abonnement.modification
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        ignoreExceptions:
+          - com.serviceabonnement.exception.BaseException
+    instances:
+      paymentService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        ignoreExceptions:
+          - com.serviceabonnement.exception.BaseException
+    instances:
+      paymentService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 10
+        maxWaitDuration: 0
+    instances:
+      paymentService:
+        baseConfig: default
+      userService:
+        baseConfig: default
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 2000
+        readTimeout: 5000
 
 springdoc:
   swagger-ui:

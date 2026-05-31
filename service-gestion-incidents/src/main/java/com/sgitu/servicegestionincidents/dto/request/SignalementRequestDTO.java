@@ -29,10 +29,12 @@ public class SignalementRequestDTO {
     @NotNull(message = "La longitude est obligatoire")
     private Double longitude;
 
-    private String adresse;
-
     private List<PreuveDTO> preuves;
 
-    @NotNull(message = "L'ID du déclarant est obligatoire")
-    private Long declarantId;
+    private String vehiculeId;
+
+    private String ligneTransport;
+
+    // Rempli par le controller à partir du JWT (VOYAGEUR, CONDUCTEUR, etc.)
+    private String role;
 }

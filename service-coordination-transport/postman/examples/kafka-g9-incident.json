@@ -1,0 +1,11 @@
+{
+  "referenceIncident": "INC-2026-042",
+  "type": "PANNE_VEHICULE",
+  "statut": "NOUVEAU",
+  "vehiculeId": "VH-001",
+  "ligneId": "L12",
+  "description": "Panne moteur signalée par G9",
+  "latitude": 35.57,
+  "longitude": -5.36,
+  "timestamp": "2026-05-20T14:35:00"
+}

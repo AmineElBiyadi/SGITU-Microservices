@@ -1,7 +1,8 @@
 package com.serviceabonnement.enums;
 
 public enum Role {
-    USER,
-    ADMIN,
+    ROLE_PASSENGER,
+    ROLE_STUDENT,
+    ROLE_ADMIN_G2,
     AGENT
 }

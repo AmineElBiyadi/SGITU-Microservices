@@ -10,7 +10,7 @@ import java.util.List;
 @Repository
 public interface ActionRepository extends JpaRepository<Action, Long> {
 
-    List<Action> findByIncidentId(Long incidentId);
+    List<Action> findByIncidentIdOrderByDateActionDesc(Long incidentId);
     List<Action> findByAuteurId(Long auteurId);
     List<Action> findByDateActionBetween(LocalDateTime debut, LocalDateTime fin);
 }

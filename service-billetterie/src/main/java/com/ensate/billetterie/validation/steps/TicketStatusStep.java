@@ -12,9 +12,10 @@ import java.util.concurrent.Executor;
 
 /**
  * Validation step that checks if a ticket has a valid status for validation.
- * Only tickets with status ISSUED or TRANSFERRED can be validated and redeemed.
+ * Only tickets with status ISSUED can be validated and redeemed.
  * 
  * Throws ValidationException if ticket status is:
+ * - TRANSFERRED (transferred to another holder)
  * - REDEEMED or USED (already used)
  * - CANCELLED (cancelled by owner or admin)
  * - EXPIRED (passed expiry date)
@@ -43,12 +44,12 @@ public class TicketStatusStep implements ValidationStep {
             Ticket ticket = context.getResolvedTicket();
             TicketStatus status = ticket.getStatus();
             
-            // Valid statuses for validation
-            if (status != TicketStatus.ISSUED && status != TicketStatus.TRANSFERRED) {
+            // Only ISSUED status is valid for validation
+            if (status != TicketStatus.ISSUED) {
                 throw new ValidationException(
                         getStepName(),
                         "Ticket status '" + status + "' is not eligible for validation. " +
-                        "Only ISSUED or TRANSFERRED tickets can be validated."
+                        "Only ISSUED tickets can be validated."
                 );
             }
             

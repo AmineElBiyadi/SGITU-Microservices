@@ -8,4 +8,5 @@ public interface RapportService {
 
     RapportDTO genererRapport(String periode);
     Map<String, Object> genererTableauBord();
+    Map<String, Object> obtenirStatsParResponsable(Long responsableId);
 }

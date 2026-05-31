@@ -20,13 +20,23 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
 
     private static final List<String> DEFAULT_ROLES = List.of(
-            "ROLE_PASSENGER",   // G1, G2 — regular customer
-            "ROLE_STUDENT",     // G2 — student identity (discount subscriptions)
-            "ROLE_DRIVER",      // G4 — bus/tram driver
-            "ROLE_STAFF",       // G4, G9 — operational staff
-            "ROLE_OPERATOR",    // G7 — IoT/tracking operator
-            "ROLE_TECHNICIAN",  // G9 — incident technician
-            "ROLE_ADMIN"        // G10 — system administrator
+            "ROLE_PASSENGER",   
+            "ROLE_STUDENT",     
+            "ROLE_DRIVER",      
+            "ROLE_DISPATCHER",
+            "ROLE_OPERATOR",      
+            "ROLE_G4_OPERATOR",   
+            "ROLE_TECHNICIAN",  
+            "ROLE_ADMIN",
+            "ROLE_G1_ADMIN",
+            "ROLE_ADMIN_G2",
+            "ROLE_G4_ADMIN",
+            "ROLE_G7_ADMIN",
+            "ROLE_G9_ADMIN",
+            "ROLE_SUPERVISOR",
+            "ROLE_SECURITY",
+            "ROLE_MEDIC",
+            "ROLE_CLEANER"
     );
 
     @Override

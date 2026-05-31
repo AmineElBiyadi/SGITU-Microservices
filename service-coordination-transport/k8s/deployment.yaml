@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g4-coordination
+  namespace: sgitu-g4
+  labels:
+    app: g4-coordination
+    group: G4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g4-coordination
+  template:
+    metadata:
+      labels:
+        app: g4-coordination
+        group: G4
+    spec:
+      containers:
+        - name: g4-coordination
+          image: sgitu/g4-coordination:0.0.1-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8084
+          envFrom:
+            - configMapRef:
+                name: g4-coordination-config
+            - secretRef:
+                name: g4-coordination-secret
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://$(K8S_INFRA_HOST):5434/sgitu_g4
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: $(K8S_INFRA_HOST):9092
+          readinessProbe:
+            httpGet:
+              path: /api/g4/health
+              port: 8084
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/g4/health
+              port: 8084
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"

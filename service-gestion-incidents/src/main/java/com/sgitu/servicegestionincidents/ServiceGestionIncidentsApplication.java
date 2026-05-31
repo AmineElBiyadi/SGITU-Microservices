@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @SpringBootApplication
 @EnableFeignClients(basePackages = "com.sgitu.servicegestionincidents.client")
 @EnableJpaAuditing
+@org.springframework.scheduling.annotation.EnableScheduling
 public class ServiceGestionIncidentsApplication {
 
     public static void main(String[] args) {

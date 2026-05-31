@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://mysql-db:3306/sgitu_incidents?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+
+microservices:
+  utilisateur:
+    url: ${UTILISATEUR_SERVICE_URL:http://service-utilisateur:8083}
+
+# On peut aussi ajuster d'autres paramètres pour la production/docker si nécessaire
+logging:
+  level:
+    root: INFO
+    com.sgitu: DEBUG

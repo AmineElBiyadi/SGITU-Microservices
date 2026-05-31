@@ -6,4 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DesactivationRepository extends JpaRepository<Desactivation, Long> {
+    java.util.List<Desactivation> findByAbonnementId(Long abonnementId);
 }

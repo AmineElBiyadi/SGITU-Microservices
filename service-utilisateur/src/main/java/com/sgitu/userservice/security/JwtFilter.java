@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -25,7 +26,10 @@ import java.util.stream.Collectors;
  * G3 valide les tokens mais ne les génère pas (génération assurée par G10).
  */
 @Component
+@RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
+
+    private final RedisTokenBlacklistService blacklistService;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -39,6 +43,18 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
+            boolean isRevoked = false;
+            try {
+                isRevoked = blacklistService.isTokenRevoked(token);
+            } catch (Exception e) {
+                // Graceful fallback to maintain high availability (disponibilité)
+                logger.error("Redis connection failed during token revocation check. Proceeding with standard signature validation.", e);
+            }
+            if (isRevoked) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
             try {
                 Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
 

@@ -1,0 +1,309 @@
+\documentclass[aspectratio=169,xcolor=table]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{colortbl}
+
+\usetheme{Ufg}
+
+% Couleur principale : UFGGreen (autre que UFGBlue) — ou SGITUTeal si votre thème l'accepte
+\definecolor{SGITUTeal}{RGB}{0,95,115}
+\definecolor{SlideRow}{RGB}{230,245,242}
+\definecolor{LightGray}{RGB}{240,240,240}
+
+\setPrimaryColor{UFGGreen}
+
+% Logos désactivés — Université Abdelmalek Essaâdi
+% \setLogos{lib/logos/infufgw.png}{lib/logos/infufgw.png}
+
+%------------------------------------- Théorèmes (template)
+\newtheorem{conj}{Conjetura}
+\newtheorem{defi}{Definição}
+\newtheorem{teo}{Teorema}
+\newtheorem{lema}{Lema}
+\newtheorem{prop}{Proposição}
+\newtheorem{cor}{Corolário}
+\newtheorem{ex}{Exemplo}
+\newtheorem{exer}{Exercício}
+
+\setbeamertemplate{theorems}[numbered]
+\setbeamertemplate{caption}[numbered]
+
+%------------------------------------- Document
+\begin{document}
+
+\title[SGITU]{SGITU — G4 Coordination des transports}
+\subtitle{Support de présentation — Soutenance finale — Pr. BESRI}
+\author{EL ASSAL DOUAE, EL MAKOUDI YOUNES, MAGNE TSAFACK LYDIVINE MERVEILLE}
+\institute[UAE]{
+  Université Abdelmalek Essaâdi\\
+  ENSA Tétouan — Génie Informatique 2
+}
+\date{1\textsuperscript{er} juin 2026}
+
+\frame[noframenumbering]{\titlepage}
+
+%------------------------------------------------ Plan
+\setLayout{vertical}
+\begin{frame}
+  \frametitle{Plan}
+  \tableofcontents
+\end{frame}
+
+%==============================================================================
+\section{Contexte et architecture}
+%==============================================================================
+
+\subsection{Contexte SGITU}
+
+\setLayout{vertical}
+\begin{frame}{Contexte : où se place G4 ?}
+  \begin{itemize}
+    \item \textbf{SGITU} : Système de Gestion Intelligente des Transports Urbains
+    \item Architecture \textbf{microservices} (G1 à G10)
+    \item \textbf{G4} : couche de \textit{coordination opérationnelle}
+    \item Périmètre : réseau (lignes, trajets), flotte (missions), événements, intégrations temps réel
+  \end{itemize}
+  \vspace{0.4cm}
+  \begin{center}
+    \fbox{\parbox{0.8\textwidth}{\centering
+      \textbf{G4} = cerveau opérationnel — port \textbf{8084}\\
+      \small G10 (Gateway) $\rightarrow$ JWT $\rightarrow$ API G4
+    }}
+  \end{center}
+\end{frame}
+
+\subsection{Valeur métier}
+
+\begin{frame}{Valeur métier — À quoi sert G4 ?}
+  \textbf{Problème :} coordonner l'exploitation quotidienne du réseau.
+  \vspace{0.3cm}
+  \begin{columns}
+    \column{0.48\textwidth}
+    \textbf{Gestionnaire réseau (G4\_OPERATOR)}
+    \begin{itemize}
+      \item Lignes, trajets, arrêts, horaires
+    \end{itemize}
+    \vspace{0.2cm}
+    \textbf{Gestionnaire flotte (DISPATCHER)}
+    \begin{itemize}
+      \item Missions, affectations
+      \item Retards, déviations, pannes
+    \end{itemize}
+    \column{0.48\textwidth}
+    \textbf{Points clés}
+    \begin{itemize}
+      \item Perturbation \textbf{sans bloquer} la mission
+      \item Conflit véhicule $\rightarrow$ HTTP \textbf{409}
+      \item Incidents G9 \textbf{séparés} des événements G4
+    \end{itemize}
+  \end{columns}
+  \vspace{0.3cm}
+  \begin{block}{Plus-value métier}
+    Une perturbation n'arrête pas la mission — on trace un \textbf{événement}.
+  \end{block}
+\end{frame}
+
+\subsection{Cas d'usage}
+
+\setLayout{vertical}
+\begin{frame}{Cas d'usage (exemple soutenance)}
+  \textbf{Scénario :} Ligne L12, véhicule VH-001 en mission.
+  \begin{enumerate}
+    \item G7 envoie la position GPS (Kafka \texttt{vehicule-positions})
+    \item G4 détecte une \textbf{déviation} $\rightarrow$ événement DEVIATION
+    \item G4 notifie G5 (alerte régulation / conducteur)
+    \item G9 signale un incident $\rightarrow$ G4 enregistre un \textbf{impact} mission
+  \end{enumerate}
+  \vspace{0.2cm}
+  \small Deux missions \texttt{EN\_COURS} sur le même véhicule $\Rightarrow$ \textbf{409 Conflict} (pas 500).
+\end{frame}
+
+\subsection{Architecture technique}
+
+\setLayout{vertical}
+\begin{frame}{Architecture technique}
+  \begin{itemize}
+    \item \textbf{Java 17}, Spring Boot 3.5, Spring Security, Spring Data JPA
+    \item \textbf{PostgreSQL} — persistance métier
+    \item \textbf{Kafka 3.7} — G7 positions, G9 incidents, G1 lifecycle
+    \item \textbf{Docker / Compose} — réseau \texttt{sgitu-network}
+    \item \textbf{JWT} aligné G3 / G10
+    \item Resilience4j + Prometheus / Grafana
+  \end{itemize}
+\end{frame}
+
+%==============================================================================
+\section{Intégration et API}
+%==============================================================================
+
+\subsection{Intégration inter-groupes}
+
+\setLayout{vertical}
+\begin{frame}{Intégration inter-groupes}
+  \small
+  \begin{table}[]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \setlength{\tabcolsep}{8pt}
+    {\rowcolors{2}{}{SlideRow}
+      \begin{tabular}{p{1.5cm}p{1.5cm}p{5.2cm}}
+        \toprule
+        \textbf{Groupe} & \textbf{Mode} & \textbf{Contrat} \\
+        \midrule
+        G3 & HTTP & Validation chauffeurs \texttt{/api/users/drivers/ids} \\
+        G5 & HTTP & Notifications + fallback \texttt{DEGRADED} \\
+        G7 & Kafka & Topic \texttt{vehicule-positions} \\
+        G9 & Kafka & Topic \texttt{incident.transport.topic} \\
+        G1 & Kafka & Topic \texttt{missions-lifecycle} \\
+        G10 & HTTP & Passerelle JWT \\
+        \bottomrule
+      \end{tabular}
+    }
+  \end{table}
+\end{frame}
+
+\subsection{Modèle métier}
+
+\begin{frame}{UML — Modèle métier (extrait)}
+  \footnotesize
+  \begin{itemize}
+    \item \textbf{Mission} $1$ — $*$ \textbf{CoordinationEvent} (RETARD, DEVIATION, PANNE…)
+    \item \textbf{Mission} $1$ — $0..1$ \textbf{MissionIncidentImpact} $\rightarrow$ référence incident \textbf{G9}
+    \item Diagrammes : \texttt{docs/diagrams/*.puml}
+  \end{itemize}
+  \vspace{0.4cm}
+  \begin{block}{Feedback prof}
+    Séparation Incident (G9) vs événement opérationnel (G4) — \textbf{intégrée}.
+  \end{block}
+\end{frame}
+
+\subsection{API REST}
+
+\setLayout{vertical}
+\begin{frame}{API REST \& OpenAPI}
+  \begin{itemize}
+    \item Swagger : \texttt{/swagger-ui.html} — port 8084
+    \item Codes HTTP : 200, 201, 400, 401, 403, 404, \textbf{409}, 202
+    \item Collection Postman + exemples JSON (\texttt{postman/examples/})
+    \item Supervision publique : \texttt{/api/g4/health}, \texttt{/api/g4/logs}
+    \item Validation croisée : JWT G3 $\rightarrow$ appel G4
+  \end{itemize}
+\end{frame}
+
+%==============================================================================
+\section{Sécurité et observabilité}
+%==============================================================================
+
+\subsection{Sécurité JWT}
+
+\begin{frame}{Sécurité JWT}
+  \begin{itemize}
+    \item Filtrage \textbf{local} des rôles dans chaque requête (G4 ne fait pas confiance aveugle à G10)
+    \item Rôles G3 : \texttt{ROLE\_G4\_OPERATOR}, \texttt{ROLE\_DISPATCHER}, \texttt{ROLE\_G4\_ADMIN}
+    \item Validation croisée : token G3 $\rightarrow$ appel G4 (capture Postman)
+    \item Secret partagé : \texttt{SGITU\_JWT\_SECRET}
+  \end{itemize}
+\end{frame}
+
+\subsection{Observabilité}
+
+\setLayout{vertical}
+\begin{frame}{Observabilité (pilier livraison)}
+  \begin{itemize}
+    \item Health enrichi : DB, Kafka, \texttt{pendingNotifications}
+    \item Logs structurés : \texttt{group=G4}
+    \item \textbf{Prometheus} : \texttt{/actuator/prometheus}
+    \item \textbf{Grafana} : dashboard SGITU G4
+  \end{itemize}
+\end{frame}
+
+\subsection{Résilience}
+
+\begin{frame}{Chaos Monkey — Résilience G5}
+  \begin{enumerate}
+    \item Prof éteint \textbf{G5}
+    \item G4 répond \textbf{202 DEGRADED} (pas de 500)
+    \item Notification stockée (\texttt{pending\_notifications})
+    \item Renvoi auto quand G5 revient
+  \end{enumerate}
+  \vspace{0.3cm}
+  \begin{block}{Implémentation}
+    \small Resilience4j Circuit Breaker + file d'attente locale
+  \end{block}
+\end{frame}
+
+%==============================================================================
+\section{Tests, démo et DevOps}
+%==============================================================================
+
+\subsection{Tests et validation}
+
+\setLayout{vertical}
+\begin{frame}{Tests \& validation}
+  \begin{itemize}
+    \item \texttt{./mvnw test} — tests unitaires et intégration (MockMvc)
+    \item \texttt{SecurityRolesIntegrationTest} — 403 rôles incorrects
+    \item \texttt{MissionVehicleConflictIntegrationTest} — 409 conflit véhicule
+    \item Postman : validation croisée + scénarios Chaos Monkey
+  \end{itemize}
+\end{frame}
+
+\subsection{Démonstration live}
+
+\begin{frame}{Plan de démonstration (soutenance)}
+  \textbf{À faire devant le jury (5--7 min) :}
+  \begin{enumerate}
+    \item \texttt{docker compose --profile monitoring ps}
+    \item Postman : login \texttt{gestionnaire.flotte} $\rightarrow$ missions
+    \item \texttt{/api/g4/health} et \texttt{/api/g4/logs} (sans token)
+    \item \textbf{Bonus :} notification sans G5 sur le réseau $\rightarrow$ statut \texttt{DEGRADED} (Chaos Monkey)
+  \end{enumerate}
+  \vspace{0.2cm}
+  \begin{alertblock}{Conseil}
+    Préparer Postman + Docker déjà démarrés avant l'oral.
+  \end{alertblock}
+\end{frame}
+
+\subsection{DevOps}
+
+\begin{frame}{DevOps — Démarrage}
+  \footnotesize
+  \texttt{docker compose --profile monitoring up -d --build}
+  \vspace{0.3cm}
+  \begin{itemize}
+    \item Port G4 : \textbf{8084}
+    \item Stack : Postgres + Kafka + Prometheus + Grafana
+    \item Monorepo : \texttt{SGITU-Microservices/docker-compose.yml}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+  \textbf{G4 livre :}
+  \begin{itemize}
+    \item Microservice métier \textbf{complet} et \textbf{intégré}
+    \item API documentée, sécurisée, conteneurisée
+    \item Robustesse démontrable (Chaos Monkey)
+  \end{itemize}
+\end{frame}
+
+%------------------------------------------------ Slide Merci
+\setLayout{blank}
+\setBGColor{UFGGreen}
+\begin{frame}
+  \centering
+  \vspace{2cm}
+  \textbf{\Huge Merci}
+  \\
+  \textbf{\Large Questions ?}
+  \\
+  \vspace{1cm}
+  \text{\footnotesize SGITU — G4 Coordination des transports}
+  \vspace{2cm}
+\end{frame}
+
+\end{document}

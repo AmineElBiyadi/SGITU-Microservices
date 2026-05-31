@@ -3,7 +3,6 @@ package com.ensate.billetterie.ticket.client;
 import com.ensate.billetterie.ticket.dto.response.MissionDTO;
 import com.ensate.billetterie.validation.exceptions.ValidationException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
@@ -14,7 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * Client for calling the Coordination microservice using RestTemplate.
  * This client retrieves mission data from the Coordination Service
  * without storing mission data locally in the Billetterie microservice.
- *
+ * <p>
  * This follows the microservices principle: each service owns its data.
  */
 @Component
@@ -33,7 +32,7 @@ public class CoordinationClient {
 
     /**
      * Retrieve a mission by its ID from the Coordination microservice.
-     *
+     * <p>
      * Fail-closed strategy: if the Coordination Service is unreachable,
      * ticket validation is blocked (safer than letting anyone through).
      *
@@ -42,7 +41,7 @@ public class CoordinationClient {
      * @throws ValidationException if the mission is not found or the service is unavailable
      */
     public MissionDTO getMission(String missionId) {
-        String url = UriComponentsBuilder.fromHttpUrl(coordinationServiceUrl)
+        String url = UriComponentsBuilder.fromUriString(coordinationServiceUrl)
                 .pathSegment("missions", missionId)
                 .toUriString();
 
@@ -57,7 +56,7 @@ public class CoordinationClient {
             );
 
         } catch (RestClientException ex) {
-            // ✅ Réseau down, timeout, 5xx, etc. → stratégie fail-closed :
+            // Réseau down, timeout, 5xx, etc. → stratégie fail-closed :
             //    on bloque la validation plutôt que de laisser passer n'importe qui
             throw new ValidationException(
                     "EventActiveStep",

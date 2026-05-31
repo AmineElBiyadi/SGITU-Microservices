@@ -6,8 +6,11 @@ import lombok.Data;
 @Data
 @Builder
 public class PaymentRequestDTO {
-    private Long abonnementId;
     private Long userId;
-    private Double montant;
+    private String sourceType;
+    private Long sourceId;
+    private Double amount;
+    private String paymentMethod;
+    private String email;
     private String description;
 }

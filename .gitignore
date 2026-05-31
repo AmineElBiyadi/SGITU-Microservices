@@ -5,6 +5,9 @@
 # Environment variables (secrets)
 .env
 
+# Livraisons ZIP locales (ne pas versionner)
+*.zip
+
 # Operating System Files and Logs
 .DS_Store
 Thumbs.db

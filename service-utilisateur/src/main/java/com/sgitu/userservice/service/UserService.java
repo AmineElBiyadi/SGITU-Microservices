@@ -14,6 +14,8 @@ public interface UserService {
 
     List<UserResponseDTO> getUsersByRole(String roleName);
 
+    List<Long> getDriverIds();
+
     UserResponseDTO updateUser(Long id, UserRequestDTO request);
 
     void changePassword(Long id, String newPassword);

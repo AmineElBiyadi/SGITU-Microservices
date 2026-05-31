@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: g4-coordination-config
+  namespace: sgitu-g4
+  labels:
+    app: g4-coordination
+    group: G4
+data:
+  SERVER_PORT: "8084"
+  JPA_DDL_AUTO: "update"
+  SGITU_KAFKA_ENABLED: "true"
+  # Postgres + Kafka tournent via docker compose sur la machine hôte (ports publiés).
+  # Docker Desktop K8s : host.docker.internal
+  # Minikube : remplacer par host.minikube.internal
+  K8S_INFRA_HOST: "host.docker.internal"
+  SPRING_DATASOURCE_USERNAME: "g4"
+  SPRING_DATASOURCE_PASSWORD: "g4"
+  SGITU_G3_URL: "http://g3-user-service:8083"
+  SGITU_G5_URL: "http://g5-notification-service:8085"
+  SGITU_G10_URL: "http://g10-gateway:8080"
+  SGITU_G7_URL: "http://g7-service:8087"
+  SGITU_G9_URL: "http://g9-incidents:8089"
+  SGITU_G1_URL: "http://g1-billetterie:8081"
+  SGITU_G3_VALIDATION_ENABLED: "true"
+  SGITU_G9_INCIDENT_TOPIC: "incident.transport.topic"
+  SGITU_G7_POSITIONS_TOPIC: "vehicule-positions"
+  SGITU_G1_MISSION_TOPIC: "missions-lifecycle"

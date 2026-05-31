@@ -2,7 +2,10 @@ package com.serviceabonnement.service;
 
 import com.serviceabonnement.entity.PlanAbonnement;
 import com.serviceabonnement.repository.PlanAbonnementRepository;
+import com.serviceabonnement.exception.PlanNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,8 +20,12 @@ public class PlanAbonnementService {
         return planRepository.findAll();
     }
 
+    public Page<PlanAbonnement> getAllPlans(Pageable pageable) {
+        return planRepository.findAll(pageable);
+    }
+
     public PlanAbonnement getPlanById(Long id) {
-        return planRepository.findById(id).orElseThrow(() -> new RuntimeException("Plan non trouvé"));
+        return planRepository.findById(id).orElseThrow(() -> new PlanNotFoundException(id));
     }
 
     public PlanAbonnement createPlan(PlanAbonnement plan) {

@@ -4,7 +4,7 @@ import com.sgitu.servicegestionincidents.messaging.constant.MessagingConstants;
 import com.sgitu.servicegestionincidents.messaging.event.IncidentTransportEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,15 +12,21 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class TransportProducer {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public void notifierTransport(IncidentTransportEvent event) {
-        log.info("Publication événement transport pour incident {}", event.getReference());
-        rabbitTemplate.convertAndSend(
-                MessagingConstants.INCIDENT_EXCHANGE,
-                MessagingConstants.TRANSPORT_ROUTING_KEY,
-                event
-        );
-        log.info("Événement transport publié avec succès");
+        try {
+            log.info("Publication événement transport (G4) pour incident {}", event.getReferenceIncident());
+            kafkaTemplate.send(MessagingConstants.TRANSPORT_TOPIC, event)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            log.warn("Échec envoi transport G4 (Kafka indisponible): {}", ex.getMessage());
+                        } else {
+                            log.info("Événement transport publié avec succès");
+                        }
+                    });
+        } catch (Exception e) {
+            log.warn("Kafka indisponible — Événement transport G4 non envoyé: {}", e.getMessage());
+        }
     }
 }

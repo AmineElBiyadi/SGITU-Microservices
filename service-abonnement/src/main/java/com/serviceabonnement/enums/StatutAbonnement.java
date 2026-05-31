@@ -1,5 +1,13 @@
 package com.serviceabonnement.enums;
 
 public enum StatutAbonnement {
-    ACTIF, EXPIRE, SUSPENDU, ANNULATION_EN_COURS, ANNULE, ECHEC_REMBOURSEMENT
+    EN_ATTENTE_PAIEMENT,
+    ACTIF,
+    EXPIRE,
+    DESACTIVE,
+    SUSPENDU,
+    ANNULATION_EN_COURS,
+    ECHEC_PAIEMENT,
+    ECHEC_REMBOURSEMENT,
+    ANNULE
 }

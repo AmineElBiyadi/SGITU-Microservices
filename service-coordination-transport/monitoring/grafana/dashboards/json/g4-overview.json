@@ -1,0 +1,53 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "up{job=\"g4-coordination\"}",
+          "legendFormat": "G4 UP"
+        }
+      ],
+      "title": "G4 — Service vivant (up=1)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "http_server_requests_seconds_count{application=\"g4-coordination-transport\"}",
+          "legendFormat": "requêtes HTTP"
+        }
+      ],
+      "title": "G4 — Volume requêtes HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_state{name=\"g5Notification\"}",
+          "legendFormat": "circuit G5"
+        }
+      ],
+      "title": "G4 — Circuit breaker G5 (0=closed, 1=open, 2=half-open)",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["SGITU", "G4"],
+  "time": { "from": "now-15m", "to": "now" },
+  "title": "SGITU G4 — Coordination Transport",
+  "uid": "sgitu-g4-main",
+  "version": 1
+}

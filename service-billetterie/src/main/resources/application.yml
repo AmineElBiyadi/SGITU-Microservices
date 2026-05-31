@@ -1,0 +1,19 @@
+api:
+  info:
+    title: Paperless Ticket Service
+    description: Microservice responsible for managing paperless tickets
+    version: v1
+    termsOfService: https://example.com/terms
+
+  contact:
+    name: NYIRENDA AMOS, CHOUHE JIHANE, ESSEBAIY AYA, ELMESSAOUDI FATIMA
+    email: paperless-ticket-team@gmail.com
+    url: https://github.com/amosnyirenda123/SGITU-Microservices.git
+
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+service:
+  name: paperless-ticket-service
+  environment: dev

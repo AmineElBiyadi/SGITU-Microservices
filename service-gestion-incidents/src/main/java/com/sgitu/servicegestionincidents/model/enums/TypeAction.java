@@ -8,5 +8,7 @@ public enum TypeAction {
     ESCALADE,
     CLOTURE,
     COMMENTAIRE,
-    NOTIFICATION
+    NOTIFICATION,
+    DEMANDE_ESCALADE,
+    REFUS_ESCALADE
 }

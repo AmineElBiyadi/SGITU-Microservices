@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,5 +16,5 @@ public class IssueTokenRequest {
     private IdentityMethodType methodType;
     private String holderId;
     private String eventId;
-    private String rawPayload;
+    Map<String, Object> rawPayload;
 }

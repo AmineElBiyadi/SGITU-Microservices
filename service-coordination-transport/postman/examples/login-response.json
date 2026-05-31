@@ -1,0 +1,6 @@
+{
+	"token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJnZXN0aW9ubmFpcmVyLnJlc2VhdSIsInJvbGVzIjpbIkdFU1RJT05OQUlSRV9SRVNFQSJdLCJpYXQiOjE3MTUwMzAwMDAsImV4cCI6MTcxNTAzMzYwMH0.example-signature",
+	"type": "Bearer",
+	"expiresIn": 3600000,
+	"role": "GESTIONNAIRE_RESEAU"
+}

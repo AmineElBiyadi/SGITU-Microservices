@@ -1,5 +1,5 @@
 package com.serviceabonnement.enums;
 
 public enum CategorieAbonnement {
-    NORMAL, ETUDIANT
+    ROLE_PASSENGER, ROLE_STUDENT
 }

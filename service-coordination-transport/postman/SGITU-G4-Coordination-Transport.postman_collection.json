@@ -1,0 +1,1604 @@
+{
+	"info": {
+		"_postman_id": "g4-coord-2026-ordered",
+		"name": "SGITU G4 — Tests ordonnés",
+		"description": "ORDRE IMPORTANT\n\n1) Démarrer G4 : cd service-coordination-transport puis docker compose up -d\n2) Attendre health UP : GET 00 — Démarrage\n3) Parcours rapide : dossier GUIDE (requêtes 1→13 dans l'ordre)\n4) Login : gestionnaire.reseau = réseau | gestionnaire.flotte = missions | admin.technique = admin\n\nLes POST « créer » enregistrent automatiquement ligneId, arretId, missionId…",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8084"
+		},
+		{
+			"key": "accessToken",
+			"value": ""
+		},
+		{
+			"key": "ligneId",
+			"value": "1"
+		},
+		{
+			"key": "arretId",
+			"value": "1"
+		},
+		{
+			"key": "arretId2",
+			"value": "2"
+		},
+		{
+			"key": "trajetId",
+			"value": "1"
+		},
+		{
+			"key": "horaireId",
+			"value": "1"
+		},
+		{
+			"key": "affectationId",
+			"value": "1"
+		},
+		{
+			"key": "missionId",
+			"value": "1"
+		},
+		{
+			"key": "eventId",
+			"value": "1"
+		},
+		{
+			"key": "impactId",
+			"value": "1"
+		},
+		{
+			"key": "vehiculeId",
+			"value": "VH-001"
+		},
+		{
+			"key": "g3BaseUrl",
+			"value": "http://localhost:8083"
+		},
+		{
+			"key": "g3AccessToken",
+			"value": ""
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "00 — Démarrage",
+			"description": "Sans JWT — faire en premier",
+			"item": [
+				{
+					"name": "GET health (public)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/health",
+						"auth": {
+							"type": "noauth"
+						},
+						"description": "Réponse 200 avec status UP"
+					}
+				}
+			]
+		},
+		{
+			"name": "01 — Connexion",
+			"description": "Choisir UN login selon le test",
+			"item": [
+				{
+					"name": "Login gestionnaire.reseau (G4_OPERATOR)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.reseau\",\n  \"password\": \"password\"\n}"
+						},
+						"description": "Réseau : lignes, arrêts, trajets, horaires"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login gestionnaire.flotte (DISPATCHER)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.flotte\",\n  \"password\": \"password\"\n}"
+						},
+						"description": "Flotte : missions, events, incident-impacts, notifications"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login admin.technique (G4_ADMIN)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin.technique\",\n  \"password\": \"password\"\n}"
+						},
+						"description": "Admin : pending-notifications, operator/status"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "GUIDE — Parcours complet (1→13)",
+			"description": "Exécuter dans l'ordre, une requête à la fois. Ne pas sauter d'étapes.",
+			"item": [
+				{
+					"name": "1. Login flotte (DISPATCHER)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.flotte\",\n  \"password\": \"password\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2. POST ligne",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"L12\",\n  \"nom\": \"Ligne test Postman\",\n  \"description\": \"Parcours guidé\",\n  \"active\": true\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('ligneId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3. POST arrêt A",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR-A\",\n  \"nom\": \"Arrêt A\",\n  \"latitude\": 35.57,\n  \"longitude\": -5.37,\n  \"ligneId\": {{ligneId}}\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('arretId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4. POST arrêt B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR-B\",\n  \"nom\": \"Arrêt B\",\n  \"latitude\": 35.58,\n  \"longitude\": -5.36,\n  \"ligneId\": {{ligneId}}\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('arretId2', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5. POST trajet",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ligneId\": {{ligneId}},\n  \"code\": \"T12-A\",\n  \"nom\": \"Sens aller\",\n  \"sens\": \"ALLER\",\n  \"actif\": true,\n  \"arretSequence\": [\n    { \"arretId\": {{arretId}}, \"sequenceOrder\": 1 },\n    { \"arretId\": {{arretId2}}, \"sequenceOrder\": 2 }\n  ]\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('trajetId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6. POST horaire",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/horaires",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"trajetId\": {{trajetId}},\n  \"arretId\": {{arretId}},\n  \"heurePassage\": \"07:15:00\",\n  \"jourSemaine\": 1,\n  \"validFrom\": \"2026-01-01\",\n  \"validTo\": \"2026-12-31\",\n  \"libelle\": \"Passage matin\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('horaireId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "7. POST affectation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/affectations",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"ligneId\": {{ligneId}},\n  \"dateDebut\": \"2026-05-07T06:00:00Z\",\n  \"statut\": \"ACTIF\",\n  \"commentaire\": \"Test\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('affectationId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "8. POST mission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"ligneId\": {{ligneId}},\n  \"trajetId\": {{trajetId}},\n  \"affectationId\": {{affectationId}},\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\",\n  \"notes\": \"Mission test\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('missionId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "9. POST detect-delay",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/detect-delay",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"missionId\": {{missionId}},\n  \"retardMinutes\": 10,\n  \"cause\": \"Trafic\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('eventId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "10. POST incident-impact (G9)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/incident-impacts",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"incidentReference\": \"INC-TEST-001\",\n  \"missionId\": {{missionId}},\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"resume\": \"Test impact G9\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('impactId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "11. POST notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/notifications/send",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"canal\": \"MOBILE_PUSH\",\n  \"sujet\": \"Retard L12\",\n  \"corps\": \"Retard 10 min\",\n  \"metadata\": { \"missionId\": \"{{missionId}}\" }\n}"
+						}
+					}
+				},
+				{
+					"name": "12. GET missions actives",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/actives"
+					}
+				},
+				{
+					"name": "13. GET health",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/health",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "02 — Lignes",
+			"description": "Login gestionnaire.reseau",
+			"item": [
+				{
+					"name": "POST créer ligne",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"L99\",\n  \"nom\": \"Ligne détaillée\",\n  \"active\": true\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('ligneId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET toutes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes"
+					}
+				},
+				{
+					"name": "GET actives",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/actives"
+					}
+				},
+				{
+					"name": "GET par id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}"
+					}
+				},
+				{
+					"name": "GET trajets de la ligne",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}/trajets"
+					}
+				},
+				{
+					"name": "PUT modifier",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"L99\",\n  \"nom\": \"Ligne maj\",\n  \"active\": true\n}"
+						}
+					}
+				},
+				{
+					"name": "DELETE (fin de test)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/{{ligneId}}",
+						"description": "Optionnel"
+					}
+				}
+			]
+		},
+		{
+			"name": "03 — Arrêts",
+			"description": "Après une ligne (variables ligneId)",
+			"item": [
+				{
+					"name": "POST arrêt 1",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR1\",\n  \"nom\": \"Stop 1\",\n  \"latitude\": 35.57,\n  \"longitude\": -5.37,\n  \"ligneId\": {{ligneId}}\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('arretId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST arrêt 2",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"AR2\",\n  \"nom\": \"Stop 2\",\n  \"latitude\": 35.58,\n  \"longitude\": -5.36,\n  \"ligneId\": {{ligneId}}\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('arretId2', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET tous",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets"
+					}
+				},
+				{
+					"name": "GET par id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets/{{arretId}}"
+					}
+				},
+				{
+					"name": "GET par ligne",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets/ligne/{{ligneId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "04 — Trajets",
+			"description": "Après 2 arrêts",
+			"item": [
+				{
+					"name": "POST créer trajet",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ligneId\": {{ligneId}},\n  \"code\": \"T-A\",\n  \"nom\": \"Aller\",\n  \"sens\": \"ALLER\",\n  \"actif\": true,\n  \"arretSequence\": [\n    { \"arretId\": {{arretId}}, \"sequenceOrder\": 1 },\n    { \"arretId\": {{arretId2}}, \"sequenceOrder\": 2 }\n  ]\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('trajetId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET tous",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets"
+					}
+				},
+				{
+					"name": "GET par id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}"
+					}
+				},
+				{
+					"name": "GET arrêts du trajet",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}/arrets"
+					}
+				}
+			]
+		},
+		{
+			"name": "05 — Horaires",
+			"description": "Après trajet",
+			"item": [
+				{
+					"name": "POST créer horaire",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/horaires",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"trajetId\": {{trajetId}},\n  \"arretId\": {{arretId}},\n  \"heurePassage\": \"08:00:00\",\n  \"jourSemaine\": 1,\n  \"validFrom\": \"2026-01-01\",\n  \"validTo\": \"2026-12-31\",\n  \"libelle\": \"Matin\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('horaireId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET tous",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/horaires"
+					}
+				},
+				{
+					"name": "GET par id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "06 — Affectations",
+			"description": "Login gestionnaire.flotte",
+			"item": [
+				{
+					"name": "POST créer affectation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/affectations",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"ligneId\": {{ligneId}},\n  \"dateDebut\": \"2026-05-07T06:00:00Z\",\n  \"statut\": \"ACTIF\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('affectationId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET toutes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/affectations"
+					}
+				},
+				{
+					"name": "GET par véhicule",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/affectations/vehicule/{{vehiculeId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "07 — Missions",
+			"description": "Login gestionnaire.flotte — après affectation",
+			"item": [
+				{
+					"name": "POST créer mission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"ligneId\": {{ligneId}},\n  \"trajetId\": {{trajetId}},\n  \"affectationId\": {{affectationId}},\n  \"statut\": \"PLANIFIEE\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('missionId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET toutes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions"
+					}
+				},
+				{
+					"name": "GET actives",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/actives"
+					}
+				},
+				{
+					"name": "GET statut",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/{{missionId}}/status"
+					}
+				},
+				{
+					"name": "PUT modifier",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/{{missionId}}",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"ligneId\": {{ligneId}},\n  \"trajetId\": {{trajetId}},\n  \"statut\": \"EN_COURS\",\n  \"plannedStart\": \"2026-05-07T08:00:00Z\"\n}"
+						}
+					}
+				},
+				{
+					"name": "POST clôturer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/{{missionId}}/cloturer"
+					}
+				},
+				{
+					"name": "POST annuler",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions/{{missionId}}/annuler"
+					}
+				}
+			]
+		},
+		{
+			"name": "08 — Événements coordination",
+			"description": "Pas incident G9 ici",
+			"item": [
+				{
+					"name": "POST enregistrer événement",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"RETARD\",\n  \"status\": \"SIGNALE\",\n  \"missionId\": {{missionId}},\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"description\": \"Test\"\n}"
+						}
+					}
+				},
+				{
+					"name": "POST detect-delay",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/detect-delay",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"missionId\": {{missionId}},\n  \"retardMinutes\": 5,\n  \"cause\": \"Test\"\n}"
+						}
+					}
+				},
+				{
+					"name": "POST detect-deviation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/detect-deviation",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"missionId\": {{missionId}},\n  \"details\": \"Hors itinéraire\",\n  \"ecartMetres\": 100\n}"
+						}
+					}
+				},
+				{
+					"name": "POST detect-breakdown",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/detect-breakdown",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"missionId\": {{missionId}},\n  \"symptomes\": \"Panne\"\n}"
+						}
+					}
+				},
+				{
+					"name": "GET par type RETARD",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/type/RETARD"
+					}
+				},
+				{
+					"name": "POST cancel-mission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/events/cancel-mission",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"missionId\": {{missionId}},\n  \"motif\": \"Test\",\n  \"notifierG1\": false\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "09 — Impacts incident G9",
+			"description": "Distinct de /api/g4/events",
+			"item": [
+				{
+					"name": "POST impact",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/incident-impacts",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"incidentReference\": \"INC-2026-001\",\n  \"missionId\": {{missionId}},\n  \"vehiculeId\": \"{{vehiculeId}}\",\n  \"resume\": \"Test REST (Kafka en prod)\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if ([200, 201].includes(pm.response.code)) {",
+									"  const j = pm.response.json();",
+									"  if (j && j.id != null) pm.collectionVariables.set('impactId', String(j.id));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET tous",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/incident-impacts"
+					}
+				},
+				{
+					"name": "GET par mission",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/incident-impacts/mission/{{missionId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "10 — Notifications (G5)",
+			"description": "Login flotte",
+			"item": [
+				{
+					"name": "POST envoyer notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/notifications/send",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"canal\": \"MOBILE_PUSH\",\n  \"sujet\": \"Info voyageurs\",\n  \"corps\": \"Message test\",\n  \"metadata\": { \"missionId\": \"{{missionId}}\" }\n}"
+						},
+						"description": "202 OK ou 202 DEGRADED si G5 arrêté"
+					}
+				}
+			]
+		},
+		{
+			"name": "11 — Référence G7 (lecture v1)",
+			"description": "GET seulement — contrat G7",
+			"item": [
+				{
+					"name": "GET v1 lignes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/lignes"
+					}
+				},
+				{
+					"name": "GET v1 trajets ligne",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/lignes/{{ligneId}}/trajet"
+					}
+				},
+				{
+					"name": "GET v1 horaires ligne",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/lignes/{{ligneId}}/horaires"
+					}
+				},
+				{
+					"name": "GET v1 arrets",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/arrets"
+					}
+				},
+				{
+					"name": "GET v1 arret id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/arrets/{{arretId}}"
+					}
+				}
+			]
+		},
+		{
+			"name": "12 — Supervision",
+			"description": "Admin pour pending et operator",
+			"item": [
+				{
+					"name": "GET logs (public)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/logs",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "GET operator status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/v1/operator/status",
+						"description": "Login admin.technique"
+					}
+				},
+				{
+					"name": "GET pending notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/pending-notifications",
+						"description": "Login admin.technique"
+					}
+				},
+				{
+					"name": "POST retry pending",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/pending-notifications/retry",
+						"description": "Login admin.technique"
+					}
+				},
+				{
+					"name": "GET actuator prometheus",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/actuator/prometheus",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "90 — Erreurs",
+			"description": "Exemples",
+			"item": [
+				{
+					"name": "GET missions sans JWT → 401",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				},
+				{
+					"name": "GET ligne 999999 → 404",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/lignes/999999"
+					}
+				}
+			]
+		},
+		{
+			"name": "99 — Intégration G3 (optionnel)",
+			"description": "Si G3 tourne sur 8083",
+			"item": [
+				{
+					"name": "G3 Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{g3BaseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.flotte\",\n  \"password\": \"password\"\n}"
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('g3AccessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "G4 GET missions avec token G3",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/missions",
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{g3AccessToken}}",
+									"type": "string"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "100 — Chaos G5 (optionnel)",
+			"description": "Arrêter G5 puis tester",
+			"item": [
+				{
+					"name": "POST notification DEGRADED",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/notifications/send",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"CHAOS-001\",\n  \"sourceService\": \"G4\",\n  \"eventType\": \"RETARD\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": { \"email\": \"test@sgitu.local\" }\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "101 — OpenAPI",
+			"item": [
+				{
+					"name": "GET v3 api-docs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/v3/api-docs",
+						"auth": {
+							"type": "noauth"
+						}
+					}
+				}
+			]
+		}
+	]
+}

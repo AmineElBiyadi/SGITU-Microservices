@@ -1,0 +1,21 @@
+{
+  "notificationId": "g4-mission-1-MISSION_PLANIFIED",
+  "eventType": "MISSION_PLANIFIED",
+  "metadata": {
+    "reason": "DEBUT_MISSION",
+    "missionDetails": {
+      "missionId": "M-1",
+      "status": "EN_COURS",
+      "horaire": {
+        "depart": "2026-05-20T08:00:00Z",
+        "arrivee": null
+      },
+      "trajet": {
+        "ligneId": "1"
+      }
+    },
+    "variables": {
+      "vehiculeId": "VH-001"
+    }
+  }
+}

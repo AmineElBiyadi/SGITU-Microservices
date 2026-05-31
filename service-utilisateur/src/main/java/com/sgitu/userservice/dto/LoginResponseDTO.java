@@ -11,8 +11,10 @@ import java.util.List;
 @AllArgsConstructor
 @Schema(description = "Reponse d authentification contenant le token JWT")
 public class LoginResponseDTO {
-    @Schema(description = "JWT signe a inclure dans Authorization: Bearer <token>")
+    @Schema(description = "JWT d acces a inclure dans Authorization: Bearer <token>")
     private String token;
+    @Schema(description = "Token de rafraichissement pour renouveler le JWT d acces")
+    private String refreshToken;
     @Schema(description = "ID de l utilisateur authentifie")
     private Long userId;
     @Schema(description = "Email de l utilisateur authentifie")

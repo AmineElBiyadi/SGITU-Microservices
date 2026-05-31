@@ -1,0 +1,644 @@
+\documentclass[12pt,a4paper]{report}
+
+% =========================
+% Packages
+% =========================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage[most]{tcolorbox}
+\usepackage{hyperref}
+
+% =========================
+% Geometry
+% =========================
+\geometry{
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% =========================
+% Colors
+% =========================
+\definecolor{ensablue}{RGB}{0,51,102}
+
+% =========================
+% Hyperref setup (après les autres packages)
+% =========================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=ensablue,
+    filecolor=magenta,
+    urlcolor=blue
+}
+
+% =========================
+% Header and footer
+% =========================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{SGITU G4 — Coordination des transports}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\setlength{\headheight}{15pt}
+
+% =========================
+% Chapter and section formatting
+% =========================
+\titleformat{\chapter}[display]
+{\normalfont\Large\bfseries\color{ensablue}}
+{\chaptertitlename\ \thechapter}{10pt}{\Large}
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+\titleformat{\section}
+{\normalfont\large\bfseries\color{ensablue}}
+{\thesection}{1em}{}
+
+\titleformat{\subsection}
+{\normalfont\normalsize\bfseries\color{ensablue}}
+{\thesubsection}{1em}{}
+
+\begin{document}
+
+% ============================================
+% PAGE DE GARDE
+% ============================================
+\begin{titlepage}
+    \begin{center}
+        \vspace*{0.5cm}
+        \includegraphics[width=0.4\textwidth]{image.png}
+
+        \vspace{1cm}
+
+        {\large \textbf{Université Abdelmalek Essaâdi}}\\
+        {\large \textbf{École Nationale des Sciences Appliquées de Tétouan}}\\
+
+        \vspace{0.5cm}
+        \rule{\textwidth}{1pt}
+        \vspace{0.8cm}
+
+        {\color{ensablue}\textbf{FILIÈRE : GÉNIE INFORMATIQUE 2}}\\[0.3cm]
+        {\large Module : Microservices}\\
+
+        \vspace{1.2cm}
+
+        \begin{tcolorbox}[
+            colback=gray!10,
+            colframe=ensablue,
+            width=0.9\textwidth,
+            arc=8mm,
+            boxrule=0.8pt,
+            drop shadow
+        ]
+        \centering
+        \Large\bfseries
+        Rapport Technique Final\\
+        Microservice ``Coordination des transports'' (G4)
+        \end{tcolorbox}
+
+        \vspace{1.5cm}
+
+        \begin{minipage}[t]{0.45\textwidth}
+            \textbf{Réalisé par :}\\[0.3cm]
+            EL ASSAL DOUAE\\
+            EL MAKOUDI YOUNES\\
+            MAGNE TSAFACK LYDIVINE MERVEILLE\\
+        \end{minipage}
+        \hfill
+        \begin{minipage}[t]{0.45\textwidth}
+            \raggedleft
+            \textbf{Encadré par :}\\[0.3cm]
+            Pr. BESRI\\
+            \vspace{0.5cm}
+        \end{minipage}
+
+        \vfill
+
+        \rule{\textwidth}{1pt}\\
+        \vspace{0.3cm}
+        {\large \textbf{Année Universitaire : 2025--2026}}
+
+    \end{center}
+\end{titlepage}
+
+% ============================================
+% TABLE DES MATIÈRES
+% ============================================
+\tableofcontents
+\newpage
+
+% ============================================
+% CHAPITRE 1
+% ============================================
+\chapter{Présentation du microservice}
+
+\section{Description du sous-système}
+Le microservice \textbf{G4 -- Coordination des Transports} est responsable de la
+coordination opérationnelle du réseau SGITU. Il centralise la gestion des entités
+métier nécessaires à l'exploitation quotidienne : lignes, trajets, arrêts,
+horaires, affectations véhicule/ligne, missions et événements de coordination
+(retard, déviation, panne, incident, annulation).
+
+Son rôle est de fournir une vue cohérente de l'état opérationnel et de permettre
+le pilotage des missions de transport en temps réel.
+
+\section{Positionnement dans SGITU}
+Dans l'architecture microservices SGITU, G4 occupe une position centrale entre
+les services de planification/exploitation et les services d'intégration temps réel.
+
+\begin{itemize}
+  \item \textbf{Exposition API} : endpoints REST exposés via la Gateway G10.
+  \item \textbf{Interaction suivi des véhicules G7} : consommation des positions véhicules pour le suivi opérationnel et la détection de situations anormales.
+  \item \textbf{Interaction gestion des incidents G9} : consommation Kafka \texttt{incident.transport.topic} et persistance des \textbf{impacts} (\texttt{mission\_incident\_impacts}), sans confondre avec les événements opérationnels G4.
+  \item \textbf{Interaction Billetterie G1} : publication du cycle de vie des missions (Kafka) selon le contrat inter-services.
+  \item \textbf{Interaction Notifications} : relais d'alertes vers le service de notification.
+\end{itemize}
+
+Ainsi, G4 agit comme couche de \textit{coordination métier} entre les données de
+référence, les flux temps réel et les actions opérationnelles.
+
+\section{Fonctionnalités métier implémentées}
+Les fonctionnalités implémentées à ce stade sont les suivantes :
+
+\begin{enumerate}
+  \item \textbf{Gestion du référentiel transport}
+  \begin{itemize}
+    \item CRUD des lignes ;
+    \item CRUD des trajets et consultation des arrêts par trajet ;
+    \item CRUD des arrêts et filtrage par ligne ;
+    \item CRUD des horaires.
+  \end{itemize}
+
+  \item \textbf{Gestion opérationnelle}
+  \begin{itemize}
+    \item gestion des affectations véhicule/ligne ;
+    \item planification et suivi des missions ;
+    \item transitions de mission (en cours, clôture, annulation) .
+  \end{itemize}
+
+  \item \textbf{Gestion des événements de coordination}
+  \begin{itemize}
+    \item enregistrement d'événements métier ;
+    \item détection de retard, déviation, panne et incident ;
+    \item annulation de mission sur décision opérationnelle.
+  \end{itemize}
+
+  \item \textbf{Intégration et supervision}
+  \begin{itemize}
+    \item publication Kafka des événements de cycle de vie mission ;
+    \item endpoints de supervision (\texttt{/api/g4/health}, statut opérateur, logs) ;
+    \item documentation OpenAPI/Swagger et collection Postman de tests.
+  \end{itemize}
+\end{enumerate}
+
+% ============================================
+% CHAPITRE 2
+% ============================================
+\chapter{Conception}
+
+\section{Identification des endpoints REST}
+Les endpoints du microservice G4 sont exposés principalement sous le préfixe \texttt{/api/g4/**}.  
+Le service de notification est exposé via \texttt{/api/notifications/send}.  
+Les endpoints de supervision et d'état opérateur sont également disponibles pour le monitoring du système.
+
+\section{Choix des méthodes HTTP}
+Le design REST suit les conventions standards :
+\begin{itemize}
+    \item \texttt{GET} : consultation des ressources ;
+    \item \texttt{POST} : création de ressource ou action métier ;
+    \item \texttt{PUT} : mise à jour d'une ressource ;
+    \item \texttt{DELETE} : suppression d'une ressource.
+\end{itemize}
+
+\section{Formats d'échange}
+Le format d'échange principal est \textbf{JSON}.  
+Les contrats d'entrée/sortie sont portés par des DTOs avec validations.  
+L'API est documentée via \textbf{Swagger/OpenAPI}.
+
+\section{Gestion des erreurs}
+Les codes HTTP appliqués sont :
+\begin{itemize}
+    \item \texttt{200} / \texttt{201} : succès ;
+    \item \texttt{400} : requête invalide (validation) ;
+    \item \texttt{401} : non authentifié ;
+    \item \texttt{403} : interdit (rôle insuffisant) ;
+    \item \texttt{404} : ressource introuvable ;
+    \item \texttt{409} : conflit métier (ex. deux missions \texttt{EN\_COURS} sur le même véhicule) ;
+    \item \texttt{500} : erreur interne.
+\end{itemize}
+
+\section{Diagrammes UML (conception avancée)}
+Les diagrammes PlantUML du projet sont versionnés dans \texttt{docs/diagrams/} :
+\begin{itemize}
+    \item \texttt{mission-coordination-events.puml} — relation Mission / CoordinationEvent ;
+    \item \texttt{mission-incident-vs-coordination.puml} — séparation impact incident G9 vs événements G4 ;
+    \item \texttt{architecture-externe-g3-g7.puml} — jonctions G3, G7, G1, G5, G10, Kafka.
+\end{itemize}
+Ces modèles intègrent le retour pédagogique du 11 mai 2026 (feedback prof).
+
+% ============================================
+% CHAPITRE 3 bis — Architecture (insert before impl if needed - actually after conception)
+% ============================================
+\chapter{Architecture technique et choix technologiques}
+
+\section{Stack retenue}
+\begin{itemize}
+    \item \textbf{Spring Boot 3.5} : productivité, écosystème mature, intégration native Actuator ;
+    \item \textbf{PostgreSQL} : persistance relationnelle, contraintes d'intégrité, compatibilité JPA ;
+    \item \textbf{Apache Kafka 3.7} : découplage asynchrone inter-groupes (G7, G9, G1) ;
+    \item \textbf{Docker Compose} : orchestration locale, réseau partagé \texttt{sgitu-network} ;
+    \item \textbf{Resilience4j} : circuit breaker sur appels G5 (Chaos Monkey) ;
+    \item \textbf{Micrometer + Prometheus + Grafana} : observabilité (pilier livraison finale).
+\end{itemize}
+
+\section{Justification}
+Le microservice G4 combine REST synchrone (CRUD, supervision) et messaging asynchrone (positions véhicules, incidents). PostgreSQL garantit la cohérence des missions ; Kafka évite le couplage fort avec G7/G9 en charge.
+
+% ============================================
+% CHAPITRE 3
+% ============================================
+\chapter{Implémentation}
+
+\section{Architecture en couches}
+Le microservice suit une architecture en couches :
+\begin{itemize}
+    \item \texttt{controller} : exposition REST ;
+    \item \texttt{service} : logique métier ;
+    \item \texttt{repository} : accès aux données via JPA ;
+    \item \texttt{entity} : modèle de persistance ;
+    \item \texttt{dto/mapper} : transformation entrée/sortie ;
+    \item \texttt{config/security} : sécurité JWT, configuration Kafka et technique.
+\end{itemize}
+
+\section{Technologies utilisées}
+\begin{itemize}
+    \item Java, Spring Boot ;
+    \item Spring Web, Spring Data JPA, Spring Security ;
+    \item JWT (authentification locale de développement) ;
+    \item Kafka (publication/consommation d'événements) ;
+    \item PostgreSQL (runtime) ;
+    \item Swagger/OpenAPI ;
+    \item Docker, Docker Compose.
+\end{itemize}
+\section{Organisation du projet}
+Le projet suit une structure Maven standard avec une séparation claire des responsabilités :
+\begin{itemize}
+    \item \texttt{controller} : exposition des endpoints REST ;
+    \item \texttt{service} : implémentation de la logique métier ;
+    \item \texttt{repository} : accès aux données via Spring Data JPA ;
+    \item \texttt{entity} : modèle de persistance ;
+    \item \texttt{dto} : contrats d'échange API (request/response) ;
+    \item \texttt{mapper} : transformation entre entités et DTO ;
+    \item \texttt{integration} : échanges avec les services externes (G1, G5, G7, G9) ;
+    \item \texttt{config} / \texttt{security} : configuration technique, JWT et sécurité ;
+    \item \texttt{exception} : gestion centralisée des erreurs.
+\end{itemize}
+
+% ============================================
+% CHAPITRE 4
+% ============================================
+\chapter{Documentation API (Swagger / OpenAPI)}
+
+\section{Documentation complète}
+La documentation Swagger UI couvre les endpoints d'authentification, de gestion métier (CRUD + actions), de supervision et d'intégration.
+
+\section{Requêtes et réponses}
+Chaque endpoint dispose de payloads JSON structurés :
+\begin{itemize}
+    \item Request DTO avec validations ;
+    \item Response DTO cohérente avec le domaine.
+\end{itemize}
+
+\section{Cas d'utilisation couverts}
+\begin{itemize}
+    \item Création et gestion de lignes, trajets, arrêts, horaires ;
+    \item Affectation opérationnelle véhicule/ligne ;
+    \item Création et suivi des missions ;
+    \item Détection/déclaration d'événements de coordination ;
+    \item Clôture et annulation de mission.
+\end{itemize}
+
+\section{Accès OpenAPI}
+\begin{itemize}
+    \item \texttt{/swagger-ui.html}
+    \item \texttt{/v3/api-docs}
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_4_1_swagger_overview.png}
+  \caption{Vue d'ensemble Swagger UI montrant les endpoints exposés du microservice G4.}
+  \label{fig:fig_4_1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_4_2_swagger_request_response.png}
+  \caption{Exécution d'un endpoint dans Swagger avec payload de requête JSON et réponse HTTP.}
+  \label{fig:fig_4_2}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_4_3_openapi_json.png}
+  \caption{Extrait du contrat OpenAPI (\texttt{/v3/api-docs}) montrant version, paths et sécurité JWT (\texttt{bearerAuth}).}
+  \label{fig:fig_4_3}
+\end{figure}
+
+% ============================================
+% CHAPITRE 5
+% ============================================
+\chapter{Conteneurisation (Docker)}
+
+\section{Introduction}
+Afin d'assurer la portabilité du microservice et la reproductibilité de son exécution,
+la conteneurisation repose sur une image Docker dédiée à G4. Les dépendances
+d'infrastructure (PostgreSQL et Kafka) sont orchestrées séparément via Docker Compose.
+
+\section{Dockerfile}
+Le Dockerfile est de type \textit{multi-stage}, ce qui signifie qu'il contient deux étapes :
+\begin{itemize}
+    \item une étape de build (compilation et packaging Maven) ;
+    \item une étape runtime (exécution du JAR dans une image plus légère).
+\end{itemize}
+Cette approche réduit la taille de l'image finale et isole les dépendances de compilation de l'environnement d'exécution.
+
+\begin{verbatim}
+# Build
+FROM eclipse-temurin:17-jdk-alpine AS build
+WORKDIR /app
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+COPY src src
+RUN chmod +x mvnw && ./mvnw -q -DskipTests package
+
+# Run
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+RUN addgroup -S sgitu && adduser -S g4 -G sgitu
+COPY --from=build /app/target/service-coordination-transport-0.0.1-SNAPSHOT.jar app.jar
+RUN chown g4:sgitu app.jar
+USER g4
+EXPOSE 8084
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+\end{verbatim}
+
+\section{Image Docker}
+L'image Docker du service est générée localement avec succès à partir du Dockerfile multi-stage.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_5_1_docker_build_success.png}
+  \caption{Build Docker réussi du microservice G4 (image générée et taguée localement).}
+  \label{fig:fig_5_1}
+\end{figure}
+\section{Exécution}
+Le service est exécutable via Docker Compose et exposé sur le port \texttt{8084}.  
+La validation d'exécution est démontrée par :
+\begin{itemize}
+    \item le statut \texttt{Running} des conteneurs dans Docker Compose ;
+    \item l'accès à l'interface Swagger sur \texttt{http://localhost:8084/swagger-ui.html}.
+\end{itemize}
+
+% ============================================
+% CHAPITRE 6
+% ============================================
+\chapter{Orchestration (docker-compose)}
+
+\section{Introduction}
+L'orchestration locale est unifiée dans un seul fichier \texttt{docker-compose.yml},
+ce qui permet de démarrer rapidement un environnement cohérent de test et d'intégration.
+
+\section{docker-compose.yml (contenu exact)}
+\begin{verbatim}
+services:
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: sgitu-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - sgitu-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sgitu-g4-postgres
+    environment:
+      POSTGRES_DB: sgitu_g4
+      POSTGRES_USER: g4
+      POSTGRES_PASSWORD: g4
+    ports:
+      - "5434:5432"
+    volumes:
+      - sgitu_g4_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U g4 -d sgitu_g4"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sgitu-net
+
+  g4-coordination:
+    build: .
+    container_name: sgitu-g4-coordination
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: "8084"
+      JPA_DDL_AUTO: update
+      SGITU_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      SGITU_G9_INCIDENT_TOPIC: "${SGITU_G9_INCIDENT_TOPIC:-incident.transport.topic}"
+      SGITU_G7_POSITIONS_TOPIC: "${SGITU_G7_POSITIONS_TOPIC:-vehicule-positions}"
+      SGITU_G1_MISSION_TOPIC: "${SGITU_G1_MISSION_TOPIC:-missions-lifecycle}"
+      SGITU_G9_CONSUMER_GROUP: "${SGITU_G9_CONSUMER_GROUP:-g4-coordination-g9}"
+      SGITU_G7_CONSUMER_GROUP: "${SGITU_G7_CONSUMER_GROUP:-g4-coordination-g7}"
+      SGITU_G10_URL: "${SGITU_G10_URL:-http://g10-gateway:8080}"
+      SGITU_G5_URL: "${SGITU_G5_URL:-http://g5-notifications:8085}"
+      SGITU_G1_URL: "${SGITU_G1_URL:-http://g1-billetterie:8081}"
+      SGITU_G7_URL: "${SGITU_G7_URL:-http://g7-tracking:8087}"
+      SGITU_G9_URL: "${SGITU_G9_URL:-http://g9-incidents:8089}"
+      SGITU_INTEGRATION_G5_NOTIFICATION_PATH: "${SGITU_INTEGRATION_G5_NOTIFICATION_PATH:-/api/notifications/send}"
+      SGITU_G1_MISSION_LIFECYCLE_PATH: "${SGITU_G1_MISSION_LIFECYCLE_PATH:-/api/internal/missions/events}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sgitu-net
+
+volumes:
+  sgitu_g4_pgdata:
+
+networks:
+  sgitu-net:
+    name: sgitu-network
+    driver: bridge
+\end{verbatim}
+
+\section{Interaction inter-microservices}
+Le compose prépare les variables d'environnement nécessaires à l'intégration avec la Gateway (G10), les notifications (G5), la billetterie (G1), le suivi véhicule (G7) et les incidents (G9).
+
+\section{Simulation distribuée}
+L'environnement local simule un contexte distribué réaliste avec service applicatif, base PostgreSQL et broker Kafka.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_6_1_compose_running_3_3.png}
+  \caption{Environnement Docker Compose G4 démarré avec succès : \texttt{sgitu-kafka}, \texttt{sgitu-g4-postgres} et \texttt{sgitu-g4-coordination} en statut \textit{Running (3/3)}.}
+  \label{fig:fig_6_1}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_6_2_docker_desktop.png}
+  \caption{Docker Desktop : projet \texttt{service-coordination-transport} avec les conteneurs \texttt{sgitu-kafka} (\texttt{apache/kafka:3.7.0}, port \texttt{9092}), \texttt{sgitu-g4-coordination} (port \texttt{8084}) et \texttt{sgitu-g4-postgres} (\texttt{postgres:16-alpine}, port hôte \texttt{5434}) en cours d'exécution.}
+  \label{fig:fig_6_2}
+\end{figure}
+
+% ============================================
+% CHAPITRE 7
+% ============================================
+\chapter{Sécurité (JWT, Spring Security)}
+
+\section{Authentification (JWT)}
+Endpoint de login local : \texttt{POST /api/auth/login}, retour d'un token \texttt{Bearer JWT}.
+\section{Protection des endpoints}
+Les endpoints publics sont limités à :
+\begin{itemize}
+    \item \texttt{/api/auth/login} ;
+    \item \texttt{/api/g4/health} et \texttt{/api/g4/logs} ;
+    \item \texttt{/swagger-ui.html}, \texttt{/v3/api-docs} ;
+    \item \texttt{/actuator/health}, \texttt{/actuator/prometheus} (monitoring).
+\end{itemize}
+Tous les autres endpoints sont protégés par Spring Security + JWT, avec \textbf{re-vérification locale des rôles} (indépendamment de G10).
+
+\section{Gestion des accès (rôles alignés G3)}
+Les rôles JWT suivent la convention inter-groupes G3/G10 :
+\begin{itemize}
+  \item \texttt{ROLE\_OPERATOR} — gestionnaire réseau : CRUD lignes, trajets, arrêts, horaires ;
+  \item \texttt{ROLE\_DISPATCHER} — gestionnaire flotte : missions, affectations, événements, notifications ;
+  \item \texttt{ROLE\_ADMIN\_G4} / \texttt{ROLE\_ADMIN} — supervision et droits complets.
+\end{itemize}
+
+\subsection*{Règles d'accès fonctionnelles}
+\begin{itemize}
+  \item \textbf{Consultation (\texttt{GET /api/g4/**})} : OPERATOR, DISPATCHER, ADMIN\_G4, ADMIN.
+  \item \textbf{Référentiel réseau} (lignes, trajets, arrêts, horaires) : OPERATOR, ADMIN\_G4, ADMIN.
+  \item \textbf{Opérationnel flotte} (missions, événements, incident-impacts, notifications) : DISPATCHER, ADMIN\_G4, ADMIN.
+  \item \textbf{File notifications PENDING} : ADMIN\_G4, ADMIN.
+\end{itemize}
+
+\section{Validation croisée}
+Un token JWT émis par G3 (même secret) est accepté par G4 pour prouver l'intégration sécurisée inter-groupes (capture Postman fournie dans \texttt{rapport/captures/}).
+
+\section{Supervision et monitoring}
+\begin{itemize}
+  \item \texttt{GET /api/g4/health} : DB, Kafka, notifications en attente ;
+  \item \texttt{GET /api/v1/operator/status} : état des intégrations G1/G5/G7/G9/G10 ;
+  \item \texttt{GET /api/g4/logs} : journal applicatif (public, sans token) ;
+  \item \texttt{GET /actuator/prometheus} : métriques pour Prometheus/Grafana.
+\end{itemize}
+
+% ============================================
+% CHAPITRE 8 — Tests
+% ============================================
+\chapter{Validation et tests}
+
+\section{Tests automatisés}
+La commande \texttt{./mvnw test} exécute les tests JUnit 5 et Spring Boot Test :
+\begin{itemize}
+    \item \texttt{LigneApiIntegrationTest} — CRUD lignes, health public ;
+    \item \texttt{MissionVehicleConflictIntegrationTest} — HTTP 409 conflit véhicule ;
+    \item \texttt{SecurityRolesIntegrationTest} — 403 si rôle incorrect (OPERATOR vs DISPATCHER) ;
+    \item \texttt{G4ApplicationTests} — chargement du contexte Spring.
+\end{itemize}
+
+\section{Collection Postman}
+Fichier \texttt{postman/SGITU-G4-Coordination-Transport.postman\_collection.json} :
+\begin{itemize}
+    \item scénarios métier (lignes, missions, événements) ;
+    \item dossier \textbf{99 — Validation croisée} (JWT G3 $\rightarrow$ G4) ;
+    \item dossier \textbf{100 — Chaos Monkey} (G5 down, notifications PENDING).
+\end{itemize}
+
+Exemples JSON : \texttt{postman/examples/}.
+
+% ============================================
+% CHAPITRE 9 — Livraison finale (3 piliers)
+% ============================================
+\chapter{Livraison finale — trois piliers et résilience}
+
+\section{Pilier 1 — Intégration sans couture}
+Stack Docker sur \texttt{sgitu-network} : compose local, \texttt{docker-compose.yml} (profil monitoring, sans G5), intégration dans le monorepo \texttt{SGITU-Microservices/docker-compose.yml}.
+
+\section{Pilier 2 — Observabilité}
+Health, logs structurés, Prometheus, dashboard Grafana (\texttt{monitoring/}).
+
+\section{Pilier 3 — Validation croisée}
+Preuve Postman : appel G4 avec JWT valide émis par G3 (ou G10).
+
+\section{Chaos Monkey (bonus)}
+Appel critique G5 : circuit breaker Resilience4j, réponse \texttt{DEGRADED}, table \texttt{pending\_notifications}, retry automatique. Voir \texttt{docs/SOUTENANCE\_CHAOS\_ORAL.md}.
+
+% ============================================
+% CHAPITRE 10 — Conclusion
+% ============================================
+\chapter{Conclusion}
+
+\section{Bilan}
+Le microservice G4 répond aux cas d'usage prévus : référentiel réseau, pilotage flotte, événements de coordination, intégrations Kafka/HTTP, sécurité JWT, conteneurisation Docker Compose, documentation OpenAPI et tests automatisés.
+
+\section{Perspectives}
+\begin{itemize}
+    \item Déploiement Kubernetes (hors périmètre obligatoire mai 2026) ;
+    \item CI/CD GitHub Actions ;
+    \item Tests inter-groupes en environnement partagé ENSA.
+\end{itemize}
+
+% ============================================
+% ANNEXE — État d'avancement (archivé)
+% ============================================
+\chapter*{Annexe — Historique d'avancement}
+\addcontentsline{toc}{chapter}{Annexe — Historique}
+
+\section*{Fonctionnalités finalisées}
+\begin{itemize}
+    \item Endpoints métiers, persistance, JWT, Kafka, Docker, Swagger, Postman, Resilience4j, monitoring.
+\end{itemize}
+
+\section*{Difficultés résolues}
+\begin{itemize}
+    \item Alignement rôles G3/G4 ; image Kafka ; séparation Incident G9 / Événement G4 ; HTTP 409 conflit véhicule.
+\end{itemize}
+
+\end{document}

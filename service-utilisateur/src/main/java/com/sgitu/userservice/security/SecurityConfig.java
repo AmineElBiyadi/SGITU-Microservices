@@ -40,25 +40,31 @@ public class SecurityConfig {
                     res.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
             )
             .authorizeHttpRequests(auth -> auth
-                // Public -- login (G3 issues the JWT)
+                // Public -- login & refresh (G3 issues the JWT)
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                //.requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
 
                 // Public -- account creation (called by G10 on registration)
                 .requestMatchers(HttpMethod.POST, "/users").permitAll()
 
-                // Swagger / OpenAPI
+                // Swagger / OpenAPI, Actuator & Error endpoint
                 .requestMatchers(
+                    "/error",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/v3/api-docs/**",
-                    "/v3/api-docs.yaml"
+                    "/v3/api-docs.yaml",
+                    "/actuator/**"
                 ).permitAll()
 
                 // Existence check -- any authenticated service
                 .requestMatchers(HttpMethod.GET, "/users/*/exists").authenticated()
+                .requestMatchers(HttpMethod.GET, "/users/drivers/ids").authenticated()
 
                 // Admin endpoints
                 .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/users/roles/*").hasAnyRole("SUPERVISOR", "DISPATCHER")
                 .requestMatchers(HttpMethod.PUT, "/users/*/roles").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/deactivate").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/users/*/activate").hasRole("ADMIN")

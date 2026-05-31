@@ -1,0 +1,23 @@
+@startuml architecture-externe-g4
+title G4 — Architecture externe (extrait)
+
+actor "Gestionnaire flotte" as User
+component "G10 Gateway" as G10
+component "G4 Coordination" as G4
+component "G3 Utilisateurs" as G3
+queue "Kafka\napache/kafka:3.7.0" as Kafka
+component "G7 Suivi véhicule" as G7
+component "G1 Billetterie" as G1
+component "G5 Notifications" as G5
+database "PostgreSQL" as PG
+
+User --> G10 : HTTPS + JWT
+G10 --> G4 : routes /api/g4/**
+G4 --> G3 : Valider utilisateur / conducteur / rôle\n(évolution: GET /users/{id}/exists)
+G4 --> PG : persistance
+G7 --> Kafka : topic vehicule-positions
+Kafka --> G4 : G7VehiclePositionKafkaConsumer
+G4 --> G1 : HTTP / Kafka missions-lifecycle
+G4 --> G5 : POST notification
+
+@enduml

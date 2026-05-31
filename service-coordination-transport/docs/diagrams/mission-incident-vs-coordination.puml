@@ -1,0 +1,37 @@
+@startuml mission-incident-vs-coordination
+title G4 — Séparation incident G9 / événements de coordination
+
+package "G4 — Coordination" {
+  class Mission
+  class CoordinationEventEntity {
+    +type: RETARD | DEVIATION | PANNE | ANNULATION_MISSION
+  }
+  class MissionIncidentImpact {
+    +g9ReferenceIncident: String
+    +vehiculeId: String
+    +g9Type: String
+  }
+  Mission "1" -- "0..*" CoordinationEventEntity : événements opérationnels
+  Mission "1" -- "0..*" MissionIncidentImpact : impacts incident G9
+}
+
+package "G9 <<externe>>" {
+  class Incident {
+    +reference: String
+    +statut: String
+    +vehiculeId: String
+  }
+}
+
+MissionIncidentImpact ..> Incident : référence (pas de copie)
+
+note bottom of CoordinationEventEntity
+  Sources : API G4, Kafka G7 vehicule-positions
+end note
+
+note bottom of MissionIncidentImpact
+  Sources : Kafka G9 incident.transport.topic,
+  POST /api/g4/incident-impacts
+end note
+
+@enduml

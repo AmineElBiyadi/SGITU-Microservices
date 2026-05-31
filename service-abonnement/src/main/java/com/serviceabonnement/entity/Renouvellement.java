@@ -42,6 +42,15 @@ public class Renouvellement {
     @Column(name = "prix_applique")
     private Double prixApplique;
 
+    @Column(name = "user_email")
+    private String userEmail;
+
+    @Column(name = "nb_tentatives")
+    private int nbTentatives;
+
+    @Column(name = "date_derniere_tentative")
+    private LocalDateTime dateDerniereTentative;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
