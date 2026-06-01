@@ -171,6 +171,44 @@ public class KafkaConsumerController {
         }
     }
 
+    // ── G6 — Paiement : notifications paiement via topic payment.notification ──
+    @KafkaListener(
+        topics = "payment.notification",
+        groupId = "notification-group",
+        containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void handlePaymentNotification(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
+        log.info("[KAFKA-G6] Event paiement recu | topic={} | offset={}", record.topic(), record.offset());
+        try {
+            Map<String, Object> event = objectMapper.readValue(record.value(), Map.class);
+
+            String notificationId = String.valueOf(event.getOrDefault(
+                    "notificationId", "G6-PAYMENT-" + UUID.randomUUID()));
+            String eventType = String.valueOf(event.getOrDefault("eventType", "UNKNOWN_PAYMENT"));
+            String channel = String.valueOf(event.getOrDefault("channel", "EMAIL"));
+            String priority = String.valueOf(event.getOrDefault("priority", "NORMAL"));
+            String userId = String.valueOf(resolveRecipientField(event, "userId", "unknown"));
+
+            Map<String, Object> metadata = extractMetadata(event);
+
+            NotificationRequestDTO dto = buildDto(
+                notificationId,
+                "G6_PAYMENT",
+                eventType,
+                channel,
+                priority,
+                userId,
+                event,
+                metadata
+            );
+
+            notificationService.send(dto);
+            acknowledgment.acknowledge();
+        } catch (Exception e) {
+            log.error("[KAFKA-G6] Echec du traitement paiement : {}", e.getMessage(), e);
+        }
+    }
+
     // ── G9 — Incidents : Topic unique 'notifications' (Contrat v5.0) ───────
     @KafkaListener(
         topics = "${g5.kafka.g9-notifications-topic:notifications}", 
