@@ -5,6 +5,7 @@ import com.sgitu.userservice.entity.*;
 import com.sgitu.userservice.exception.*;
 import com.sgitu.userservice.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
@@ -27,6 +29,7 @@ public class UserServiceImpl implements UserService {
     private final UserEventPublisher eventPublisher;
     private final KafkaNotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
+    private final EmailVerificationService verificationService;
 
     @Override
     public UserResponseDTO createUser(UserRequestDTO request) {
@@ -60,15 +63,22 @@ public class UserServiceImpl implements UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .profile(profile)
                 .roles(new HashSet<>(Set.of(role)))
+                .active(false)  // User starts inactive until email is verified
                 .build();
 
         User saved = userRepository.save(user);
         
-        // Notify Group 8 (Analytics) via Kafka
-        eventPublisher.publish(saved.getId(), "active");
+        // Generate and store verification code
+        String verificationCode = verificationService.generateVerificationCode();
+        verificationService.storeVerificationCode(saved.getEmail(), verificationCode);
         
-        // Notify Group 5 (Notifications) via Kafka
-        notificationService.sendNotification("WELCOME", saved);
+        // Log the code for testing purposes (REMOVE IN PRODUCTION)
+        log.info("🔐 VERIFICATION CODE FOR {} : {}", saved.getEmail(), verificationCode);
+        
+        // Send verification email via Kafka (G5)
+        notificationService.sendVerificationEmail(saved, verificationCode);
+        
+        log.info("User created (inactive) - email verification required: {}", saved.getEmail());
         
         return toResponseDTO(saved);
     }
@@ -252,5 +262,62 @@ public class UserServiceImpl implements UserService {
                 .profile(profileDTO)
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    // ── Email Verification Methods ──
+
+    @Override
+    public void verifyEmail(String email, String code) {
+        // Find user by email
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+
+        // Check if already verified
+        if (user.getActive()) {
+            throw new IllegalStateException("This account is already verified");
+        }
+
+        // Verify the code
+        boolean isValid = verificationService.verifyCode(email, code);
+        
+        if (!isValid) {
+            throw new IllegalArgumentException("Invalid or expired verification code");
+        }
+
+        // Activate the user
+        user.setActive(true);
+        userRepository.save(user);
+
+        // Publish event to G8 (Analytics)
+        eventPublisher.publish(user.getId(), "active");
+
+        // Send welcome email via Kafka (G5)
+        notificationService.sendNotification("WELCOME", user);
+
+        log.info("Email successfully verified for: {}", email);
+    }
+
+    @Override
+    public void resendVerificationCode(String email) {
+        // Find user by email
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
+
+        // Check if already verified
+        if (user.getActive()) {
+            throw new IllegalStateException("This account is already verified");
+        }
+
+        // Generate new code
+        String newCode = verificationService.generateVerificationCode();
+        verificationService.storeVerificationCode(email, newCode);
+
+        // Log for testing (REMOVE IN PRODUCTION)
+        log.info("🔐 NEW VERIFICATION CODE FOR {} : {}", email, newCode);
+
+        // Send new code by email
+        notificationService.sendVerificationEmail(user, newCode);
+
+        log.info("New verification code sent to: {}", email);
     }
 }

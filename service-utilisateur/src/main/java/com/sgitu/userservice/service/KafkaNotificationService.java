@@ -104,4 +104,36 @@ public class KafkaNotificationService {
             log.error("Critical: failed to persist failed event to database!", ex);
         }
     }
+
+    /**
+     * Sends email verification code to the user via Kafka.
+     *
+     * @param user The user who needs email verification
+     * @param verificationCode 6-digit verification code
+     */
+    @Async
+    public void sendVerificationEmail(User user, String verificationCode) {
+        try {
+            String username = "User";
+            if (user.getProfile() != null) {
+                username = user.getProfile().getFirstName() + " " + user.getProfile().getLastName();
+            }
+
+            NotificationEventDTO event = NotificationEventDTO.builder()
+                    .eventType("EMAIL_VERIFICATION")
+                    .userId(String.valueOf(user.getId()))
+                    .email(user.getEmail())
+                    .username(username.trim())
+                    .verificationCode(verificationCode)
+                    .timestamp(ZonedDateTime.now(ZoneId.of("UTC"))
+                            .format(DateTimeFormatter.ISO_INSTANT))
+                    .build();
+
+            String jsonPayload = objectMapper.writeValueAsString(event);
+            log.info("Sending verification code via Kafka to: {}", user.getEmail());
+            kafkaTemplate.send(TOPIC, jsonPayload);
+        } catch (Exception e) {
+            log.error("Error sending verification email: {}", e.getMessage());
+        }
+    }
 }

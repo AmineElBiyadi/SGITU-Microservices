@@ -43,6 +43,8 @@ public class SecurityConfig {
                 // Public -- login & refresh (G3 issues the JWT)
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/verify-email").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/resend-code").permitAll()
                 //.requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
 
                 // Public -- account creation (called by G10 on registration)
