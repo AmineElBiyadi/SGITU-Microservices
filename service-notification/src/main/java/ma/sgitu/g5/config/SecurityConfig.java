@@ -2,6 +2,7 @@ package ma.sgitu.g5.config;
 
 import lombok.RequiredArgsConstructor;
 import ma.sgitu.g5.security.GatewayHeaderAuthenticationFilter;
+import ma.sgitu.g5.security.JWTAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -17,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private final JWTAuthenticationFilter jwtAuthenticationFilter;
     private final GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter;
 
     @Bean
@@ -43,7 +45,10 @@ public class SecurityConfig {
                 // Tout le reste : exige une identite deja validee et transmise par l'API Gateway
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(gatewayHeaderAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            // On ajoute le filtre JWT d'abord
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            // Puis le filtre Gateway (qui sera ignoré si le JWT a déjà authentifié la requête)
+            .addFilterAfter(gatewayHeaderAuthenticationFilter, JWTAuthenticationFilter.class);
         
         return http.build();
     }

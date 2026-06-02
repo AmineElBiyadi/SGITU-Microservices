@@ -305,4 +305,38 @@ class AbonnementServiceTest {
 
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // TEST 8 : Notification G5 — Confirmation de Souscription (Kafka)
+    // Scénario : Quand G6 valide le paiement (SUCCESS), notre service doit
+    //            immédiatement publier un événement Kafka vers G5 (Notifications)
+    //            en appelant publishConfirmationSouscription().
+    // ═══════════════════════════════════════════════════════════════════════════════
+    @Test
+    void testConfirmerPaiement_Success_EnvoieNotificationG5() {
+        // Arrange : Callback SUCCESS de G6
+        PaymentCallbackDTO callback = new PaymentCallbackDTO();
+        callback.setTransactionToken("TRX-001");
+        callback.setStatus("SUCCESS");
+
+        when(abonnementRepository.findByPaiementId("TRX-001")).thenReturn(Optional.of(sampleAbonnement));
+        when(abonnementRepository.findByUserIdAndStatut(any(), any())).thenReturn(java.util.List.of());
+        when(abonnementRepository.save(any(Abonnement.class))).thenReturn(sampleAbonnement);
+
+        // Simuler G3 pour le fetchUser dans la méthode de notification
+        com.serviceabonnement.dto.external.UserDTO user = new com.serviceabonnement.dto.external.UserDTO();
+        user.setId(42L);
+        user.setEmail("etudiant@test.com");
+        when(userClient.getUserById(42L)).thenReturn(user);
+
+        // Act
+        abonnementService.confirmerPaiement(callback);
+
+        // Assert : Le publisher Kafka (canal G5) a bien été invoqué avec les bonnes données
+        verify(eventPublisher, times(1))
+                .publishConfirmationSouscription(
+                        argThat(u -> u.getId().equals(42L) && "etudiant@test.com".equals(u.getEmail())),
+                        argThat(a -> a.getPlan().getNomPlan().equals("Forfait Mensuel Étudiant"))
+                );
+    }
 }
