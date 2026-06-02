@@ -1,11 +1,11 @@
 # G10 - Observabilite et Kubernetes
 
-## Docker Compose integration avec Prometheus/Grafana
+## Docker Compose global avec Prometheus/Grafana
 
-Demarrer l'environnement de test avec monitoring :
+Demarrer l'environnement global avec monitoring :
 
 ```powershell
-docker compose -f docker-compose.integration.yml --profile monitoring up -d --build
+docker compose --env-file .env -f docker-compose.yml --profile monitoring up -d --build api-gateway prometheus grafana redis
 ```
 
 URLs :
@@ -39,15 +39,15 @@ curl http://localhost:8080/actuator/prometheus
 Voir les logs :
 
 ```powershell
-docker compose -f docker-compose.integration.yml logs -f api-gateway
-docker compose -f docker-compose.integration.yml logs -f prometheus
-docker compose -f docker-compose.integration.yml logs -f grafana
+docker compose --env-file .env -f docker-compose.yml logs -f api-gateway
+docker compose --env-file .env -f docker-compose.yml logs -f prometheus
+docker compose --env-file .env -f docker-compose.yml logs -f grafana
 ```
 
 Arreter :
 
 ```powershell
-docker compose -f docker-compose.integration.yml --profile monitoring down
+docker compose --env-file .env -f docker-compose.yml --profile monitoring down
 ```
 
 ## Kubernetes local G10 + Redis + Prometheus + Grafana

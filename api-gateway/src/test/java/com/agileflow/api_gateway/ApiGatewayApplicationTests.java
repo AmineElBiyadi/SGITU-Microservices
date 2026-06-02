@@ -3,6 +3,7 @@ package com.agileflow.api_gateway;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
@@ -30,6 +31,13 @@ class ApiGatewayApplicationTests {
 
     @Autowired
     private RouteDefinitionLocator routeDefinitionLocator;
+
+    @BeforeEach
+    void configureWebTestClient() {
+        webTestClient = webTestClient.mutate()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024))
+                .build();
+    }
 
     @Test
     void gatewayErrorsAreStructuredForMissingInvalidAndUnknownRoutes() {

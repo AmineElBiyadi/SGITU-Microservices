@@ -102,6 +102,12 @@ public class SwaggerConfig {
                         .name("G3 - Administration via Gateway")
                         .description("Operations admin G3 protegees par ROLE_ADMIN au niveau Gateway."),
                 new Tag()
+                        .name("G1 - Billetterie via Gateway")
+                        .description("Tickets dematerialises G1 routes par G10."),
+                new Tag()
+                        .name("G1 - Administration via Gateway")
+                        .description("Operations administratives G1 protegees par ROLE_ADMIN."),
+                new Tag()
                         .name("G2 - Abonnements via Gateway")
                         .description("Plans et abonnements G2 routes par G10."),
                 new Tag()
@@ -187,6 +193,7 @@ public class SwaggerConfig {
                 .addPathItem("/api/users", registerPath())
                 .addPathItem("/api/users/roles/{roleName}", usersByRolePath())
                 .addPathItem("/api/users/drivers/ids", driverIdsPath())
+                .addPathItem("/api/users/notification-recipients", notificationRecipientsPath())
                 .addPathItem("/api/users/{id}", userByIdPath())
                 .addPathItem("/api/users/{id}/exists", userExistsPath())
                 .addPathItem("/api/users/{id}/password", changePasswordPath())
@@ -201,6 +208,79 @@ public class SwaggerConfig {
                         "Activate user",
                         "Reactive un compte utilisateur. Acces : ROLE_ADMIN.",
                         true))
+                .addPathItem("/api/v1/tickets", g1TicketsPath())
+                .addPathItem("/api/v1/tickets/{ticketId}", g1TicketByIdPath())
+                .addPathItem("/api/v1/tickets/user/{userId}", g1TicketsByUserPath())
+                .addPathItem("/api/v1/tickets/{ticketId}/pay", g1TicketActionPath(
+                        "payTicketViaGateway",
+                        "Pay ticket",
+                        "Declenche le paiement d'un ticket G1. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/validate", g1TicketActionPath(
+                        "validateTicketViaGateway",
+                        "Validate ticket",
+                        "Valide ou consomme un ticket G1. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/transfer", g1TicketActionPath(
+                        "transferTicketViaGateway",
+                        "Transfer ticket",
+                        "Initie le transfert d'un ticket G1. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/cancel", g1TicketNoBodyActionPath(
+                        "cancelTicketViaGateway",
+                        "Cancel ticket",
+                        "Annule un ticket G1. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/refund", g1TicketNoBodyActionPath(
+                        "refundTicketViaGateway",
+                        "Refund ticket",
+                        "Demande le remboursement d'un ticket G1. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/transfer/accept", g1TransferDecisionPath(
+                        "acceptTransferViaGateway",
+                        "Accept ticket transfer",
+                        "Accepte un transfert de ticket G1 en attente. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/transfer/reject", g1TransferDecisionPath(
+                        "rejectTransferViaGateway",
+                        "Reject ticket transfer",
+                        "Refuse un transfert de ticket G1 en attente. Acces : JWT valide."))
+                .addPathItem("/api/v1/tickets/{ticketId}/transfer/cancel", g1TicketNoBodyActionPath(
+                        "cancelTransferViaGateway",
+                        "Cancel ticket transfer",
+                        "Annule un transfert de ticket G1 en attente. Acces : JWT valide."))
+                .addPathItem("/api/v1/admin/dashboard", g1AdminSimpleGetPath(
+                        "g1AdminDashboardViaGateway",
+                        "G1 admin dashboard",
+                        "Retourne les indicateurs administratifs de billetterie. Acces : ROLE_ADMIN."))
+                .addPathItem("/api/v1/admin/tickets", g1AdminSimpleGetPath(
+                        "g1AdminTicketsViaGateway",
+                        "List G1 tickets",
+                        "Liste les tickets G1 pour le back-office. Acces : ROLE_ADMIN."))
+                .addPathItem("/api/v1/admin/tickets/flagged", g1AdminSimpleGetPath(
+                        "g1AdminFlaggedTicketsViaGateway",
+                        "List flagged tickets",
+                        "Liste les tickets signales G1. Acces : ROLE_ADMIN."))
+                .addPathItem("/api/v1/admin/tickets/{ticketId}/audit", g1AdminTicketGetPath(
+                        "g1AdminTicketAuditViaGateway",
+                        "Get ticket audit",
+                        "Retourne l'audit d'un ticket G1. Acces : ROLE_ADMIN."))
+                .addPathItem("/api/v1/admin/tickets/{ticketId}/flagged", g1AdminTicketGetPath(
+                        "g1AdminFlaggedTicketDetailViaGateway",
+                        "Get flagged ticket detail",
+                        "Retourne le detail d'un ticket signale G1. Acces : ROLE_ADMIN."))
+                .addPathItem("/api/v1/admin/tickets/{ticketId}/flag/resolve", g1AdminTicketBodyPath(
+                        "g1AdminResolveFlagViaGateway",
+                        "Resolve ticket flag",
+                        "Traite et resout un signalement de ticket G1. Acces : ROLE_ADMIN.",
+                        "PUT",
+                        map("resolutionNote", "Signalement revu via G10", "resolvedBy", "1")))
+                .addPathItem("/api/v1/admin/tickets/{ticketId}/flag/confirmfraud", g1AdminTicketBodyPath(
+                        "g1AdminConfirmFraudViaGateway",
+                        "Confirm ticket fraud",
+                        "Confirme une fraude sur un ticket G1. Acces : ROLE_ADMIN.",
+                        "PUT",
+                        map("fraudReason", "Fraude confirmee via G10", "confirmedBy", "1", "blacklistHolder", false)))
+                .addPathItem("/api/v1/admin/tickets/{ticketId}/forcerefund", g1AdminTicketBodyPath(
+                        "g1AdminForceRefundViaGateway",
+                        "Force ticket refund",
+                        "Force le remboursement administratif d'un ticket G1. Acces : ROLE_ADMIN.",
+                        "POST",
+                        map("reason", "Remboursement force via G10", "refundedBy", "1")))
                 .addPathItem("/api/plans", plansPath())
                 .addPathItem("/api/plans/{id}", planByIdPath())
                 .addPathItem("/api/abonnements/souscrire", subscribePath())
@@ -477,6 +557,36 @@ public class SwaggerConfig {
         return new PathItem().get(operation);
     }
 
+    private PathItem notificationRecipientsPath() {
+        Operation operation = securedOperation(
+                "G3 - Utilisateurs via Gateway",
+                "getNotificationRecipientsViaGateway",
+                "Get notification recipients",
+                """
+                        Retourne les destinataires actifs utilisables par G4/G5.
+                        Acces aligne avec G3 : ROLE_G4_OPERATOR ou ROLE_DISPATCHER.
+                        """
+        ).addParametersItem(queryParameter("page", "Numero de page 0-based", "0"))
+                .addParametersItem(queryParameter("size", "Taille de page", "100"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Destinataires notification",
+                                new ObjectSchema(),
+                                "notificationRecipients",
+                                map(
+                                        "recipients", List.of(map(
+                                                "userId", 1,
+                                                "email", "dispatcher@sgitu.ma")),
+                                        "page", 0,
+                                        "size", 100,
+                                        "totalElements", 1)))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_G4_OPERATOR ou ROLE_DISPATCHER requis", "FORBIDDEN", 403))
+                        .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
     private PathItem userByIdPath() {
         Operation getOperation = securedOperation(
                 "G3 - Utilisateurs via Gateway",
@@ -616,6 +726,186 @@ public class SwaggerConfig {
                         .addApiResponse("503", errorResponse("G3 indisponible", "SERVICE_UNAVAILABLE", 503)));
 
         return new PathItem().put(operation);
+    }
+
+    private PathItem g1TicketsPath() {
+        Operation createOperation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                "createG1TicketViaGateway",
+                "Create ticket",
+                "Cree un ticket dematerialise G1. Acces : JWT valide."
+        ).requestBody(jsonRequest(
+                        "Ticket a creer",
+                        new ObjectSchema(),
+                        "createTicket",
+                        g1TicketCreateExample()))
+                .responses(new ApiResponses()
+                        .addApiResponse("201", jsonResponse("Ticket cree", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(createOperation);
+    }
+
+    private PathItem g1TicketByIdPath() {
+        Operation getOperation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                "getG1TicketViaGateway",
+                "Get ticket",
+                "Retourne un ticket G1 par identifiant. Acces : JWT valide."
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1", "TCK-001"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Ticket trouve", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(getOperation);
+    }
+
+    private PathItem g1TicketsByUserPath() {
+        Operation operation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                "listG1TicketsByUserViaGateway",
+                "List user tickets",
+                "Retourne l'historique des tickets d'un utilisateur. Acces : JWT valide."
+        ).addParametersItem(pathParameter("userId", "Identifiant utilisateur", "101"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse(
+                                "Tickets utilisateur",
+                                arrayOf(new ObjectSchema()),
+                                "tickets",
+                                List.of(g1TicketExample())))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g1TicketActionPath(String operationId, String summary, String description) {
+        Operation operation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                operationId,
+                summary,
+                description
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1", "TCK-001"))
+                .requestBody(jsonRequest(
+                        "Payload action ticket",
+                        new ObjectSchema(),
+                        "ticketAction",
+                        map("userId", "101")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Action traitee", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("422", errorResponse("Regle metier non respectee", "UNPROCESSABLE_ENTITY", 422))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g1TicketNoBodyActionPath(String operationId, String summary, String description) {
+        Operation operation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                operationId,
+                summary,
+                description
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1", "TCK-001"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Action traitee", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("422", errorResponse("Regle metier non respectee", "UNPROCESSABLE_ENTITY", 422))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g1TransferDecisionPath(String operationId, String summary, String description) {
+        Operation operation = securedOperation(
+                "G1 - Billetterie via Gateway",
+                operationId,
+                summary,
+                description
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1 en transfert", "TCK-PENDING-001"))
+                .requestBody(jsonRequest(
+                        "Decision de transfert",
+                        new ObjectSchema(),
+                        "transferDecision",
+                        map("acceptingUserId", "102", "reason", "Decision via Gateway G10")))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Decision traitee", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("422", errorResponse("Regle metier non respectee", "UNPROCESSABLE_ENTITY", 422))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().post(operation);
+    }
+
+    private PathItem g1AdminSimpleGetPath(String operationId, String summary, String description) {
+        Operation operation = securedOperation(
+                "G1 - Administration via Gateway",
+                operationId,
+                summary,
+                description
+        ).responses(new ApiResponses()
+                .addApiResponse("200", jsonResponse("Reponse G1 admin", new ObjectSchema(), "g1Admin", map("status", "OK")))
+                .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g1AdminTicketGetPath(String operationId, String summary, String description) {
+        Operation operation = securedOperation(
+                "G1 - Administration via Gateway",
+                operationId,
+                summary,
+                description
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1", "TCK-001"))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Reponse G1 admin", new ObjectSchema(), "g1Admin", map("status", "OK")))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("422", errorResponse("Regle metier non respectee", "UNPROCESSABLE_ENTITY", 422))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        return new PathItem().get(operation);
+    }
+
+    private PathItem g1AdminTicketBodyPath(
+            String operationId,
+            String summary,
+            String description,
+            String method,
+            Map<String, Object> example
+    ) {
+        Operation operation = securedOperation(
+                "G1 - Administration via Gateway",
+                operationId,
+                summary,
+                description
+        ).addParametersItem(pathParameter("ticketId", "Identifiant du ticket G1", "TCK-001"))
+                .requestBody(jsonRequest("Payload admin G1", new ObjectSchema(), "g1AdminAction", example))
+                .responses(new ApiResponses()
+                        .addApiResponse("200", jsonResponse("Action admin traitee", new ObjectSchema(), "ticket", g1TicketExample()))
+                        .addApiResponse("400", errorResponse("Payload invalide", "BAD_REQUEST", 400))
+                        .addApiResponse("401", errorResponse("JWT absent ou invalide", "UNAUTHORIZED", 401))
+                        .addApiResponse("403", errorResponse("ROLE_ADMIN requis", "FORBIDDEN", 403))
+                        .addApiResponse("404", errorResponse("Ticket introuvable", "NOT_FOUND", 404))
+                        .addApiResponse("422", errorResponse("Regle metier non respectee", "UNPROCESSABLE_ENTITY", 422))
+                        .addApiResponse("503", errorResponse("G1 indisponible", "SERVICE_UNAVAILABLE", 503)));
+
+        if ("PUT".equalsIgnoreCase(method)) {
+            return new PathItem().put(operation);
+        }
+        return new PathItem().post(operation);
     }
 
     private PathItem plansPath() {
@@ -2058,6 +2348,35 @@ public class SwaggerConfig {
                         "phone", "+212611111111",
                         "address", "Rabat",
                         "birthDate", "2000-01-01"));
+    }
+
+    private Map<String, Object> g1TicketCreateExample() {
+        return map(
+                "tripId", "MISSION-001",
+                "holderId", "101",
+                "price", 7.5,
+                "currency", "MAD",
+                "ticketType", "ONE_WAY",
+                "ticketClass", "ORDINARY",
+                "identityMethod", "QR_CODE",
+                "rawPayload", "qr-g10-g1-demo",
+                "expiresAt", "2026-05-09T10:00:00Z",
+                "metadata", map("source", "SWAGGER_G10_G1"));
+    }
+
+    private Map<String, Object> g1TicketExample() {
+        return map(
+                "id", "TCK-001",
+                "tripId", "MISSION-001",
+                "holderId", "101",
+                "price", 7.5,
+                "currency", "MAD",
+                "ticketType", "ONE_WAY",
+                "ticketClass", "ORDINARY",
+                "identityMethod", "QR_CODE",
+                "status", "CREATED",
+                "tokenValue", "qr-g10-g1-demo",
+                "expiresAt", "2026-05-09T10:00:00Z");
     }
 
     private Map<String, Object> planExample() {

@@ -1,0 +1,349 @@
+{
+  "info": {
+    "name": "SGITU - G10 Integration G3 G8 G5 Network",
+    "description": "Collection de demonstration reseau : Client -> G10 -> G3, Client -> G10 -> G8, puis notification type G8 -> G10 -> G5. Elle reprend les cas principaux de la collection directe G8 mais les execute via la Gateway.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const secret = pm.collectionVariables.get('jwtSecret') || 'SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!';",
+          "const nowDate = new Date();",
+          "pm.collectionVariables.set('isoNow', nowDate.toISOString());",
+          "pm.collectionVariables.set('today', nowDate.toISOString().slice(0, 10));",
+          "if (!pm.collectionVariables.get('runId')) { pm.collectionVariables.set('runId', 'net-' + Date.now()); }",
+          "pm.collectionVariables.set('testEmail', 'net.' + pm.collectionVariables.get('runId') + '@sgitu.ma');",
+          "pm.collectionVariables.set('g5NotificationId', 'g8-alert-' + pm.collectionVariables.get('runId'));",
+          "function b64url(input) { return CryptoJS.enc.Base64.stringify(input).replace(/=+$/,'').replace(/\\+/g,'-').replace(/\\//g,'_'); }",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'postman-' + Math.random().toString(36).slice(2) };",
+          "  const h = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "  const p = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const s = b64url(CryptoJS.HmacSHA256(h + '.' + p, secret));",
+          "  return h + '.' + p + '.' + s;",
+          "}",
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'false') {",
+          "  pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "  pm.collectionVariables.set('operatorToken', makeJwt('operator.g10@sgitu.ma', '2', ['ROLE_OPERATOR'], 3600));",
+          "  pm.collectionVariables.set('staffToken', makeJwt('staff.g10@sgitu.ma', '3', ['ROLE_STAFF'], 3600));",
+          "  pm.collectionVariables.set('passengerToken', makeJwt('passenger.g10@sgitu.ma', '4', ['ROLE_PASSENGER'], 3600));",
+          "  pm.collectionVariables.set('expiredToken', makeJwt('expired.g10@sgitu.ma', '5', ['ROLE_ADMIN'], -60));",
+          "  pm.collectionVariables.set('invalidToken', pm.collectionVariables.get('adminToken') + 'invalid');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!", "type": "string" },
+    { "key": "autoGenerateTokens", "value": "true", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "operatorToken", "value": "", "type": "string" },
+    { "key": "staffToken", "value": "", "type": "string" },
+    { "key": "passengerToken", "value": "", "type": "string" },
+    { "key": "expiredToken", "value": "", "type": "string" },
+    { "key": "invalidToken", "value": "", "type": "string" },
+    { "key": "createdUserToken", "value": "", "type": "string" },
+    { "key": "createdUserRefreshToken", "value": "", "type": "string" },
+    { "key": "createdUserId", "value": "1", "type": "string" },
+    { "key": "reportId", "value": "000000000000000000000000", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "isoNow", "value": "", "type": "string" },
+    { "key": "today", "value": "", "type": "string" },
+    { "key": "g5NotificationId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preconditions reseau",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G10 UP', function () { pm.response.to.have.status(200); });",
+            "pm.test('Body UP', function () { pm.expect(pm.response.text()).to.include('UP'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "X-Correlation-Id", "value": "net-health-g10" }], "url": "{{baseUrl}}/actuator/health" }
+        },
+        {
+          "name": "00.2 - 200 health G5 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G5 health routed by G10', function () { pm.response.to.have.status(200); });",
+            "pm.test('Correlation id returned', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('net-health-g5'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "X-Correlation-Id", "value": "net-health-g5" }], "url": "{{baseUrl}}/api/notifications/health" }
+        },
+        {
+          "name": "00.3 - 200 OpenAPI G10 contient G3 G8 G5",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('OpenAPI accessible', function () { pm.response.to.have.status(200); });",
+            "pm.test('Paths G3/G8/G5 presents', function () { const paths = pm.response.json().paths; pm.expect(paths['/api/users']).to.exist; pm.expect(paths['/api/v1/analytics/dashboard']).to.exist; pm.expect(paths['/api/notifications/send']).to.exist; });"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/v3/api-docs" }
+        }
+      ]
+    },
+    {
+      "name": "01 - G3 utilisateur et JWT via G10",
+      "item": [
+        {
+          "name": "01.1 - 201 register user G3 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('User created or already exists', function () { pm.expect([201, 409]).to.include(pm.response.code); });",
+            "if (pm.response.code === 201) { const json = pm.response.json(); pm.collectionVariables.set('createdUserId', String(json.id)); }"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "net-g3-register" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"Network\",\n    \"lastName\": \"Integration\",\n    \"phone\": \"+212600000099\",\n    \"address\": \"Casablanca\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "01.2 - 200 login G3 via G10 genere JWT",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login success', function () { pm.response.to.have.status(200); });",
+            "pm.test('Token captured', function () { const json = pm.response.json(); pm.expect(json.token).to.be.a('string'); pm.collectionVariables.set('createdUserToken', json.token); if (json.refreshToken) pm.collectionVariables.set('createdUserRefreshToken', json.refreshToken); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "net-g3-login" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Securite G10 avant G8",
+      "item": [
+        {
+          "name": "02.1 - 401 analytics sans JWT",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Unauthorized', function () { pm.response.to.have.status(401); });",
+            "pm.test('Code UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "X-Correlation-Id", "value": "net-g8-no-jwt" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.2 - 401 analytics JWT invalide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Invalid token rejected', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{invalidToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-invalid-jwt" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.3 - 401 analytics JWT expire",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Expired token rejected', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{expiredToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-expired-jwt" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.4 - 403 analytics ROLE_PASSENGER",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Forbidden', function () { pm.response.to.have.status(403); });",
+            "pm.test('Code FORBIDDEN', function () { pm.expect(pm.response.json().code).to.eql('FORBIDDEN'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{passengerToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-passenger-forbidden" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "02.5 - 200 analytics ROLE_OPERATOR",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Operator allowed', function () { pm.response.to.have.status(200); });",
+            "pm.test('Correlation id returned', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('net-g8-operator-ok'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{operatorToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-operator-ok" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        }
+      ]
+    },
+    {
+      "name": "03 - G8 ingestion via G10",
+      "item": [
+        {
+          "name": "03.1 - Ingest tickets",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Tickets ingested', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-ingest-tickets" }],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-001\",\n    \"userId\": \"USR-{{runId}}\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"station\": \"Casa Port\",\n    \"amount\": 7.5\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          }
+        },
+        {
+          "name": "03.2 - Ingest users depuis contexte G3",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Users ingested', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-ingest-users" }],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"userId\": \"{{createdUserId}}\",\n    \"email\": \"{{testEmail}}\",\n    \"role\": \"ROLE_PASSENGER\",\n    \"active\": true,\n    \"timestamp\": \"{{isoNow}}\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/users"
+          }
+        },
+        {
+          "name": "03.3 - Ingest payments",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Payments ingested', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-ingest-payments" }],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"paymentId\": \"PAY-{{runId}}-001\",\n    \"userId\": \"{{createdUserId}}\",\n    \"amount\": 50,\n    \"method\": \"CARD\",\n    \"status\": \"SUCCESS\",\n    \"timestamp\": \"{{isoNow}}\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/payments"
+          }
+        },
+        {
+          "name": "03.4 - Ingest incidents",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Incidents ingested', function () { pm.expect([200, 201, 207]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-ingest-incidents" }],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"incidentId\": \"INC-{{runId}}-001\",\n    \"type\": \"delay\",\n    \"line\": \"L1\",\n    \"zone\": \"CENTER\",\n    \"severity\": \"MEDIUM\",\n    \"timestamp\": \"{{isoNow}}\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/incidents"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - G8 analytics reports ML via G10",
+      "item": [
+        {
+          "name": "04.1 - GET dashboard",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Dashboard OK', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{operatorToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-dashboard" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        },
+        {
+          "name": "04.2 - GET trips summary",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Trips summary OK', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-trips" }], "url": "{{baseUrl}}/api/v1/analytics/trips/summary?period={{today}}" }
+        },
+        {
+          "name": "04.3 - POST generate report",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Report generated', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+            "const json = pm.response.json(); if (json.id) pm.collectionVariables.set('reportId', json.id); if (json.reportId) pm.collectionVariables.set('reportId', json.reportId);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-report-generate" }],
+            "body": { "mode": "raw", "raw": "{\n  \"period\": \"{{today}}\",\n  \"snapshotTypes\": [\"TRIPS\", \"REVENUE\", \"USERS\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/analytics/reports/generate"
+          }
+        },
+        {
+          "name": "04.4 - GET report by id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Report lookup handled', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-report-get" }], "url": "{{baseUrl}}/api/v1/analytics/reports/{{reportId}}" }
+        },
+        {
+          "name": "04.5 - POST ML peak hours",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('ML peak hours OK', function () { pm.response.to.have.status(200); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{operatorToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-ml-peak" }],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 },\n    { \"hour\": 17, \"validationCount\": 180 }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/predict/peak-hours"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Erreurs G8 via G10",
+      "item": [
+        {
+          "name": "05.1 - 400 empty batch",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Empty batch rejected', function () { pm.response.to.have.status(400); });"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-empty-batch" }], "body": { "mode": "raw", "raw": "[]", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/v1/ingestion/tickets" }
+        },
+        {
+          "name": "05.2 - 207 partial missing timestamp",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Partial ingestion', function () { pm.response.to.have.status(207); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-partial" }],
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-GOOD\",\n    \"userId\": \"USR-GOOD\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"status\": \"validated\"\n  },\n  {\n    \"ticketId\": \"TCK-{{runId}}-BAD\",\n    \"userId\": \"USR-BAD\",\n    \"status\": \"validated\"\n  }\n]", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          }
+        },
+        {
+          "name": "05.3 - 404 report inexistant",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Missing report handled', function () { pm.response.to.have.status(404); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-report-404" }], "url": "{{baseUrl}}/api/v1/analytics/reports/000000000000000000000000" }
+        }
+      ]
+    },
+    {
+      "name": "06 - G8 vers G5 via G10",
+      "item": [
+        {
+          "name": "06.1 - Send notification style G8 alert via G10",
+          "description": "Ce test valide le chemin reseau attendu pour les alertes G8 : G8 devrait utiliser cette meme route Gateway vers G5.",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Notification accepted by G5 through G10', function () { pm.expect([202]).to.include(pm.response.code); });",
+            "pm.test('Notification id returned', function () { pm.expect(pm.response.json().notificationId).to.eql(pm.collectionVariables.get('g5NotificationId')); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-Correlation-Id", "value": "net-g8-to-g5-alert" }],
+            "body": { "mode": "raw", "raw": "{\n  \"notificationId\": \"{{g5NotificationId}}\",\n  \"sourceService\": \"G8_ANALYTICS\",\n  \"eventType\": \"ANALYTICS_THRESHOLD_ALERT\",\n  \"channel\": \"LOG\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"admin\",\n    \"email\": \"admin.g10@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"metric\": \"active_vehicles_count\",\n    \"threshold\": 10,\n    \"currentValue\": 3,\n    \"source\": \"Postman network test G8-G5 via G10\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "06.2 - Admin list G5 notifications by source G8",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Admin G5 source list accessible', function () { pm.response.to.have.status(200); });",
+            "pm.test('Page response', function () { pm.expect(pm.response.json()).to.have.property('content'); });"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "net-g5-by-source-g8" }], "url": "{{baseUrl}}/api/notifications/admin/notifications/by-source/G8_ANALYTICS?page=0&size=10" }
+        }
+      ]
+    },
+    {
+      "name": "07 - Resilience reseau",
+      "item": [
+        {
+          "name": "07.1 - G8 down -> 503 via G10",
+          "description": "Avant ce test manuel : docker stop sgitu-int-g8-analytics ou docker stop g8-analytics-service. Si G8 tourne encore, la reponse peut etre 200.",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G8 up ou indisponible gere proprement', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+            "if (pm.response.code === 503) { pm.test('SERVICE_UNAVAILABLE', function () { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }); }"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "X-Correlation-Id", "value": "net-g8-down" }], "url": "{{baseUrl}}/api/v1/analytics/dashboard" }
+        }
+      ]
+    }
+  ]
+}

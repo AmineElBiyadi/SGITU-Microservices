@@ -17,7 +17,8 @@ RUN apt-get update && \
     adduser --system --ingroup appgroup --no-create-home appuser
 
 COPY --from=builder /app/target/notification-service-1.0.0.jar app.jar
-RUN chown appuser:appgroup app.jar
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app/logs app.jar
 
 USER appuser
 EXPOSE 8085

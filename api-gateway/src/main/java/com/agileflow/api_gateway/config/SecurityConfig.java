@@ -68,6 +68,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/users").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/users/roles/*")
                                 .hasAnyAuthority("ROLE_SUPERVISOR", "ROLE_DISPATCHER")
+                        .pathMatchers(HttpMethod.GET, "/api/users/notification-recipients")
+                                .hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_DISPATCHER")
                         .pathMatchers(
                                 "/api/plans",
                                 "/api/plans/**",
@@ -83,6 +85,7 @@ public class SecurityConfig {
                                 "/api/v1/ticket-types/**"
                         ).hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.DELETE, "/api/users/*").hasAuthority("ROLE_ADMIN")
+                        .pathMatchers("/api/v1/tickets", "/api/v1/tickets/**").authenticated()
                         .pathMatchers(
                                 "/api/v1/analytics/**",
                                 "/predict/**"
@@ -90,7 +93,7 @@ public class SecurityConfig {
                         .pathMatchers("/api/notifications/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/v1/operator/status")
                                 .hasAuthority("ROLE_G4_ADMIN")
-                        .pathMatchers(HttpMethod.GET, "/api/v1/**", "/api/g4/**")
+                        .pathMatchers(HttpMethod.GET, "/api/g4/**")
                                 .hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_DISPATCHER", "ROLE_G4_ADMIN")
                         .pathMatchers(
                                 HttpMethod.POST,
