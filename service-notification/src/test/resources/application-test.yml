@@ -1,0 +1,58 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:notifications_test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  sql:
+    init:
+      mode: never
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    listener:
+      auto-startup: false
+    consumer:
+      group-id: notification-group-test
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      retries: 0
+
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+
+jwt:
+  secret: test-jwt-secret-key-sgitu-g5-minimum-256-bits-required-for-hmac
+
+firebase:
+  credentials:
+    path:
+
+twilio:
+  account-sid:
+  auth-token:
+  from-phone:
+
+g5:
+  kafka:
+    g9-notifications-topic: notifications
+
+logging:
+  level:
+    ma.sgitu.g5: WARN
+    org.springframework.kafka: WARN

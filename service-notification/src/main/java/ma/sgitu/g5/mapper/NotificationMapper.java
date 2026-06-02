@@ -29,44 +29,54 @@ public interface NotificationMapper {
         @Mapping(target = "email",           source = "recipient.email"),
         @Mapping(target = "phone",           source = "recipient.phone"),
         @Mapping(target = "deviceToken",     source = "recipient.deviceToken"),
-        @Mapping(target = "recipient",       ignore = true),   // résolu manuellement
+        @Mapping(target = "recipient",       expression = "java(ma.sgitu.g5.mapper.NotificationMapper.resolveRecipientString(dto))"),
         @Mapping(target = "status",          constant = "PENDING"),
-        @Mapping(target = "type",            ignore = true),   // converti via @AfterMapping
-        @Mapping(target = "subject",         ignore = true),   // hydraté par TemplateService
-        @Mapping(target = "content",         ignore = true),   // hydraté par TemplateService
+        @Mapping(target = "type",            expression = "java(ma.sgitu.g5.entity.NotificationType.valueOf(dto.getChannel().toUpperCase()))"),
+        @Mapping(target = "subject",         ignore = true),
+        @Mapping(target = "content",         ignore = true),
         @Mapping(target = "provider",        ignore = true),
         @Mapping(target = "retryCount",      ignore = true),
-        @Mapping(target = "createdAt",       ignore = true),
+        @Mapping(target = "createdAt",       expression = "java(java.time.LocalDateTime.now())"),
         @Mapping(target = "sentAt",          ignore = true)
     })
     Notification toEntity(NotificationRequestDTO dto);
 
     /**
-     * Résout NotificationType à partir du channel string après le mapping principal.
+     * Résout la valeur du champ recipient (string) selon le canal.
      */
+    static String resolveRecipientString(NotificationRequestDTO dto) {
+        if (dto == null || dto.getRecipient() == null) {
+            return "system";
+        }
+        return switch (dto.getChannel() != null ? dto.getChannel() : "") {
+            case "EMAIL" -> dto.getRecipient().getEmail() != null ? dto.getRecipient().getEmail() : "unknown";
+            case "SMS"   -> dto.getRecipient().getPhone() != null ? dto.getRecipient().getPhone() : "unknown";
+            case "PUSH"  -> dto.getRecipient().getDeviceToken() != null ? dto.getRecipient().getDeviceToken() : "unknown";
+            case "LOG"   -> dto.getRecipient().getUserId() != null ? dto.getRecipient().getUserId() : "system";
+            default      -> "unknown";
+        };
+    }
+
+    /**
+     * @deprecated Conservé pour compatibilité ; la logique est dans {@link #resolveRecipientString}.
+     */
+    @Deprecated
     @AfterMapping
     default void resolveType(@MappingTarget Notification entity, NotificationRequestDTO dto) {
-        try {
+        if (entity.getType() == null && dto.getChannel() != null) {
             entity.setType(NotificationType.valueOf(dto.getChannel().toUpperCase()));
-        } catch (Exception e) {
-            entity.setType(NotificationType.EMAIL);
         }
-        entity.setCreatedAt(LocalDateTime.now());
+        if (entity.getCreatedAt() == null) {
+            entity.setCreatedAt(LocalDateTime.now());
+        }
         if (entity.getStatus() == null) {
             entity.setStatus(NotificationStatus.PENDING);
         }
         if (entity.getPriority() == null) {
             entity.setPriority("NORMAL");
         }
-        // Résolution du champ recipient (string simple)
-        if (dto.getRecipient() != null) {
-            String recipientStr = switch (dto.getChannel()) {
-                case "EMAIL" -> dto.getRecipient().getEmail();
-                case "SMS"   -> dto.getRecipient().getPhone();
-                case "PUSH"  -> dto.getRecipient().getDeviceToken();
-                default      -> "unknown";
-            };
-            entity.setRecipient(recipientStr != null ? recipientStr : "unresolved");
+        if (entity.getRecipient() == null) {
+            entity.setRecipient(resolveRecipientString(dto));
         }
     }
 

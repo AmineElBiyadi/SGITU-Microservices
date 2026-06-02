@@ -131,45 +131,6 @@ public class KafkaConsumerController {
         }
     }
 
-    // ── G7 — Suivi Vehicules : Logs critiques admin (topic dedie) ─────────
-    @KafkaListener(
-        topics = "${g5.kafka.g7-log-topic:g7.log-alerts}",
-        groupId = "notification-group",
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void handleG7LogAlert(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
-        log.info("[KAFKA-G7] Log alert recu | topic={} | offset={}", record.topic(), record.offset());
-        try {
-            Map<String, Object> event = objectMapper.readValue(record.value(), Map.class);
-
-            String eventType = (String) event.getOrDefault("eventType", "LOG_ALERT_ADMIN");
-            String channel = (String) event.getOrDefault("channel", "EMAIL");
-            String priority = (String) event.getOrDefault("priority", "HIGH");
-
-            String notificationId = String.valueOf(event.getOrDefault(
-                    "notificationId", "G7-LOG-" + UUID.randomUUID()));
-
-            String userId = String.valueOf(resolveRecipientField(event, "userId", "admin"));
-
-            Map<String, Object> metadata = extractMetadata(event);
-
-            NotificationRequestDTO dto = buildDto(
-                notificationId,
-                "G7_SUIVI_VEHICULES",
-                eventType,
-                channel,
-                priority,
-                userId,
-                event,
-                metadata
-            );
-
-            notificationService.send(dto);
-            acknowledgment.acknowledge();
-        } catch (Exception e) {
-            log.error("[KAFKA-G7] Echec du traitement : {}", e.getMessage());
-        }
-    }
 
     // ── G6 — Paiement : notifications paiement via topic payment.notification ──
     @KafkaListener(

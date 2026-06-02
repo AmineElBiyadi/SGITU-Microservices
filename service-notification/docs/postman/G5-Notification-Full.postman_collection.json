@@ -1,0 +1,530 @@
+{
+  "info": {
+    "_postman_id": "g5-notification-full-collection",
+    "name": "SGITU G5 — Notification Service (Complet)",
+    "description": "Collection Postman complète pour le microservice G5 (Notifications).\n\nCouverture :\n- Health & Swagger\n- Envoi REST (EMAIL, SMS, PUSH, LOG)\n- Consultation, filtres, retry\n- Admin (ROLE_ADMIN)\n- Via API Gateway G10\n- Simulations des contrats G1→G10 (REST + payloads Kafka documentés)\n\nVariables :\n- `g5BaseUrl` : http://localhost:8085 (direct)\n- `gatewayUrl` : http://localhost:8080 (via G10)\n- `accessToken` : JWT obtenu via Login G10",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "g5BaseUrl", "value": "http://localhost:8085", "type": "string" },
+    { "key": "gatewayUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "lastNotificationId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "0. Santé & Observabilité",
+      "item": [
+        {
+          "name": "Health Check G5",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Service UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Actuator Health",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/swagger-ui.html"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Envoi REST direct G5",
+      "item": [
+        {
+          "name": "Send EMAIL (G6 Paiement)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "svc-g6" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" },
+              { "key": "X-Source-Group", "value": "G6" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G6_PAYMENT\",\n  \"eventType\": \"PAYMENT_SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"user-123\",\n    \"email\": \"test.client@example.com\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"amount\": \"150\",\n      \"paymentMethod\": \"CMI\",\n      \"invoiceNumber\": \"INV-2026-001\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                "const json = pm.response.json();",
+                "pm.collectionVariables.set('lastNotificationId', json.notificationId);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Send SMS (G9 Incidents)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "svc-g9" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G9_INCIDENT\",\n  \"eventType\": \"INCIDENT_CONFIRMATION\",\n  \"channel\": \"SMS\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"user-456\",\n    \"phone\": \"+212600000000\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"reference\": \"INC-2026-042\",\n      \"type\": \"RETARD\",\n      \"statut\": \"OUVERT\",\n      \"lienSuivi\": \"https://sgitu.ma/suivi/INC-2026-042\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "Send PUSH (G4 Coordination)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "svc-g4" },
+              { "key": "X-Roles", "value": "ROLE_FLEET_WRITE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G4_COORDINATION\",\n  \"eventType\": \"MISSION_ASSIGNED\",\n  \"channel\": \"PUSH\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"driver-789\",\n    \"deviceToken\": \"fcm-token-example-123456\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"missionCode\": \"M-9988\",\n      \"lineId\": \"L-12\",\n      \"driverName\": \"Youssef\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "Send LOG admin (G7 Suivi véhicules)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "admin-ops" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G7_SUIVI_VEHICULES\",\n  \"eventType\": \"LOG_ALERT_ADMIN\",\n  \"channel\": \"LOG\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"system\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"logLevel\": \"ERROR\",\n      \"serviceName\": \"G7\",\n      \"message\": \"Anomalie GPS véhicule BUS-42\",\n      \"source\": \"GPS_SENSOR\",\n      \"timestamp\": \"2026-06-02T10:00:00\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "Idempotence — même notificationId (ALREADY_QUEUED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "test-idem" },
+              { "key": "X-Roles", "value": "ROLE_USER" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"idem-test-001\",\n  \"sourceService\": \"G6_PAYMENT\",\n  \"eventType\": \"PAYMENT_SUCCESS\",\n  \"channel\": \"LOG\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": { \"userId\": \"u-1\" },\n  \"metadata\": { \"data\": { \"amount\": \"10\" } }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('ALREADY_QUEUED on duplicate', () => {",
+                "  if (pm.response.code === 202) {",
+                "    pm.expect(['QUEUED','ALREADY_QUEUED']).to.include(pm.response.json().status);",
+                "  }",
+                "});"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "2. Consultation & Retry",
+      "item": [
+        {
+          "name": "List notifications (filtres)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "viewer" },
+              { "key": "X-Roles", "value": "ROLE_USER" }
+            ],
+            "url": {
+              "raw": "{{g5BaseUrl}}/api/notifications?page=0&size=20&sort=createdAt,desc&status=SENT&sourceService=G6_PAYMENT",
+              "host": ["{{g5BaseUrl}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "createdAt,desc" },
+                { "key": "status", "value": "SENT" },
+                { "key": "sourceService", "value": "G6_PAYMENT" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get notification by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "viewer" },
+              { "key": "X-Roles", "value": "ROLE_USER" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/{{lastNotificationId}}"
+          }
+        },
+        {
+          "name": "Retry notification FAILED",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "ops" },
+              { "key": "X-Roles", "value": "ROLE_USER" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/{{lastNotificationId}}/retry"
+          }
+        },
+        {
+          "name": "Invalid status filter (400)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "viewer" },
+              { "key": "X-Roles", "value": "ROLE_USER" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications?status=INVALID_STATUS"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "3. Admin (ROLE_ADMIN)",
+      "item": [
+        {
+          "name": "Stats globales",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "admin" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/admin/stats"
+          }
+        },
+        {
+          "name": "List admin (filtres complets)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "admin" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "url": {
+              "raw": "{{g5BaseUrl}}/api/notifications/admin/notifications?channel=LOG&status=PENDING",
+              "host": ["{{g5BaseUrl}}"],
+              "path": ["api", "notifications", "admin", "notifications"],
+              "query": [
+                { "key": "channel", "value": "LOG" },
+                { "key": "status", "value": "PENDING" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Notifications FAILED",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "admin" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/admin/notifications/failed"
+          }
+        },
+        {
+          "name": "By source G4_COORDINATION",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "admin" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/admin/notifications/by-source/G4_COORDINATION"
+          }
+        },
+        {
+          "name": "Health détaillé admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "admin" },
+              { "key": "X-Roles", "value": "ROLE_ADMIN" }
+            ],
+            "url": "{{g5BaseUrl}}/api/notifications/admin/health/detailed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Via API Gateway G10",
+      "item": [
+        {
+          "name": "Login G10 (stocke accessToken)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sgitu.ma\",\n  \"password\": \"Admin1234!\"\n}"
+            },
+            "url": "{{gatewayUrl}}/auth/login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "if (pm.response.code === 200) {",
+                "  pm.collectionVariables.set('accessToken', pm.response.json().accessToken);",
+                "}"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Send via Gateway (JWT Bearer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G10_AUTH\",\n  \"eventType\": \"VERIFY_EMAIL\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"new-user\",\n    \"email\": \"new@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"verificationLink\": \"http://localhost:8080/auth/verify-email?token=abc123\"\n    }\n  }\n}"
+            },
+            "url": "{{gatewayUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "List via Gateway",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{gatewayUrl}}/api/notifications?page=0&size=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Simulations inter-microservices (REST)",
+      "description": "Chaque requête simule le contrat qu'un microservice envoie à G5.\nKafka (G1, G2, G3, G6, G9) : publier sur les topics indiqués dans la description de chaque requête.",
+      "item": [
+        {
+          "name": "G1 Billetterie — TICKET_ISSUED (équiv. Kafka ticket.created)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g1-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" },
+              { "key": "X-Source-Group", "value": "G1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"G1-TK-777-TICKET_ISSUED-EMAIL\",\n  \"sourceService\": \"G1_BILLETTERIE\",\n  \"eventType\": \"TICKET_ISSUED\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"passenger-1\",\n    \"email\": \"passenger@sgitu.ma\",\n    \"deviceToken\": \"fcm-token-g1\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"ticketId\": \"TK-777\",\n      \"tokenValue\": \"QR-ABC123\",\n      \"expiresAt\": \"2026-12-31T23:59:59\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "Kafka réel : topic `ticket.*` (ex: ticket.created). G5 envoie automatiquement EMAIL + PUSH."
+          }
+        },
+        {
+          "name": "G2 Abonnement — RENOUVELLEMENT (équiv. Kafka abonnement.*)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g2-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"G2-AB-9-RENOUVELLEMENT_EFFECTUE-EMAIL\",\n  \"sourceService\": \"G2_ABONNEMENT\",\n  \"eventType\": \"RENOUVELLEMENT_EFFECTUE\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"sub-1\",\n    \"email\": \"abonne@sgitu.ma\",\n    \"phone\": \"+212611111111\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"planNom\": \"Mensuel Casablanca\",\n      \"montantPaye\": \"299\",\n      \"nouvelleDateFin\": \"2026-07-02\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "Kafka réel : topic `abonnement.*`. Payload utilise champ `type` et `channels[]`."
+          }
+        },
+        {
+          "name": "G3 Utilisateur — WELCOME (équiv. Kafka user-events)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g3-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" },
+              { "key": "X-Source-Group", "value": "G3" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"G3-user-001-WELCOME\",\n  \"sourceService\": \"G3_UTILISATEUR\",\n  \"eventType\": \"WELCOME\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"user-001\",\n    \"email\": \"newuser@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"data\": { \"username\": \"Ahmed\" }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "Kafka réel : topic `user-events`."
+          }
+        },
+        {
+          "name": "G4 Coordination — MISSION_CANCELLED (REST via G10)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g4-svc" },
+              { "key": "X-Roles", "value": "ROLE_FLEET_WRITE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G4_COORDINATION\",\n  \"eventType\": \"MISSION_CANCELLED\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"driver-42\",\n    \"email\": \"driver@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"lineId\": \"L-12\",\n    \"reason\": \"Panne véhicule\",\n    \"variables\": {\n      \"missionCode\": \"M-9988\",\n      \"reason\": \"Panne véhicule\",\n      \"cancelSource\": \"G4\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "G4 appelle G5 via G10 (G5NotificationClient). Même payload que G5NotificationWireAdapter."
+          }
+        },
+        {
+          "name": "G6 Paiement — PAYMENT_SUCCESS (équiv. Kafka payment.notification)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g6-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"G6-PAY-001\",\n  \"sourceService\": \"G6_PAYMENT\",\n  \"eventType\": \"PAYMENT_SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"client-1\",\n    \"email\": \"client@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"amount\": \"150\",\n      \"paymentMethod\": \"CMI\",\n      \"invoiceNumber\": \"INV-2026-001\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "Kafka réel : topic `payment.notification`."
+          }
+        },
+        {
+          "name": "G8 Analytique — PUNCTUALITY_ALERT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g8-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G8_ANALYTIQUE\",\n  \"eventType\": \"PUNCTUALITY_ALERT\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"ops-admin\",\n    \"email\": \"ops@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"lineId\": \"L-5\",\n      \"value\": \"62\",\n      \"threshold\": \"80\",\n      \"period\": \"2026-06-01\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "G8 appelle G5 via API Gateway (G5_NOTIFICATION_URL)."
+          }
+        },
+        {
+          "name": "G9 Incidents — INCIDENT_ALERT (équiv. Kafka notifications)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "g9-svc" },
+              { "key": "X-Roles", "value": "ROLE_SERVICE" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"G9-INC-99-INCIDENT_ALERT-EMAIL\",\n  \"sourceService\": \"G9_INCIDENT\",\n  \"eventType\": \"INCIDENT_ALERT\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"agent-1\",\n    \"email\": \"agent@sgitu.ma\",\n    \"phone\": \"+212622222222\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"reference\": \"INC-99\",\n      \"type\": \"PANNE\",\n      \"localisation\": \"Casablanca Centre\",\n      \"gravite\": \"HAUTE\"\n    }\n  }\n}"
+            },
+            "url": "{{g5BaseUrl}}/api/notifications/send",
+            "description": "Kafka réel : topic `notifications` (contrat v5.0)."
+          }
+        },
+        {
+          "name": "G10 Auth — RESET_PASSWORD",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{$guid}}\",\n  \"sourceService\": \"G10_AUTH\",\n  \"eventType\": \"RESET_PASSWORD\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"user-reset\",\n    \"email\": \"user@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"data\": {\n      \"resetLink\": \"http://localhost:8080/auth/reset-password?token=xyz\"\n    }\n  }\n}"
+            },
+            "url": "{{gatewayUrl}}/api/notifications/send",
+            "description": "G10 NotificationClient envoie lors du register / reset password."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Kafka — Exemples payloads (référence)",
+      "description": "Ces payloads sont à publier via Kafka UI (http://localhost:8091) ou kafka-console-producer.\nG5 consomme automatiquement et crée les notifications.",
+      "item": [
+        {
+          "name": "[DOC] G1 ticket.created payload",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health",
+            "description": "Topic: ticket.created\n```json\n{\n  \"eventType\": \"TICKET_ISSUED\",\n  \"userId\": \"u-100\",\n  \"ticketId\": \"T-55\",\n  \"email\": \"client@sgitu.ma\",\n  \"deviceToken\": \"fcm-abc\"\n}\n```\n→ G5 crée 2 notifications : EMAIL + PUSH"
+          }
+        },
+        {
+          "name": "[DOC] G2 abonnement.renouvellement payload",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health",
+            "description": "Topic: abonnement.renouvellement\n```json\n{\n  \"type\": \"RENOUVELLEMENT_EFFECTUE\",\n  \"userId\": \"u-200\",\n  \"abonnementId\": \"AB-9\",\n  \"channels\": [\"EMAIL\", \"SMS\"],\n  \"data\": { \"planNom\": \"Mensuel\" },\n  \"email\": \"abonne@sgitu.ma\",\n  \"phone\": \"+212611111111\"\n}\n```"
+          }
+        },
+        {
+          "name": "[DOC] G3 user-events payload",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health",
+            "description": "Topic: user-events\n```json\n{\n  \"eventType\": \"WELCOME\",\n  \"userId\": \"u-300\",\n  \"email\": \"new@sgitu.ma\",\n  \"username\": \"Ahmed\"\n}\n```"
+          }
+        },
+        {
+          "name": "[DOC] G6 payment.notification payload",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health",
+            "description": "Topic: payment.notification\n```json\n{\n  \"eventType\": \"PAYMENT_SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"userId\": \"u-600\",\n  \"recipient\": { \"userId\": \"u-600\", \"email\": \"pay@sgitu.ma\" },\n  \"metadata\": { \"amount\": \"150\", \"invoiceNumber\": \"INV-1\" }\n}\n```"
+          }
+        },
+        {
+          "name": "[DOC] G9 notifications payload",
+          "request": {
+            "method": "GET",
+            "url": "{{g5BaseUrl}}/api/notifications/health",
+            "description": "Topic: notifications\n```json\n{\n  \"eventType\": \"INCIDENT_ALERT\",\n  \"channels\": [\"EMAIL\", \"SMS\"],\n  \"recipient\": { \"userId\": \"agent-1\", \"email\": \"agent@sgitu.ma\", \"phone\": \"+212622222222\" },\n  \"metadata\": { \"reference\": \"INC-99\", \"localisation\": \"Casablanca\" }\n}\n```"
+          }
+        }
+      ]
+    }
+  ]
+}

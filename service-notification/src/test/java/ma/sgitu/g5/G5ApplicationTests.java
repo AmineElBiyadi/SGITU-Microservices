@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class G5ApplicationTests {
 
     @Autowired
@@ -122,8 +124,10 @@ class G5ApplicationTests {
         notificationRepository.save(n1);
         notificationRepository.save(n2);
 
-        // Test controller endpoint with userId filter
+        // Test controller endpoint with userId filter (auth via headers Gateway G10)
         mockMvc.perform(get("/api/notifications")
+                        .header("X-User-Id", "admin-test")
+                        .header("X-Roles", "ROLE_USER")
                         .param("userId", "user-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -131,6 +135,8 @@ class G5ApplicationTests {
 
         // Test controller endpoint with status filter
         mockMvc.perform(get("/api/notifications")
+                        .header("X-User-Id", "admin-test")
+                        .header("X-Roles", "ROLE_USER")
                         .param("status", "FAILED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -138,18 +144,24 @@ class G5ApplicationTests {
 
         // Test controller endpoint with sourceService filter
         mockMvc.perform(get("/api/notifications")
+                        .header("X-User-Id", "admin-test")
+                        .header("X-Roles", "ROLE_USER")
                         .param("sourceService", "PAYMENT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].notificationId").value("notif-2"));
 
         // Test controller endpoint with no filters
-        mockMvc.perform(get("/api/notifications"))
+        mockMvc.perform(get("/api/notifications")
+                        .header("X-User-Id", "admin-test")
+                        .header("X-Roles", "ROLE_USER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2));
 
         // Test controller endpoint with invalid status (expect 400 Bad Request)
         mockMvc.perform(get("/api/notifications")
+                        .header("X-User-Id", "admin-test")
+                        .header("X-Roles", "ROLE_USER")
                         .param("status", "INVALID"))
                 .andExpect(status().isBadRequest());
     }

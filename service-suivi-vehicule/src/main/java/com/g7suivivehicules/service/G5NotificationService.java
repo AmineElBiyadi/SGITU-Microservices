@@ -5,6 +5,8 @@ import com.g7suivivehicules.entity.Alert;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +16,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,6 +33,25 @@ public class G5NotificationService {
 
     @Value("${g5.notification.url}")
     private String g5Url;
+
+    // Secret partagé avec G5 (doit être identique dans application.properties de G5)
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    /**
+     * Génère un Service JWT signé pour prouver l'identité de G7 auprès de G5.
+     * Le token est valide 5 minutes, suffisant pour un appel REST synchrone.
+     */
+    private String generateServiceJwt() {
+        return Jwts.builder()
+                .subject("G7_SUIVI_VEHICULES")
+                .claim("sourceService", "G7_SUIVI_VEHICULES")
+                .claim("role", "ROLE_SERVICE")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 5 * 60 * 1000)) // 5 min
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+    }
 
     @CircuitBreaker(name = "g5NotificationService", fallbackMethod = "notifierConducteurFallback")
     @Retry(name = "g5NotificationService")
@@ -59,8 +82,8 @@ public class G5NotificationService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            // On pourrait ajouter le JWT ici si on l'avait dans le contexte
-            // headers.setBearerAuth(jwt);
+            headers.setBearerAuth(generateServiceJwt()); // Service JWT signé avec le secret partagé
+            headers.set("X-Source-Group", "G7");
 
             HttpEntity<G5NotificationRequest> entity = new HttpEntity<>(request, headers);
 
@@ -139,6 +162,8 @@ public class G5NotificationService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(generateServiceJwt()); // Service JWT signé avec le secret partagé
+            headers.set("X-Source-Group", "G7");
 
             HttpEntity<G5NotificationRequest> entity = new HttpEntity<>(request, headers);
 
