@@ -389,7 +389,10 @@ class ApiGatewayApplicationTests {
                 .blockFirst();
 
         assertThat(route).isNotNull();
-        assertThat(route.getFilters()).isEmpty();
+        assertThat(route.getFilters()).anySatisfy(filter -> {
+            assertThat(filter.getName()).isEqualTo("RemoveRequestHeader");
+            assertThat(filter.getArgs().values()).contains("Authorization");
+        });
         assertThat(route.getPredicates()).anySatisfy(predicate -> {
             assertThat(predicate.getArgs().values())
                     .anySatisfy(value -> assertThat(value)

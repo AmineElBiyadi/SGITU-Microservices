@@ -1,7 +1,7 @@
 ﻿{
     "info":  {
                  "name":  "SGITU - G10 Gateway x G5 Notifications",
-                 "description":  "Collection Postman complete pour verifier la relation Client -\u003e G10 -\u003e G5 Notifications. Elle couvre health public, JWT, RBAC admin, envoi notification LOG, consultation, retry, filtres admin, erreurs 400/401/403 et resilience 503.",
+                 "description":  "Collection Postman complete pour verifier la relation Client -\u003e G10 -\u003e G5 Notifications. Postman envoie Authorization: Bearer JWT a G10; G10 valide ce JWT, retire Authorization avant le routage vers G5, puis transmet X-User-Id, X-User-Email, X-Roles, X-Source-Group et X-Correlation-Id. Elle couvre health public, JWT, RBAC admin, envoi notification LOG, consultation, retry, filtres admin, erreurs 400/401/403 et resilience 503.",
                  "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
              },
     "event":  [

@@ -62,6 +62,8 @@ spring:
           uri: http://notification-service:8085
           predicates:
             - Path=/api/notifications,/api/notifications/**
+          filters:
+            - RemoveRequestHeader=Authorization
 
         - id: g6-paiement
           uri: http://payment-service:8086
