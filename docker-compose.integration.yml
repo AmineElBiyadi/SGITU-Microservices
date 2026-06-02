@@ -229,7 +229,7 @@ services:
       # a la cle brute utilisee par G3/G10 dans cet environnement de test.
       SGITU_JWT_SECRET: ${G4_JWT_SECRET_B64:-U0dJVFVfRzNfSldUX1NFQ1JFVF9LRVlfQ0hBTkdFX01FX0lOX1BST0RVQ1RJT05fMjU2QklUUyEh}
       SGITU_G3_URL: http://user-service:8083
-      SGITU_G5_URL: http://notification-service:8085
+      SGITU_G5_URL: http://api-gateway:8080
       SGITU_G7_URL: http://g7-suivi-vehicules:8087
       SGITU_G9_URL: http://service-gestion-incidents:8089
       SGITU_G10_URL: http://api-gateway:8080
@@ -359,7 +359,7 @@ services:
       SECURITY_REQUIRE_HTTPS: "false"
       SUBSCRIPTION_SERVICE_URL: http://service-abonnement:8082
       TICKET_SERVICE_URL: http://service-billetterie:8081
-      NOTIFICATION_SERVICE_URL: http://notification-service:8085
+      NOTIFICATION_SERVICE_URL: http://api-gateway:8080
     depends_on:
       payment-db:
         condition: service_healthy
@@ -416,7 +416,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       G9_INTEGRATION_URL: http://service-gestion-incidents:8089/api/v1/incidents
-      G5_NOTIFICATION_URL: http://notification-service:8085/api/notifications/send
+      G5_NOTIFICATION_URL: http://api-gateway:8080/api/notifications/send
     depends_on:
       g7-postgres:
         condition: service_healthy
@@ -465,7 +465,7 @@ services:
     environment:
       MONGO_URI: mongodb://g8-mongodb:27017/g8_analytics
       ML_SERVICE_URL: http://ml-service:5000
-      G5_NOTIFICATION_URL: http://notification-service:8085/api/notifications/send
+      G5_NOTIFICATION_URL: http://api-gateway:8080/api/notifications/send
     depends_on:
       g8-mongodb:
         condition: service_healthy

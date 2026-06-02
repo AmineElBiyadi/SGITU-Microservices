@@ -18,6 +18,11 @@ import java.util.stream.Collectors;
 public class GatewayHeadersFilter implements GlobalFilter, Ordered {
 
     private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USER_EMAIL_HEADER = "X-User-Email";
+    private static final String ROLES_HEADER = "X-Roles";
+    private static final String SOURCE_GROUP_HEADER = "X-Source-Group";
+    private static final String TRACE_ID_HEADER = "X-Trace-Id";
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -46,20 +51,28 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
                                              String correlationId) {
         var requestBuilder = exchange.getRequest()
                 .mutate()
+                .headers(headers -> {
+                    headers.remove(USER_ID_HEADER);
+                    headers.remove(USER_EMAIL_HEADER);
+                    headers.remove(ROLES_HEADER);
+                    headers.remove(SOURCE_GROUP_HEADER);
+                    headers.remove(TRACE_ID_HEADER);
+                })
                 .header(CORRELATION_ID_HEADER, correlationId);
 
         if (authentication != null && authentication.isAuthenticated()) {
-            requestBuilder.header("X-Roles", extractRoles(authentication));
+            requestBuilder.header(ROLES_HEADER, extractRoles(authentication));
+            requestBuilder.header(SOURCE_GROUP_HEADER, "G10");
 
             if (authentication.getPrincipal() instanceof JwtPrincipal principal) {
                 if (principal.email() != null && !principal.email().isBlank()) {
-                    requestBuilder.header("X-User-Email", principal.email());
+                    requestBuilder.header(USER_EMAIL_HEADER, principal.email());
                 }
                 if (principal.userId() != null && !principal.userId().isBlank()) {
-                    requestBuilder.header("X-User-Id", principal.userId());
+                    requestBuilder.header(USER_ID_HEADER, principal.userId());
                 }
             } else {
-                requestBuilder.header("X-User-Email", authentication.getName());
+                requestBuilder.header(USER_EMAIL_HEADER, authentication.getName());
             }
         }
 
@@ -91,8 +104,8 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
                 correlationId,
                 exchange.getRequest().getMethod(),
                 exchange.getRequest().getURI().getRawPath(),
-                exchange.getRequest().getHeaders().getFirst("X-User-Email"),
-                exchange.getRequest().getHeaders().getFirst("X-Roles")
+                exchange.getRequest().getHeaders().getFirst(USER_EMAIL_HEADER),
+                exchange.getRequest().getHeaders().getFirst(ROLES_HEADER)
         );
     }
 
