@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.service;
+package com.sgitu.apigateway.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

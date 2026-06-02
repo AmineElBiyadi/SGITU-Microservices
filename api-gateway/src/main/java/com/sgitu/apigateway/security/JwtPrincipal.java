@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.security;
+package com.sgitu.apigateway.security;
 
 import java.security.Principal;
 

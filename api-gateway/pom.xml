@@ -11,10 +11,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.agileflow</groupId>
-    <artifactId>api_gateway</artifactId>
+    <groupId>ma.sgitu</groupId>
+    <artifactId>api-gateway</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>api_gateway</name>
+    <name>api-gateway</name>
     <description>API Gateway - Groupe 10 SGITU</description>
 
     <properties>

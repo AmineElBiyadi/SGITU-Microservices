@@ -1,9 +1,9 @@
-package com.agileflow.api_gateway.filter;
+package com.sgitu.apigateway.filter;
 
-import com.agileflow.api_gateway.error.ApiErrorWriter;
-import com.agileflow.api_gateway.security.JwtPrincipal;
-import com.agileflow.api_gateway.service.JwtService;
-import com.agileflow.api_gateway.service.TokenRevocationService;
+import com.sgitu.apigateway.error.ApiErrorWriter;
+import com.sgitu.apigateway.security.JwtPrincipal;
+import com.sgitu.apigateway.service.JwtService;
+import com.sgitu.apigateway.service.TokenRevocationService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;

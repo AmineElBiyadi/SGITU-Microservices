@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.error;
+package com.sgitu.apigateway.error;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;

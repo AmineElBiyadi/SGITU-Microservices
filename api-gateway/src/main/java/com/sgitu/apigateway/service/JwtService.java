@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.service;
+package com.sgitu.apigateway.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

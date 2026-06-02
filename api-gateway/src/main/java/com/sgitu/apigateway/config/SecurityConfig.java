@@ -1,7 +1,7 @@
-package com.agileflow.api_gateway.config;
+package com.sgitu.apigateway.config;
 
-import com.agileflow.api_gateway.error.ApiErrorWriter;
-import com.agileflow.api_gateway.filter.JwtAuthFilter;
+import com.sgitu.apigateway.error.ApiErrorWriter;
+import com.sgitu.apigateway.filter.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway;
+package com.sgitu.apigateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

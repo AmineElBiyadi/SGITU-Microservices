@@ -139,7 +139,7 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
   level:
     root: INFO
-    com.agileflow.api_gateway: DEBUG
+    com.sgitu.apigateway: DEBUG
     org.springframework.cloud.gateway: INFO
   logback:
     rollingpolicy:

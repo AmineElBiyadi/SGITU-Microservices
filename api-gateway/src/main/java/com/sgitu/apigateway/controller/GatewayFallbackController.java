@@ -1,6 +1,6 @@
-package com.agileflow.api_gateway.controller;
+package com.sgitu.apigateway.controller;
 
-import com.agileflow.api_gateway.error.ApiErrorWriter;
+import com.sgitu.apigateway.error.ApiErrorWriter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestMapping;

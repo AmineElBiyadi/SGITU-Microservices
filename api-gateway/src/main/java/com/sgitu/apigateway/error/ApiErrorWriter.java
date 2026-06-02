@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.error;
+package com.sgitu.apigateway.error;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

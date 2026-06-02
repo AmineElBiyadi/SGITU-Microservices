@@ -1,4 +1,4 @@
-package com.agileflow.api_gateway.config;
+package com.sgitu.apigateway.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;

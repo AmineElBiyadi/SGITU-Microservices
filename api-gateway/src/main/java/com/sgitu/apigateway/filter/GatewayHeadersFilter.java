@@ -1,6 +1,6 @@
-package com.agileflow.api_gateway.filter;
+package com.sgitu.apigateway.filter;
 
-import com.agileflow.api_gateway.security.JwtPrincipal;
+import com.sgitu.apigateway.security.JwtPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
