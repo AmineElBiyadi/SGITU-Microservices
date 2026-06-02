@@ -580,17 +580,21 @@ class ApiGatewayApplicationTests {
         var route = routeDefinitionLocator.getRouteDefinitions()
                 .filter(routeDefinition -> "g9-incidents".equals(routeDefinition.getId()))
                 .blockFirst();
+        var legacyRapportsRoute = routeDefinitionLocator.getRouteDefinitions()
+                .filter(routeDefinition -> "g9-rapports-legacy".equals(routeDefinition.getId()))
+                .blockFirst();
 
         assertThat(route).isNotNull();
-        assertThat(route.getFilters()).anySatisfy(filter ->
-                assertThat(filter.getName()).isEqualTo("RewritePath"));
+        assertThat(route.getFilters()).isEmpty();
         assertThat(route.getPredicates()).anySatisfy(predicate -> {
             assertThat(predicate.getArgs().values())
-                    .contains(
-                            "/api/incidents/**",
-                            "/api/rapports/**"
-                    );
+                    .contains("/api/incidents/**");
         });
+        assertThat(legacyRapportsRoute).isNotNull();
+        assertThat(legacyRapportsRoute.getFilters()).anySatisfy(filter ->
+                assertThat(filter.getName()).isEqualTo("RewritePath"));
+        assertThat(legacyRapportsRoute.getPredicates()).anySatisfy(predicate ->
+                assertThat(predicate.getArgs().values()).contains("/api/rapports/**"));
     }
 
     private String jwt(String email, String role, String userId) {

@@ -40,7 +40,7 @@ services:
       SERVER_PORT: 8081
       MONGO_URI: mongodb://${billetterie_MONGO_ROOT_USERNAME}:${billetterie_MONGO_ROOT_PASSWORD}@billetterie-mongo:27017/${billetterie_MONGO_DATABASE}?authSource=admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      PAYMENT_SERVICE_URL: ${G6_BASE_URL:-http://service-paiement:8086}
+      PAYMENT_SERVICE_URL: ${G6_BASE_URL:-http://payment-service:8086}
       COORDINATION_SERVICE_URL: ${G4_BASE_URL:-http://g4-coordination:8084}
     depends_on:
       billetterie-mongo:
@@ -55,8 +55,6 @@ services:
     image: mongo:7
     container_name: billetterie-mongo
     hostname: billetterie-mongo
-    ports:
-      - "27018:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${billetterie_MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${billetterie_MONGO_ROOT_PASSWORD}
@@ -105,8 +103,6 @@ services:
   db-abonnement:
     image: mysql:8.0
     container_name: db-abonnement
-    ports:
-      - "3307:3306"
     environment:
       - MYSQL_DATABASE=${abonnement_DB_NAME}
       - MYSQL_USER=${abonnement_DB_USER}
@@ -123,8 +119,8 @@ services:
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: phpmyadmin
-    ports:
-      - "8889:80"
+    expose:
+      - "80"
     environment:
       - PMA_ARBITRARY=1
       - PMA_HOST=
@@ -169,8 +165,6 @@ services:
   g3-users-db:
     image: postgres:15-alpine
     container_name: g3-users-db
-    ports:
-      - "5433:5432"
     environment:
       POSTGRES_DB: ${users_DB_NAME}
       POSTGRES_USER: ${users_DB_USER}
@@ -254,8 +248,6 @@ services:
   g4-postgres:
     image: postgres:16-alpine
     container_name: g4-postgres
-    ports:
-      - "5434:5432"
     environment:
       POSTGRES_DB: ${g4_DB_NAME:-sgitu_g4}
       POSTGRES_USER: ${g4_DB_USER:-g4}
@@ -316,8 +308,6 @@ services:
     image: mysql:8.0
     container_name: sgitu-mysql-notification
     hostname: mysql-notification
-    ports:
-      - "3314:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: notifications_db
@@ -337,8 +327,8 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: sgitu-kafka-ui
-    ports:
-      - "8091:8080"
+    expose:
+      - "8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: "sgitu-local"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
@@ -358,8 +348,8 @@ services:
       dockerfile: Dockerfile
     image: sgitu/payment-service:1.0.0
     container_name: g6-payment-service
-    ports:
-      - "8086:8086"
+    expose:
+      - "8086"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://g6-payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: sgitu
@@ -367,14 +357,14 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_SQL_INIT_MODE: always
-      JWT_SECRET: ${JWT_SECRET:-SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+      JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: 86400000
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8086
       SPRING_KAFKA_BOOTSTRAP_SERVERS: sgitu-kafka:9092
       SUBSCRIPTION_SERVICE_URL: ${G2_BASE_URL:-http://service-abonnement:8082}
       TICKET_SERVICE_URL: ${G1_BASE_URL:-http://service-billetterie:8081}
-      NOTIFICATION_SERVICE_URL: ${G5_BASE_URL:-http://g5-notification-service:8085}
+      NOTIFICATION_SERVICE_URL: ${G5_BASE_URL:-http://notification-service:8085}
     depends_on:
       g6-payment-db:
         condition: service_healthy
@@ -387,8 +377,6 @@ services:
   g6-payment-db:
     image: mysql:8.0
     container_name: g6-payment-db
-    ports:
-      - "3316:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: payment_db
@@ -439,8 +427,6 @@ services:
   db-g7:
     image: postgres:15-alpine
     container_name: db-g7
-    ports:
-      - "5437:5432"
     environment:
       POSTGRES_DB: ${suivi_vehicule_DB_NAME}
       POSTGRES_USER: ${suivi_vehicule_DB_USER}
@@ -535,8 +521,8 @@ services:
       context: ./service-gestion-incidents
       dockerfile: Dockerfile
     container_name: service-gestion-incidents
-    ports:
-      - "8089:8089"
+    expose:
+      - "8089"
     depends_on:
       db-g9:
         condition: service_healthy
@@ -550,14 +536,15 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - JWT_SECRET=${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
     networks:
-      - sgitu-network
-      - g9-db-network
+      sgitu-network:
+        aliases:
+          - service-gestion-incidents
+          - g9-service
+      g9-db-network: {}
 
   db-g9:
     image: mysql:8.0
     container_name: db-g9
-    ports:
-      - "3309:3306"
     environment:
       MYSQL_DATABASE: sgitu_incidents
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
@@ -660,9 +647,9 @@ services:
     hostname: kafka
     networks:
       - sgitu-network
-    ports:
-      - "9093:9092"
-      - "29093:29092"
+    expose:
+      - "9092"
+      - "29092"
     environment:
       CLUSTER_ID: "sgitu-kafka-cluster-001"
       KAFKA_NODE_ID: 1

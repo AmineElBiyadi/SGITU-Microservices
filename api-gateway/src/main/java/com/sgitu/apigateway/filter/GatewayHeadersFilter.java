@@ -21,6 +21,7 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
     private static final String USER_ID_HEADER = "X-User-Id";
     private static final String USER_EMAIL_HEADER = "X-User-Email";
     private static final String ROLES_HEADER = "X-Roles";
+    private static final String USER_ROLE_HEADER = "X-User-Role";
     private static final String SOURCE_GROUP_HEADER = "X-Source-Group";
     private static final String TRACE_ID_HEADER = "X-Trace-Id";
 
@@ -55,13 +56,16 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
                     headers.remove(USER_ID_HEADER);
                     headers.remove(USER_EMAIL_HEADER);
                     headers.remove(ROLES_HEADER);
+                    headers.remove(USER_ROLE_HEADER);
                     headers.remove(SOURCE_GROUP_HEADER);
                     headers.remove(TRACE_ID_HEADER);
                 })
                 .header(CORRELATION_ID_HEADER, correlationId);
 
         if (authentication != null && authentication.isAuthenticated()) {
-            requestBuilder.header(ROLES_HEADER, extractRoles(authentication));
+            String roles = extractRoles(authentication);
+            requestBuilder.header(ROLES_HEADER, roles);
+            firstRole(roles).ifPresent(role -> requestBuilder.header(USER_ROLE_HEADER, role));
             requestBuilder.header(SOURCE_GROUP_HEADER, "G10");
 
             if (authentication.getPrincipal() instanceof JwtPrincipal principal) {
@@ -96,6 +100,16 @@ public class GatewayHeadersFilter implements GlobalFilter, Ordered {
                 .stream()
                 .map(Object::toString)
                 .collect(Collectors.joining(","));
+    }
+
+    private java.util.Optional<String> firstRole(String roles) {
+        if (roles == null || roles.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Arrays.stream(roles.split(","))
+                .map(String::trim)
+                .filter(role -> !role.isBlank())
+                .findFirst();
     }
 
     private void logRequest(ServerWebExchange exchange, String correlationId) {

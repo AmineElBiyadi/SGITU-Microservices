@@ -4,8 +4,12 @@
 
 scrape_configs:
   # ---------------------------------------------------------------
-  #  G1 — (ajoutez votre bloc ici)
+  #  G1 — Service Billetterie (SGITU)
   # ---------------------------------------------------------------
+  - job_name: 'service-billetterie'
+    static_configs:
+      - targets: ['service-billetterie:8081']
+    metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G2 — Service Abonnement (SGITU)

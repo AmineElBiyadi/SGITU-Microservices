@@ -90,9 +90,13 @@ spring:
         - id: g9-incidents
           uri: http://service-gestion-incidents:8089
           predicates:
-            - Path=/api/incidents/**,/api/rapports/**
+            - Path=/api/incidents/**
+        - id: g9-rapports-legacy
+          uri: http://service-gestion-incidents:8089
+          predicates:
+            - Path=/api/rapports/**
           filters:
-            - RewritePath=/api/(?<segment>.*), /$\{segment}
+            - RewritePath=/api/rapports(?<segment>/?.*), /api/incidents/rapports${segment}
 
 jwt:
   secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}

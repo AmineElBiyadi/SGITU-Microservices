@@ -106,13 +106,14 @@ metadata:
   name: prometheus
   namespace: sgitu
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: prometheus
   ports:
     - name: http
       port: 9090
       targetPort: 9090
+      nodePort: 30090
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -266,10 +267,11 @@ metadata:
   name: grafana
   namespace: sgitu
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: grafana
   ports:
     - name: http
       port: 3000
       targetPort: 3000
+      nodePort: 30300

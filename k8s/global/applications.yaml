@@ -1,0 +1,774 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-billetterie
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-billetterie
+  template:
+    metadata:
+      labels:
+        app: service-billetterie
+    spec:
+      containers:
+        - name: service-billetterie
+          image: service-billetterie:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+            - name: MONGO_URI
+              value: mongodb://admin:admin@billetterie-mongo:27017/billetterie_db?authSource=admin
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: PAYMENT_SERVICE_URL
+              value: http://payment-service:8086
+            - name: COORDINATION_SERVICE_URL
+              value: http://g4-coordination:8084
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-billetterie
+  namespace: sgitu
+spec:
+  selector:
+    app: service-billetterie
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: abonnement-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: abonnement-service
+  template:
+    metadata:
+      labels:
+        app: abonnement-service
+    spec:
+      containers:
+        - name: abonnement-service
+          image: raihana10m/service-abonnement:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: abonnement_DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: abonnement_DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: abonnement_DB_PASSWORD
+            - name: UTILISATEUR_SERVICE_URL
+              value: http://user-service:8083
+            - name: PAIEMENT_SERVICE_URL
+              value: http://payment-service:8086
+            - name: ANALYSE_SERVICE_URL
+              value: http://g8-analytics-service:8088
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: abonnement-service
+  namespace: sgitu
+spec:
+  selector:
+    app: abonnement-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-abonnement
+  namespace: sgitu
+spec:
+  selector:
+    app: abonnement-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: g3-user-service:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://g3-users-db:5432/users_db
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: users_DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: users_DB_PASSWORD
+            - name: SPRING_REDIS_HOST
+              value: redis
+            - name: SPRING_REDIS_PORT
+              value: "6379"
+            - name: SERVER_PORT
+              value: "8083"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRATION
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: JWT_EXPIRATION
+            - name: G8_BASE_URL
+              value: http://g8-analytics-service:8088
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: sgitu
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g3-user-service
+  namespace: sgitu
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g4-coordination
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g4-coordination
+  template:
+    metadata:
+      labels:
+        app: g4-coordination
+    spec:
+      containers:
+        - name: g4-coordination
+          image: g4-coordination:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: SERVER_PORT
+              value: "8084"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://g4-postgres:5432/sgitu_g4
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: g4_DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: g4_DB_PASSWORD
+            - name: JPA_DDL_AUTO
+              value: update
+            - name: SGITU_KAFKA_ENABLED
+              value: "true"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: SGITU_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: G4_JWT_SECRET_B64
+            - name: SGITU_G3_URL
+              value: http://g3-user-service:8083
+            - name: SGITU_G5_URL
+              value: http://notification-service:8085
+            - name: SGITU_G10_URL
+              value: http://api-gateway:8080
+            - name: SGITU_G7_URL
+              value: http://g7-service:8087
+            - name: SGITU_G1_URL
+              value: http://service-billetterie:8081
+            - name: SGITU_G9_URL
+              value: http://service-gestion-incidents:8089
+          envFrom:
+            - configMapRef:
+                name: sgitu-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g4-coordination
+  namespace: sgitu
+spec:
+  selector:
+    app: g4-coordination
+  ports:
+    - port: 8084
+      targetPort: 8084
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coordination-service
+  namespace: sgitu
+spec:
+  selector:
+    app: g4-coordination
+  ports:
+    - port: 8084
+      targetPort: 8084
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: notification-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql-notification:3306/notifications_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: sgitu
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MYSQL_PASSWORD
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
+              value: notification-group
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: MAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MAIL_HOST
+            - name: MAIL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MAIL_PORT
+            - name: MAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MAIL_USERNAME
+            - name: MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MAIL_PASSWORD
+            - name: MAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MAIL_FROM
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: TWILIO_AUTH_TOKEN
+            - name: TWILIO_FROM_PHONE
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: TWILIO_FROM_PHONE
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: sgitu
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 8085
+      targetPort: 8085
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: payment-service
+          image: sgitu/payment-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://g6-payment-db:3306/payment_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: sgitu
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: MYSQL_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: update
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRATION
+              value: "86400000"
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: SERVER_PORT
+              value: "8086"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: SUBSCRIPTION_SERVICE_URL
+              value: http://service-abonnement:8082
+            - name: TICKET_SERVICE_URL
+              value: http://service-billetterie:8081
+            - name: NOTIFICATION_SERVICE_URL
+              value: http://notification-service:8085
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: sgitu
+spec:
+  selector:
+    app: payment-service
+  ports:
+    - port: 8086
+      targetPort: 8086
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g7-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g7-service
+  template:
+    metadata:
+      labels:
+        app: g7-service
+    spec:
+      containers:
+        - name: g7-service
+          image: service-suivi-vehicule:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8087
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://db-g7:5432/g7_vehicules
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: suivi_vehicule_DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: suivi_vehicule_DB_PASSWORD
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: SERVER_PORT
+              value: "8087"
+            - name: G4_BASE_URL
+              value: http://g4-coordination:8084
+            - name: G5_BASE_URL
+              value: http://notification-service:8085
+            - name: G8_BASE_URL
+              value: http://g8-analytics-service:8088
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g7-service
+  namespace: sgitu
+spec:
+  selector:
+    app: g7-service
+  ports:
+    - port: 8087
+      targetPort: 8087
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g7-suivi-vehicules
+  namespace: sgitu
+spec:
+  selector:
+    app: g7-service
+  ports:
+    - port: 8087
+      targetPort: 8087
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g8-ml-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g8-ml-service
+  template:
+    metadata:
+      labels:
+        app: g8-ml-service
+    spec:
+      containers:
+        - name: g8-ml-service
+          image: g8-ml-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g8-ml-service
+  namespace: sgitu
+spec:
+  selector:
+    app: g8-ml-service
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-service
+  namespace: sgitu
+spec:
+  selector:
+    app: g8-ml-service
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g8-analytics-service
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g8-analytics-service
+  template:
+    metadata:
+      labels:
+        app: g8-analytics-service
+    spec:
+      containers:
+        - name: g8-analytics-service
+          image: g8-analytics-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8088
+          env:
+            - name: MONGO_URI
+              value: mongodb://g8-mongo:27017/g8_analytics
+            - name: ML_SERVICE_URL
+              value: http://g8-ml-service:5000
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: G5_NOTIFICATION_URL
+              value: http://api-gateway:8080/api/notifications/send
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+            - name: SPRING_APPLICATION_JSON
+              value: '{"jwt":{"secret":"SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!"}}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g8-analytics-service
+  namespace: sgitu
+spec:
+  selector:
+    app: g8-analytics-service
+  ports:
+    - port: 8088
+      targetPort: 8088
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g8-analytics
+  namespace: sgitu
+spec:
+  selector:
+    app: g8-analytics-service
+  ports:
+    - port: 8088
+      targetPort: 8088
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-gestion-incidents
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-gestion-incidents
+  template:
+    metadata:
+      labels:
+        app: service-gestion-incidents
+    spec:
+      containers:
+        - name: service-gestion-incidents
+          image: service-gestion-incidents:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8089
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: DB_URL
+              value: jdbc:mysql://db-g9:3306/sgitu_incidents?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+            - name: DB_USERNAME
+              value: root
+            - name: DB_PASSWORD
+              value: ""
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-gestion-incidents
+  namespace: sgitu
+spec:
+  selector:
+    app: service-gestion-incidents
+  ports:
+    - port: 8089
+      targetPort: 8089
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: g9-service
+  namespace: sgitu
+spec:
+  selector:
+    app: service-gestion-incidents
+  ports:
+    - port: 8089
+      targetPort: 8089
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: sgitu-g10-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRATION
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: JWT_EXPIRATION
+            - name: JWT_REFRESH_EXPIRATION
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: JWT_REFRESH_EXPIRATION
+            - name: TOKEN_BLACKLIST_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: TOKEN_BLACKLIST_ENABLED
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: GATEWAY_CONNECT_TIMEOUT_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: GATEWAY_CONNECT_TIMEOUT_MS
+            - name: GATEWAY_RESPONSE_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: sgitu-config
+                  key: GATEWAY_RESPONSE_TIMEOUT
+            - name: G8_ANALYTICS_URI
+              value: http://g8-analytics-service:8088
+            - name: G8_ML_URI
+              value: http://g8-ml-service:5000
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 45
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: sgitu
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+
