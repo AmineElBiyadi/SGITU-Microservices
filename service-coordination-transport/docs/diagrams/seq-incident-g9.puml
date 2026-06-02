@@ -1,0 +1,16 @@
+@startuml seq-incident-g9
+title G4 — Séquence : impact incident G9
+
+queue "incident.transport.topic" as K
+participant "G9IncidentKafkaConsumer" as KC
+participant "IncidentImpactService" as S
+database "mission_incident_impacts" as DB
+
+K -> KC : message incident
+KC -> S : persist impact
+S -> DB : MissionIncidentImpact
+note right of DB
+  Distinct de CoordinationEventEntity
+  (événements opérationnels G4)
+end note
+@enduml

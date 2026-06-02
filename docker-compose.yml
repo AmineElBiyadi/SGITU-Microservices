@@ -21,7 +21,6 @@
 #    cp .env.example .env     # première fois — remplir g4_DB_*, JWT_SECRET, etc.
 #    docker compose up -d
 #  Monitoring : prometheus.yml (racine) — http://localhost:9090/targets | Grafana :3000
-#  Dashboard G4 local : service-coordination-transport/ + docker compose --profile monitoring
 # ================================================================
 
 services:
@@ -76,10 +75,9 @@ services:
   #  G2 — Service Abonnement (port 8082)
   # ---------------------------------------------------------------
   abonnement-service:
-    build:
-      context: ./service-abonnement
-      dockerfile: Dockerfile
-      target: runner
+    # On utilise l'image construite et publiée par le pipeline CD (GitHub Actions)
+    # Pour mettre à jour l'image : pousser sur main → GitHub Actions → Docker Hub
+    image: raihana10m/service-abonnement:latest
 
     container_name: service-abonnement
     expose:
@@ -200,6 +198,8 @@ services:
 
   # ---------------------------------------------------------------
   #  G4 — Service Coordination Transport (port 8084)
+  #  Ne modifier que ce bloc + g4-postgres + volume g4_pg_data.
+  #  Hostnames = services déjà définis par les autres groupes sur sgitu-network.
   # ---------------------------------------------------------------
   g4-coordination:
     build:
@@ -219,6 +219,17 @@ services:
       SGITU_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SGITU_JWT_SECRET: ${G4_JWT_SECRET_B64:-U0dJVFVfRzNfSldUX1NFQ1JFVF9LRVlfQ0hBTkdFX01FX0lOX1BST0RVQ1RJT05fMjU2QklUUyEh}
+      SGITU_KAFKA_TOPIC: ${SGITU_KAFKA_TOPIC:-sgitu.g4.coordination.events}
+      SGITU_G9_INCIDENT_TOPIC: ${SGITU_G9_INCIDENT_TOPIC:-incident.transport.topic}
+      SGITU_G1_MISSION_TOPIC: ${SGITU_G1_MISSION_TOPIC:-missions-lifecycle}
+      SGITU_G7_POSITIONS_TOPIC: ${SGITU_G7_POSITIONS_TOPIC:-vehicule-positions}
+      SGITU_G7_VEHICLE_REGISTERED_TOPIC: ${SGITU_G7_VEHICLE_REGISTERED_TOPIC:-vehicle.registered}
+      SGITU_G9_CONSUMER_GROUP: ${SGITU_G9_CONSUMER_GROUP:-g4-coordination-g9}
+      SGITU_G7_CONSUMER_GROUP: ${SGITU_G7_CONSUMER_GROUP:-g4-coordination-g7}
+      SGITU_G7_REGISTERED_CONSUMER_GROUP: ${SGITU_G7_REGISTERED_CONSUMER_GROUP:-g4-coordination-g7-registered}
+      SGITU_G7_FLOW_ENABLED: ${SGITU_G7_FLOW_ENABLED:-true}
+      SGITU_G7_FLOW_STRICT: ${SGITU_G7_FLOW_STRICT:-false}
+      SGITU_G7_SYNC_ON_DEMAND: ${SGITU_G7_SYNC_ON_DEMAND:-true}
       SGITU_G3_URL: http://g3-user-service:8083
       SGITU_G5_URL: http://notification-service:8085
       SGITU_G10_URL: ${G10_BASE_URL:-http://api-gateway:8080}
@@ -226,6 +237,8 @@ services:
       SGITU_G1_URL: ${G1_BASE_URL:-http://g1-billetterie:8081}
       SGITU_G9_URL: ${G9_BASE_URL:-http://g9-incidents:8089}
       SGITU_G3_VALIDATION_ENABLED: ${SGITU_G3_VALIDATION_ENABLED:-true}
+      SGITU_INTEGRATION_G5_NOTIFICATION_PATH: ${SGITU_INTEGRATION_G5_NOTIFICATION_PATH:-/api/notifications/send}
+      SGITU_G1_MISSION_LIFECYCLE_PATH: ${SGITU_G1_MISSION_LIFECYCLE_PATH:-/api/internal/missions/events}
     depends_on:
       g4-postgres:
         condition: service_healthy
@@ -565,6 +578,7 @@ services:
     networks:
       - sgitu-network
     depends_on:
+      - g4-coordination
       - g7-service
       - user-service
       - g8-analytics-service

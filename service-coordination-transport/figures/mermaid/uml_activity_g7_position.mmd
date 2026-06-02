@@ -1,0 +1,14 @@
+flowchart TD
+    A([Message Kafka recu]) --> B{JSON valide}
+    B -->|non| C[Log WARN]
+    C --> Z([Fin])
+    B -->|oui| D{vehiculeId lat long OK}
+    D -->|non| C
+    D -->|oui| F[Log INFO KAFKA-G7]
+    F --> G{Mission EN_COURS}
+    G -->|non| H([Fin])
+    G -->|oui| I{Deviation detectee}
+    I -->|non| H
+    I -->|oui| J[Creer event DEVIATION]
+    J --> K[(PostgreSQL)]
+    K --> Z

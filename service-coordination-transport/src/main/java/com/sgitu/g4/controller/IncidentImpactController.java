@@ -44,7 +44,7 @@ public class IncidentImpactController {
 			{
 			  "incidentReference": "INC-2026-001",
 			  "missionId": 1,
-			  "vehiculeId": "VH-001",
+			  "vehiculeId": "00000000-0000-4000-8000-000000000001",
 			  "resume": "Incident G9 corrélé à la mission en cours"
 			}
 			""")))

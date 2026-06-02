@@ -1,0 +1,17 @@
+@startuml activity-g7-position
+title G4 — Activité : traitement position G7
+
+start
+:Recevoir message Kafka;
+if (JSON valide?\nvehiculeId, lat, long) then (oui)
+  :Journaliser KAFKA-G7;
+  if (Règle déviation?) then (oui)
+    :Créer événement DEVIATION;
+  else (non)
+    :Fin — mission inchangée;
+  endif
+else (non)
+  :Log WARN — payload rejeté;
+endif
+stop
+@enduml

@@ -1,0 +1,17 @@
+@startuml seq-kafka-g7
+title G4 — Séquence : consommation position G7 (Kafka)
+
+participant "G7" as G7
+queue "vehicule-positions" as K
+participant "G7VehiclePositionKafkaConsumer" as C
+participant "CoordinationEventService" as S
+database "PostgreSQL" as DB
+
+G7 -> K : publish JSON\n(vehiculeId, lat, long...)
+K -> C : @KafkaListener
+C -> C : KafkaContractValidator
+C -> DB : log supervision KAFKA-G7
+opt déviation détectée
+  C -> S : create DEVIATION event
+end
+@enduml

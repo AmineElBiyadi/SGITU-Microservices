@@ -2,7 +2,7 @@
   "referenceIncident": "INC-2026-042",
   "type": "PANNE_VEHICULE",
   "statut": "NOUVEAU",
-  "vehiculeId": "VH-001",
+  "vehiculeId": "00000000-0000-4000-8000-000000000001",
   "ligneId": "L12",
   "description": "Panne moteur signalée par G9",
   "latitude": 35.57,

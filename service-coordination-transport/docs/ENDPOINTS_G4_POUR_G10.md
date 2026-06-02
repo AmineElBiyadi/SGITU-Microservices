@@ -133,7 +133,7 @@
 
 | Méthode | Chemin | Auth | Rôles écriture | Réponses |
 |---------|--------|------|----------------|----------|
-| `POST` | `/api/g4/missions` | Oui | `DISPATCHER`, `G4_ADMIN` | `201` / `400` / **409** (conflit véhicule) |
+| `POST` | `/api/g4/missions` | Oui | `DISPATCHER`, `G4_ADMIN` | `201` / `400` (UUID invalide, pas d'affectation `ACTIF`, véhicule pas `EN_SERVICE`) / **409** |
 | `GET` | `/api/g4/missions` | Oui | Lecture | `200` |
 | `GET` | `/api/g4/missions/actives` | Oui | Lecture | `200` |
 | `GET` | `/api/g4/missions/{missionId}` | Oui | Lecture | `200` / `404` |
@@ -146,11 +146,26 @@
 
 ---
 
-## 10. Flotte — Affectations (`/api/g4/affectations`)
+## 10. Référentiel véhicules G7 (`/api/g4/vehicules`) — **NOUVEAU**
+
+Alimenté par Kafka `vehicle.registered` (G7) ou sync REST. `vehiculeId` = **UUID G7** (string).
 
 | Méthode | Chemin | Auth | Rôles écriture | Réponses |
 |---------|--------|------|----------------|----------|
-| `POST` | `/api/g4/affectations` | Oui | `DISPATCHER`, `G4_ADMIN` | `201` |
+| `GET` | `/api/g4/vehicules` | Oui | Lecture (`G4_OPERATOR`, `DISPATCHER`, `G4_ADMIN`) | `200` |
+| `GET` | `/api/g4/vehicules/disponibles` | Oui | Lecture | `200` — statut G7 `DISPONIBLE` |
+| `GET` | `/api/g4/vehicules/{vehiculeId}` | Oui | Lecture | `200` / `400` |
+| `POST` | `/api/g4/vehicules/sync-from-g7/{vehiculeId}` | Oui | `DISPATCHER`, `G4_ADMIN` | `200` — `GET` G7 puis upsert référentiel |
+
+> **Routage G10 :** déjà couvert par le prédicat existant `Path=/api/g4/**` — **aucune route gateway à ajouter**.
+
+---
+
+## 11. Flotte — Affectations (`/api/g4/affectations`)
+
+| Méthode | Chemin | Auth | Rôles écriture | Réponses |
+|---------|--------|------|----------------|----------|
+| `POST` | `/api/g4/affectations` | Oui | `DISPATCHER`, `G4_ADMIN` | `201` / `400` (véhicule inconnu ou pas `DISPONIBLE`) |
 | `GET` | `/api/g4/affectations` | Oui | Lecture | `200` |
 | `GET` | `/api/g4/affectations/{affectationId}` | Oui | Lecture | `200` |
 | `GET` | `/api/g4/affectations/vehicule/{vehiculeId}` | Oui | Lecture | `200` |
@@ -159,7 +174,7 @@
 
 ---
 
-## 11. Événements de coordination (`/api/g4/events`)
+## 12. Événements de coordination (`/api/g4/events`)
 
 | Méthode | Chemin | Auth | Rôles | Réponses |
 |---------|--------|------|-------|----------|
@@ -177,7 +192,7 @@
 
 ---
 
-## 12. Impacts incident G9 (`/api/g4/incident-impacts`)
+## 13. Impacts incident G9 (`/api/g4/incident-impacts`)
 
 | Méthode | Chemin | Auth | Rôles | Réponses |
 |---------|--------|------|-------|----------|
@@ -190,7 +205,7 @@
 
 ---
 
-## 13. Notifications vers G5 (`/api/notifications`)
+## 14. Notifications vers G5 (`/api/notifications`)
 
 | Méthode | Chemin | Auth | Rôles | Réponses |
 |---------|--------|------|-------|----------|
@@ -200,7 +215,7 @@ G4 appelle G5 via gateway (`SGITU_G10_URL` + path notification). Pas de `500` br
 
 ---
 
-## 14. API de référence G7 (`/api/v1`) — lecture réseau
+## 15. API de référence G7 (`/api/v1`) — lecture réseau
 
 Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 
@@ -214,7 +229,7 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 
 ---
 
-## 15. Synthèse des compteurs
+## 16. Synthèse des compteurs
 
 | Catégorie | Nombre d'endpoints |
 |-----------|-------------------|
@@ -223,6 +238,7 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 | Trajets | 6 |
 | Arrêts | 6 |
 | Horaires | 5 |
+| **Véhicules G7 (référentiel)** | **4** |
 | Missions | 9 |
 | Affectations | 6 |
 | Events | 10 |
@@ -231,12 +247,12 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 | Pending-notifications | 2 |
 | API v1 (G7 ref) | 5 |
 | Operator status | 1 |
-| **Total endpoints métier REST** | **62** |
-| **+ supervision / auth / doc** | **~72** routes HTTP |
+| **Total endpoints métier REST** | **66** |
+| **+ supervision / auth / doc** | **~76** routes HTTP |
 
 ---
 
-## 16. Codes HTTP utilisés par G4
+## 17. Codes HTTP utilisés par G4
 
 | Code | Usage |
 |------|--------|
@@ -244,7 +260,7 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 | `201` | Création |
 | `202` | Notification acceptée / dégradée |
 | `204` | Suppression |
-| `400` | Validation / métier (ex. chauffeur G3) |
+| `400` | Validation / métier (UUID G7, affectation manquante, chauffeur G3) |
 | `401` | JWT absent ou invalide |
 | `403` | Rôle insuffisant |
 | `404` | Ressource introuvable |
@@ -252,10 +268,11 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 
 ---
 
-## 17. Intégrations asynchrones (hors REST G10 — info)
+## 18. Intégrations asynchrones (hors REST G10 — info)
 
 | Sens | Techno | Topic / cible |
 |------|--------|---------------|
+| G7 → G4 | Kafka consumer | `vehicle.registered` |
 | G7 → G4 | Kafka consumer | `vehicule-positions` |
 | G9 → G4 | Kafka consumer | `incident.transport.topic` |
 | G4 → G1 | Kafka producer | `missions-lifecycle` |
@@ -264,7 +281,7 @@ Contrat **lecture seule** pour intégration G7 (positions GPS via Kafka).
 
 ---
 
-## 18. Exemple routage G10 (suggestion)
+## 19. Exemple routage G10 (suggestion)
 
 ```yaml
 # Exemple — à adapter au format réel de G10
@@ -289,18 +306,19 @@ routes:
 
 ---
 
-## 19. Fichiers de référence dans le repo G4
+## 20. Fichiers de référence dans le repo G4
 
 | Fichier | Contenu |
 |---------|---------|
 | `docs/ROLES_G3_G4_ALIGNMENT.md` | Matrice rôles |
 | `docs/CONTRATS_ALIGNES_G4.md` | Hostnames, topics Kafka |
+| `docs/LIVRABLE_G10_NOUVEAUX_ENDPOINTS_G4.md` | **Résumé 1 page pour G10** (nouveaux `/api/g4/vehicules`) |
 | `postman/SGITU-G4-Coordination-Transport.postman_collection.json` | Tests complets |
 | `/v3/api-docs` | OpenAPI machine-readable |
 
 ---
 
-## 20. Contact / validation
+## 21. Contact / validation
 
 - **Groupe :** G4 — Coordination des transports (ENSA Tétouan, GI2)
 - **Tests :** `mvn test` + collection Postman

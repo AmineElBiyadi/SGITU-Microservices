@@ -14,6 +14,7 @@ public class MissionRequest {
 
 	@NotBlank
 	@Size(max = 64)
+	@Schema(description = "UUID du véhicule G7 (référentiel vehicle.registered + affectation ACTIF préalable)")
 	private String vehiculeId;
 
 	@Size(max = 64)

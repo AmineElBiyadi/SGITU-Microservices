@@ -48,7 +48,7 @@ public class CoordinationEventController {
 			  "type": "RETARD",
 			  "status": "SIGNALE",
 			  "missionId": 1,
-			  "vehiculeId": "VH-001",
+			  "vehiculeId": "00000000-0000-4000-8000-000000000001",
 			  "description": "Retard signalé manuellement",
 			  "occurredAt": "2026-05-20T10:15:00Z"
 			}

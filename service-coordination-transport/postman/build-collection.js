@@ -1,5 +1,8 @@
 const fs = require('fs');
 
+/** UUID exemple aligné G7 — remplacer par un id réel après POST /api/suivi-vehicules/vehicules (G7). */
+const EXAMPLE_VEHICLE_UUID = '00000000-0000-4000-8000-000000000001';
+
 const saveId = (v) => ({
 	listen: 'test',
 	script: {
@@ -24,6 +27,28 @@ const loginEvent = {
 		],
 	},
 };
+
+const expectStatus = (...codes) => ({
+	listen: 'test',
+	script: {
+		type: 'text/javascript',
+		exec: [
+			`pm.test('HTTP ${codes.join('|')}', function () {`,
+			`  pm.expect(pm.response.code).to.be.oneOf([${codes.join(',')}]);`,
+			'});',
+		],
+	},
+});
+
+const notificationBody = () =>
+	'{\n' +
+	'  "notificationId": "G4-POSTMAN-001",\n' +
+	'  "sourceService": "COORDINATION",\n' +
+	'  "eventType": "DELAY_ALERT",\n' +
+	'  "channel": "EMAIL",\n' +
+	'  "recipient": { "userId": "{{recipientUserId}}", "email": "{{recipientEmail}}" },\n' +
+	'  "metadata": { "lineId": "L12", "reason": "RETARD_SIGNIFICATIF", "variables": { "vehiculeId": "{{vehiculeId}}", "valeur": "12", "arret": "Gare Sud" } }\n' +
+	'}';
 
 const jsonHdr = () => [{ key: 'Content-Type', value: 'application/json' }];
 
@@ -52,6 +77,7 @@ const collection = {
 			'2) Attendre health UP : GET 00 — Démarrage\n' +
 			'3) Parcours rapide : dossier GUIDE (requêtes 1→13 dans l\'ordre)\n' +
 			'4) Login : gestionnaire.reseau = réseau | gestionnaire.flotte = missions | admin.technique = admin\n\n' +
+			'Flow G7 : créer véhicule chez G7 → variable vehiculeId (UUID) → sync ou Kafka → affectation ACTIF → mission.\n\n' +
 			'Les POST « créer » enregistrent automatiquement ligneId, arretId, missionId…',
 		schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
 	},
@@ -67,7 +93,10 @@ const collection = {
 		{ key: 'missionId', value: '1' },
 		{ key: 'eventId', value: '1' },
 		{ key: 'impactId', value: '1' },
-		{ key: 'vehiculeId', value: 'VH-001' },
+		{ key: 'vehiculeId', value: EXAMPLE_VEHICLE_UUID },
+		{ key: 'recipientUserId', value: '1' },
+		{ key: 'recipientEmail', value: 'test@sgitu.local' },
+		{ key: 'g7BaseUrl', value: 'http://localhost:8087' },
 		{ key: 'g3BaseUrl', value: 'http://localhost:8083' },
 		{ key: 'g3AccessToken', value: '' },
 	],
@@ -118,44 +147,64 @@ collection.item.push(
 
 const guide = [
 	{
-		...req('1. Login flotte (DISPATCHER)', 'POST', '{{baseUrl}}/api/auth/login', {
+		...req('1. Login réseau (G4_OPERATOR)', 'POST', '{{baseUrl}}/api/auth/login', {
 			noauth: true,
-			body: '{\n  "username": "gestionnaire.flotte",\n  "password": "password"\n}',
+			body: '{\n  "username": "gestionnaire.reseau",\n  "password": "password"\n}',
+			desc: 'Étapes 2→6 : lignes, arrêts, trajets, horaires',
 		}),
-		event: [loginEvent],
+		event: [loginEvent, expectStatus(200)],
 	},
 	{
 		...req('2. POST ligne', 'POST', '{{baseUrl}}/api/g4/lignes', {
-			body: '{\n  "code": "L12",\n  "nom": "Ligne test Postman",\n  "description": "Parcours guidé",\n  "active": true\n}',
+			body: '{\n  "code": "L12-{{$timestamp}}",\n  "nom": "Ligne test Postman",\n  "description": "Parcours guidé",\n  "active": true\n}',
 		}),
-		event: [saveId('ligneId')],
+		event: [saveId('ligneId'), expectStatus(201)],
 	},
 	{
 		...req('3. POST arrêt A', 'POST', '{{baseUrl}}/api/g4/arrets', {
 			body: '{\n  "code": "AR-A",\n  "nom": "Arrêt A",\n  "latitude": 35.57,\n  "longitude": -5.37,\n  "ligneId": {{ligneId}}\n}',
 		}),
-		event: [saveId('arretId')],
+		event: [saveId('arretId'), expectStatus(201)],
 	},
 	{
 		...req('4. POST arrêt B', 'POST', '{{baseUrl}}/api/g4/arrets', {
 			body: '{\n  "code": "AR-B",\n  "nom": "Arrêt B",\n  "latitude": 35.58,\n  "longitude": -5.36,\n  "ligneId": {{ligneId}}\n}',
 		}),
-		event: [saveId('arretId2')],
+		event: [saveId('arretId2'), expectStatus(201)],
 	},
 	{
 		...req('5. POST trajet', 'POST', '{{baseUrl}}/api/g4/trajets', {
 			body:
 				'{\n  "ligneId": {{ligneId}},\n  "code": "T12-A",\n  "nom": "Sens aller",\n  "sens": "ALLER",\n  "actif": true,\n  "arretSequence": [\n    { "arretId": {{arretId}}, "sequenceOrder": 1 },\n    { "arretId": {{arretId2}}, "sequenceOrder": 2 }\n  ]\n}',
 		}),
-		event: [saveId('trajetId')],
+		event: [saveId('trajetId'), expectStatus(201)],
 	},
 	{
 		...req('6. POST horaire', 'POST', '{{baseUrl}}/api/g4/horaires', {
 			body:
 				'{\n  "trajetId": {{trajetId}},\n  "arretId": {{arretId}},\n  "heurePassage": "07:15:00",\n  "jourSemaine": 1,\n  "validFrom": "2026-01-01",\n  "validTo": "2026-12-31",\n  "libelle": "Passage matin"\n}',
 		}),
-		event: [saveId('horaireId')],
+		event: [saveId('horaireId'), expectStatus(201)],
 	},
+	{
+		...req('6b. Login flotte (DISPATCHER)', 'POST', '{{baseUrl}}/api/auth/login', {
+			noauth: true,
+			body: '{\n  "username": "gestionnaire.flotte",\n  "password": "password"\n}',
+			desc: 'Étapes 7→11 : affectation, mission, events, G9, notification',
+		}),
+		event: [loginEvent, expectStatus(200)],
+	},
+	{
+		...req('6c. POST sync véhicule G7 → G4 (optionnel)', 'POST', '{{baseUrl}}/api/g4/vehicules/sync-from-g7/{{vehiculeId}}', {
+			desc: 'Si G7 UP : sync REST. Sinon exécuter run-postman-ordered.ps1 (seed référentiel).',
+		}),
+		event: [expectStatus(200, 400, 502)],
+	},
+	(() => {
+		const r = req('6d. GET véhicules disponibles G4', 'GET', '{{baseUrl}}/api/g4/vehicules/disponibles');
+		r.event = [expectStatus(200)];
+		return r;
+	})(),
 	{
 		...req('7. POST affectation', 'POST', '{{baseUrl}}/api/g4/affectations', {
 			body:
@@ -184,8 +233,7 @@ const guide = [
 		event: [saveId('impactId')],
 	},
 	req('11. POST notification', 'POST', '{{baseUrl}}/api/notifications/send', {
-		body:
-			'{\n  "canal": "MOBILE_PUSH",\n  "sujet": "Retard L12",\n  "corps": "Retard 10 min",\n  "metadata": { "missionId": "{{missionId}}" }\n}',
+		body: notificationBody(),
 	}),
 	req('12. GET missions actives', 'GET', '{{baseUrl}}/api/g4/missions/actives'),
 	req('13. GET health', 'GET', '{{baseUrl}}/api/g4/health', { noauth: true }),
@@ -272,7 +320,20 @@ collection.item.push(
 );
 
 collection.item.push(
-	folder('06 — Affectations', 'Login gestionnaire.flotte', [
+	folder('05b — Référentiel véhicules G7', 'UUID G7 obligatoire — avant affectation', [
+		req('GET véhicules disponibles', 'GET', '{{baseUrl}}/api/g4/vehicules/disponibles', {
+			desc: 'Véhicules DISPONIBLE (Kafka vehicle.registered ou sync)',
+		}),
+		req('GET tous véhicules référentiel', 'GET', '{{baseUrl}}/api/g4/vehicules'),
+		req('GET véhicule par id', 'GET', '{{baseUrl}}/api/g4/vehicules/{{vehiculeId}}'),
+		req('POST sync depuis G7', 'POST', '{{baseUrl}}/api/g4/vehicules/sync-from-g7/{{vehiculeId}}', {
+			desc: 'Secours si Kafka indisponible — G7 doit être UP sur g7BaseUrl',
+		}),
+	])
+);
+
+collection.item.push(
+	folder('06 — Affectations', 'Login gestionnaire.flotte — après véhicule DISPONIBLE', [
 		{
 			...req('POST créer affectation', 'POST', '{{baseUrl}}/api/g4/affectations', {
 				body:
@@ -345,11 +406,14 @@ collection.item.push(
 
 collection.item.push(
 	folder('10 — Notifications (G5)', 'Login flotte', [
-		req('POST envoyer notification', 'POST', '{{baseUrl}}/api/notifications/send', {
-			body:
-				'{\n  "canal": "MOBILE_PUSH",\n  "sujet": "Info voyageurs",\n  "corps": "Message test",\n  "metadata": { "missionId": "{{missionId}}" }\n}',
-			desc: '202 OK ou 202 DEGRADED si G5 arrêté',
-		}),
+		(() => {
+			const r = req('POST envoyer notification', 'POST', '{{baseUrl}}/api/notifications/send', {
+				body: notificationBody(),
+				desc: '202 ACCEPTED ou 202 DEGRADED si G5 arrêté',
+			});
+			r.event = [expectStatus(202)];
+			return r;
+		})(),
 	])
 );
 
@@ -422,7 +486,7 @@ collection.item.push(
 	folder('100 — Chaos G5 (optionnel)', 'Arrêter G5 puis tester', [
 		req('POST notification DEGRADED', 'POST', '{{baseUrl}}/api/notifications/send', {
 			body:
-				'{\n  "notificationId": "CHAOS-001",\n  "sourceService": "G4",\n  "eventType": "RETARD",\n  "channel": "EMAIL",\n  "recipient": { "email": "test@sgitu.local" }\n}',
+				'{\n  "notificationId": "CHAOS-001",\n  "sourceService": "COORDINATION",\n  "eventType": "DELAY_ALERT",\n  "channel": "EMAIL",\n  "recipient": { "userId": "{{recipientUserId}}", "email": "{{recipientEmail}}" },\n  "metadata": { "lineId": "L12", "reason": "RETARD_SIGNIFICATIF", "variables": { "vehiculeId": "{{vehiculeId}}", "valeur": "12", "arret": "Gare Sud" } }\n}',
 		}),
 	])
 );

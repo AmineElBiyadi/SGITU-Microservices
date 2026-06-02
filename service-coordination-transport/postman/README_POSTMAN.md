@@ -36,3 +36,12 @@ Après chaque **POST créer**, l’`id` de la réponse est enregistré dans `lig
 ```powershell
 node postman/build-collection.js
 ```
+
+## Exécuter tous les tests dans l'ordre (Newman)
+
+```powershell
+cd service-coordination-transport/postman
+powershell -ExecutionPolicy Bypass -File .\run-postman-ordered.ps1
+```
+
+Parcourt les dossiers `00` → `GUIDE` → `02` … → `101` avec le bon login JWT à chaque étape.

@@ -17,8 +17,14 @@ sgitu:
   jwt:
     secret: VGVzdFNlY3JldEtleUZvckc0VW5pdFRlc3RzX18xMjhCaXRzIQ==
     expiration-ms: 3600000
+  integration:
+    g7-flow-enabled: false
+    g3-validation-enabled: false
+    g3-notification-recipients-enabled: false
   kafka:
     enabled: false
+  g5-notification:
+    post-on-event-enabled: false
 
 logging:
   level:

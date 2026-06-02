@@ -13,6 +13,7 @@ import com.sgitu.g4.exception.ResourceNotFoundException;
 import com.sgitu.g4.integration.G7VehicleClient;
 import com.sgitu.g4.integration.G9IncidentClient;
 import com.sgitu.g4.mapper.EntityMapper;
+import com.sgitu.g4.util.CoordinationDetectionUtils;
 import com.sgitu.g4.repository.MissionIncidentImpactRepository;
 import com.sgitu.g4.repository.MissionRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class IncidentImpactService {
 	private final ObjectMapper objectMapper;
 	private final G7VehicleClient g7VehicleClient;
 	private final G9IncidentClient g9IncidentClient;
+	private final G5ContractNotificationService g5ContractNotificationService;
 	private final SupervisionLogService supervisionLogService;
 
 	@Transactional
@@ -56,6 +58,7 @@ public class IncidentImpactService {
 				Instant.now());
 		IncidentImpactResponse dto = EntityMapper.toDto(saved);
 		g9IncidentClient.acknowledgeCorrelation(request.getIncidentReference(), dto.getId());
+		postG5IfIncidentConfirmed(saved, mission, null);
 		return dto;
 	}
 
@@ -77,6 +80,7 @@ public class IncidentImpactService {
 				message.getDescription(),
 				buildPayloadJson(message, rawMessage),
 				occurredAt);
+		postG5IfIncidentConfirmed(saved, mission, message.getLigneId());
 		return EntityMapper.toDto(saved);
 	}
 
@@ -170,5 +174,15 @@ public class IncidentImpactService {
 		} catch (JsonProcessingException e) {
 			throw new BadRequestException("Payload JSON : " + e.getOriginalMessage());
 		}
+	}
+
+	private void postG5IfIncidentConfirmed(MissionIncidentImpact impact, Mission mission, String ligneIdHint) {
+		if (!CoordinationDetectionUtils.isG9IncidentConfirmed(impact.getG9Statut())) {
+			return;
+		}
+		String lineId = StringUtils.hasText(ligneIdHint) ? ligneIdHint.trim()
+				: (mission != null && mission.getLigne() != null ? mission.getLigne().getCode() : "N/A");
+		String lieu = StringUtils.hasText(impact.getDescription()) ? impact.getDescription() : impact.getG9Type();
+		g5ContractNotificationService.postIncidentConfirmed(lineId, lieu);
 	}
 }

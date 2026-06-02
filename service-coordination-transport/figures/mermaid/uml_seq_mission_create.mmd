@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    actor Client
+    participant MissionController
+    participant MissionService
+    participant G3UserClient
+    participant G3 as G3 User Service
+    participant DB as PostgreSQL
+    Client->>MissionController: POST /api/g4/missions JWT
+    MissionController->>MissionService: create
+    MissionService->>MissionService: assertVehicleAvailable 409
+    alt G3 validation enabled
+        MissionService->>G3UserClient: assertDriverExists
+        G3UserClient->>G3: GET /api/users/drivers/ids
+        G3-->>G3UserClient: driver ids list
+    end
+    MissionService->>DB: save Mission
+    MissionService-->>Client: 201 Created

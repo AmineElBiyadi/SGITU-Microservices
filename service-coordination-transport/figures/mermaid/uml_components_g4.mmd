@@ -1,0 +1,18 @@
+flowchart TB
+    G10[G10 Gateway] --> CTRL[Controllers REST]
+    Postman[Postman] --> CTRL
+    CTRL --> SVC[Services metier]
+    SVC --> REPO[JPA Repositories]
+    REPO --> PG[(PostgreSQL)]
+    SVC --> G3C[G3UserClient]
+    SVC --> G5C[G5NotificationClient]
+    SVC --> G7C[G7VehicleClient]
+    KF{{Kafka}}
+    G7S[G7] --> KF
+    KF --> G7K[G7 Kafka Consumer]
+    G9S[G9] --> KF
+    KF --> G9K[G9 Kafka Consumer]
+    G7K --> SVC
+    G9K --> SVC
+    G3C --> G3S[G3 :8083]
+    G5C --> G5S[G5 :8085]

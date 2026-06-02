@@ -55,10 +55,20 @@ sgitu:
     g3-validation-enabled: ${SGITU_G3_VALIDATION_ENABLED:true}
     g3-validation-strict: ${SGITU_G3_VALIDATION_STRICT:false}
     g3-drivers-ids-path: ${SGITU_G3_DRIVERS_IDS_PATH:/api/users/drivers/ids}
+    g3-notification-recipients-enabled: ${SGITU_G3_NOTIFICATION_RECIPIENTS_ENABLED:true}
+    g3-notification-recipients-strict: ${SGITU_G3_NOTIFICATION_RECIPIENTS_STRICT:false}
+    g3-notification-recipients-path: ${SGITU_G3_NOTIFICATION_RECIPIENTS_PATH:/api/users/notification-recipients}
+    g3-notification-recipients-page-size: ${SGITU_G3_NOTIFICATION_RECIPIENTS_PAGE_SIZE:100}
+    g3-notification-recipient-roles: ${SGITU_G3_NOTIFICATION_RECIPIENT_ROLES:}
+    g3-service-bearer-token: ${SGITU_G3_SERVICE_BEARER_TOKEN:}
     # Billetterie = G1. Les variables SGITU_G3_* mission restent acceptées (rétrocompat).
     g1-base-url: ${SGITU_G1_URL:http://localhost:8081}
     g5-base-url: ${SGITU_G5_URL:http://localhost:8085}
     g7-base-url: ${SGITU_G7_URL:http://localhost:8087}
+    g7-flow-enabled: ${SGITU_G7_FLOW_ENABLED:true}
+    g7-flow-strict: ${SGITU_G7_FLOW_STRICT:false}
+    g7-sync-on-demand-enabled: ${SGITU_G7_SYNC_ON_DEMAND:true}
+    g7-vehicules-path: ${SGITU_G7_VEHICULES_PATH:/api/suivi-vehicules/vehicules}
     g9-base-url: ${SGITU_G9_URL:http://localhost:8089}
     g10-gateway-url: ${SGITU_G10_URL:http://localhost:8080}
     connect-timeout-ms: 3000
@@ -66,13 +76,26 @@ sgitu:
     g5-notification-path: /api/notifications/send
     g1-mission-lifecycle-path: ${SGITU_G1_MISSION_LIFECYCLE_PATH:${SGITU_INTEGRATION_G3_MISSION_LIFECYCLE_PATH:/api/internal/missions/events}}
   kafka:
-    enabled: ${SGITU_KAFKA_ENABLED:false}
+    enabled: ${SGITU_KAFKA_ENABLED:true}
     topic-coordination: ${SGITU_KAFKA_TOPIC:sgitu.g4.coordination.events}
     topic-incident-inbound: ${SGITU_G9_INCIDENT_TOPIC:incident.transport.topic}
     g9-consumer-group-id: ${SGITU_G9_CONSUMER_GROUP:g4-coordination-g9}
     topic-mission-lifecycle: ${SGITU_G1_MISSION_TOPIC:${SGITU_G3_MISSION_TOPIC:missions-lifecycle}}
     topic-vehicule-positions: ${SGITU_G7_POSITIONS_TOPIC:vehicule-positions}
+    topic-vehicle-registered: ${SGITU_G7_VEHICLE_REGISTERED_TOPIC:vehicle.registered}
     g7-consumer-group-id: ${SGITU_G7_CONSUMER_GROUP:g4-coordination-g7}
+    g7-registered-consumer-group-id: ${SGITU_G7_REGISTERED_CONSUMER_GROUP:g4-coordination-g7-registered}
+  g5-notification:
+    # Événement coordination → POST G5 via G10, un payload par utilisateur (recipient depuis G3)
+    post-on-event-enabled: ${SGITU_G5_POST_ON_EVENT_ENABLED:true}
+    source-service: ${SGITU_G5_SOURCE_SERVICE:COORDINATION}
+    channel: EMAIL
+  detection:
+    enabled: ${SGITU_DETECTION_ENABLED:true}
+    deviation-max-meters: ${SGITU_DETECTION_DEVIATION_MAX_METERS:150}
+    delay-tolerance-minutes: ${SGITU_DETECTION_DELAY_TOLERANCE_MINUTES:5}
+    near-stop-max-meters: ${SGITU_DETECTION_NEAR_STOP_MAX_METERS:80}
+    cooldown-minutes: ${SGITU_DETECTION_COOLDOWN_MINUTES:10}
 
 resilience4j:
   circuitbreaker:

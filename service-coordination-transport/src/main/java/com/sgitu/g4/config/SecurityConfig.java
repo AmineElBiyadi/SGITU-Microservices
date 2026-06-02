@@ -75,6 +75,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/api/g4/missions", "/api/g4/missions/**").hasAnyRole(G4_FLEET_WRITE)
 						.requestMatchers(HttpMethod.PUT, "/api/g4/missions", "/api/g4/missions/**").hasAnyRole(G4_FLEET_WRITE)
 						.requestMatchers(HttpMethod.DELETE, "/api/g4/missions", "/api/g4/missions/**").hasAnyRole(G4_FLEET_WRITE)
+						.requestMatchers(HttpMethod.POST, "/api/g4/vehicules/sync-from-g7/**").hasAnyRole(G4_FLEET_WRITE)
 						.requestMatchers(HttpMethod.POST, "/api/g4/affectations", "/api/g4/affectations/**").hasAnyRole(G4_FLEET_WRITE)
 						.requestMatchers(HttpMethod.PUT, "/api/g4/affectations", "/api/g4/affectations/**").hasAnyRole(G4_FLEET_WRITE)
 						.requestMatchers(HttpMethod.DELETE, "/api/g4/affectations", "/api/g4/affectations/**").hasAnyRole(G4_FLEET_WRITE)

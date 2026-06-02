@@ -1,0 +1,14 @@
+sequenceDiagram
+    autonumber
+    participant G9 as G9 Incidents
+    participant K as Kafka incident topic
+    participant KC as G9IncidentKafkaConsumer
+    participant IS as IncidentImpactService
+    participant G7 as G7VehicleClient
+    participant DB as PostgreSQL
+    G9->>K: publish incident
+    K->>KC: message
+    KC->>IS: handleKafkaMessage
+    IS->>G7: fetchStatus vehiculeId
+    G7-->>IS: statut ou mock INCONNU
+    IS->>DB: save MissionIncidentImpact

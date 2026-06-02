@@ -1,0 +1,33 @@
+name: G2 CI - Service Abonnement
+
+on:
+  # La CI se lance quand quelqu'un fait une Pull Request
+  pull_request:
+    paths:
+      - 'service-abonnement/**'
+  # S'exécute à chaque push sur n'importe quelle branche
+  push:
+    paths:
+      - 'service-abonnement/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          # Optimisation : cache les dépendances Maven pour aller plus vite
+          cache: maven 
+
+      - name: Compilation et Tests (Maven)
+        # On dit au robot de se placer dans le dossier de notre microservice
+        working-directory: ./service-abonnement
+        # Commande pour tester si le code compile bien sans erreur
+        run: mvn clean verify

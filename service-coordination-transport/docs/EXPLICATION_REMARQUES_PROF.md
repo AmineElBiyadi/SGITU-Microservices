@@ -7,7 +7,7 @@ Ce document explique **chaque remarque** comme si on parlait entre nous, sans ja
 ## 1. Codes HTTP 409 (véhicule déjà en mission)
 
 **Ce que la prof veut :**  
-Si le bus `VH-001` est déjà sur une mission **EN_COURS**, on ne peut pas en créer une deuxième → le serveur répond **409 Conflict** (conflit), pas une erreur vague.
+Si le bus `00000000-0000-4000-8000-000000000001` est déjà sur une mission **EN_COURS**, on ne peut pas en créer une deuxième → le serveur répond **409 Conflict** (conflit), pas une erreur vague.
 
 **Chez nous :**  
 C’est dans `MissionService` + visible dans Swagger sur `POST /api/g4/missions`.

@@ -23,6 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class MissionVehicleConflictIntegrationTest {
 
+	private static final String VEHICULE_UUID = "00000000-0000-4000-8000-000000000001";
+
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -51,13 +53,13 @@ class MissionVehicleConflictIntegrationTest {
 				.getContentAsString();
 		Long ligneId = objectMapper.readTree(ligneBody).get("id").asLong();
 
-		MissionRequest first = missionRequest(ligneId, "VH-CONFLICT", StatutMission.EN_COURS);
+		MissionRequest first = missionRequest(ligneId, VEHICULE_UUID, StatutMission.EN_COURS);
 		mockMvc.perform(post("/api/g4/missions")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(first)))
 				.andExpect(status().isCreated());
 
-		MissionRequest second = missionRequest(ligneId, "VH-CONFLICT", StatutMission.EN_COURS);
+		MissionRequest second = missionRequest(ligneId, VEHICULE_UUID, StatutMission.EN_COURS);
 		mockMvc.perform(post("/api/g4/missions")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(second)))

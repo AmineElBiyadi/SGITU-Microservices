@@ -59,6 +59,7 @@ public class AbonnementController {
                 email = null;
             }
         }
+        
         return new ResponseEntity<>(abonnementService.souscrire(userId, planId, email), HttpStatus.CREATED);
     }
 
@@ -78,7 +79,7 @@ public class AbonnementController {
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé", content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    @GetMapping("/utilisateur/{userId}")
+    @GetMapping("/users/{userId}")
     public ResponseEntity<List<Abonnement>> getAbonnementsByUtilisateur(@PathVariable Long userId) {
         return ResponseEntity.ok(abonnementService.getAbonnementsByUtilisateur(userId));
     }
@@ -89,19 +90,19 @@ public class AbonnementController {
             @ApiResponse(responseCode = "404", description = "Utilisateur non trouvé", content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "500", description = "Erreur interne", content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    @GetMapping("/utilisateur/{userId}/complet")
+    @GetMapping("/users/{userId}/complet")
     public ResponseEntity<Page<Abonnement>> getFullHistory(
             @PathVariable Long userId,
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(abonnementService.getFullHistory(userId, pageable));
     }
 
-    @Operation(summary = "Récupérer l'abonnement actif d'un utilisateur")
+    @Operation(summary = "Récupérer l'abonnement actif complet d'un utilisateur")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Abonnement actif trouvé"),
             @ApiResponse(responseCode = "404", description = "Aucun abonnement actif", content = @Content(schema = @Schema(implementation = ErrorResponseDTO.class)))
     })
-    @GetMapping("/utilisateur/{userId}/actif")
+    @GetMapping("/users/{userId}/active-subscription")
     public ResponseEntity<Abonnement> getActif(@PathVariable Long userId) {
         return ResponseEntity.ok(abonnementService.getActif(userId));
     }

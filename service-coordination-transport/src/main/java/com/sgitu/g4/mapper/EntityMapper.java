@@ -18,6 +18,8 @@ import com.sgitu.g4.entity.Ligne;
 import com.sgitu.g4.entity.Mission;
 import com.sgitu.g4.entity.Trajet;
 import com.sgitu.g4.entity.TrajetArret;
+import com.sgitu.g4.entity.VehiculeReferentiel;
+import com.sgitu.g4.dto.VehiculeReferentielResponse;
 
 import java.util.Comparator;
 import java.util.List;
@@ -171,6 +173,22 @@ public final class EntityMapper {
 				.payloadJson(e.getPayloadJson())
 				.occurredAt(e.getOccurredAt())
 				.createdAt(e.getCreatedAt())
+				.build();
+	}
+
+	public static VehiculeReferentielResponse toDto(VehiculeReferentiel e) {
+		if (e == null) {
+			return null;
+		}
+		return VehiculeReferentielResponse.builder()
+				.vehiculeId(e.getVehiculeId())
+				.immatriculation(e.getImmatriculation())
+				.typeVehicule(e.getTypeVehicule())
+				.statutG7(e.getStatutG7())
+				.disponiblePourAffectation(e.isDisponiblePourAffectation())
+				.ligneAffecteeId(e.getLigneAffecteeId())
+				.registeredAt(e.getRegisteredAt())
+				.updatedAt(e.getUpdatedAt())
 				.build();
 	}
 

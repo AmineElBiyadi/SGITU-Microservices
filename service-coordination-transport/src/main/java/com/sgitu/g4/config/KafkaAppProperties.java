@@ -18,4 +18,6 @@ public class KafkaAppProperties {
 	private String topicMissionLifecycle = "missions-lifecycle";
 	private String g7PositionsTopic = "vehicule-positions";
 	private String g7ConsumerGroupId = "g4-coordination-g7";
+	private String topicVehicleRegistered = "vehicle.registered";
+	private String g7RegisteredConsumerGroupId = "g4-coordination-g7-registered";
 }

@@ -14,6 +14,7 @@ public class AffectationRequest {
 
 	@NotBlank
 	@Size(max = 64)
+	@Schema(description = "UUID du véhicule G7 en statut DISPONIBLE (Kafka vehicle.registered)")
 	private String vehiculeId;
 
 	@Size(max = 64)

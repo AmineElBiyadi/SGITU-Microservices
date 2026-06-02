@@ -1,0 +1,15 @@
+@startuml seq-chaos-g5
+title G4 — Séquence : notification + Chaos Monkey (G5 down)
+
+actor Client
+participant "NotificationController" as C
+participant "G5NotificationClient" as G5
+database "pending_notifications" as DB
+
+Client -> C : POST /api/notifications/send
+C -> G5 : HTTP (CircuitBreaker)
+G5 --> C : échec / timeout
+C -> DB : save PENDING
+C --> Client : 202 DEGRADED
+note right of DB : Retry auto 30s\nou POST /pending-notifications/retry
+@enduml
