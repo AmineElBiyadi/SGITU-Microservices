@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -22,6 +24,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.name = :roleName")
     List<Long> findIdsByRolesName(@Param("roleName") String roleName);
+
+    Page<User> findByActiveTrueAndEmailIsNotNull(Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional

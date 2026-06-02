@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -202,6 +205,29 @@ public class UserServiceImpl implements UserService {
     public boolean userExists(Long id) {
         return userRepository.existsById(id);
     }
+
+        @Override
+        @Transactional(readOnly = true)
+        public NotificationRecipientsResponseDTO getNotificationRecipients(int page, int size) {
+        if (page < 0) page = 0;
+        if (size <= 0) size = 100;
+        Pageable pageable = PageRequest.of(page, size);
+        Page<User> userPage = userRepository.findByActiveTrueAndEmailIsNotNull(pageable);
+
+        List<NotificationRecipientDTO> items = userPage.getContent().stream()
+            .map(u -> NotificationRecipientDTO.builder()
+                .userId(u.getId())
+                .email(u.getEmail())
+                .build())
+            .collect(Collectors.toList());
+
+        return NotificationRecipientsResponseDTO.builder()
+            .items(items)
+            .page(userPage.getNumber())
+            .size(userPage.getSize())
+            .total(userPage.getTotalElements())
+            .build();
+        }
 
 
     // ── Mapping helpers ──
