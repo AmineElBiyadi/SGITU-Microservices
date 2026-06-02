@@ -41,29 +41,6 @@ Content-Type: application/json
 }
 
 
-### Auth G3 routee par G10 - verify email
-GET {{baseUrl}}/auth/verify-email?token=COLLER_TOKEN_G3
-
-
-### Auth G3 routee par G10 - forgot password
-POST {{baseUrl}}/auth/forgot-password
-Content-Type: application/json
-
-{
-  "email": "user@sgitu.ma"
-}
-
-
-### Auth G3 routee par G10 - reset password
-POST {{baseUrl}}/auth/reset-password
-Content-Type: application/json
-
-{
-  "token": "COLLER_RESET_TOKEN_G3",
-  "newPassword": "NewPassword123"
-}
-
-
 ### Auth G3 routee par G10 - refresh
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json

@@ -44,9 +44,6 @@ public class SecurityConfig {
                         .pathMatchers(
                                 "/auth/login",
                                 "/auth/refresh",
-                                "/auth/verify-email",
-                                "/auth/forgot-password",
-                                "/auth/reset-password",
                                 "/actuator/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -93,6 +90,8 @@ public class SecurityConfig {
                         .pathMatchers("/api/notifications/admin/**").hasAuthority("ROLE_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/v1/operator/status")
                                 .hasAuthority("ROLE_G4_ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/v1/lignes", "/api/v1/lignes/**", "/api/v1/arrets", "/api/v1/arrets/**")
+                                .hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_DISPATCHER", "ROLE_G4_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/g4/**")
                                 .hasAnyAuthority("ROLE_G4_OPERATOR", "ROLE_DISPATCHER", "ROLE_G4_ADMIN")
                         .pathMatchers(
@@ -163,11 +162,17 @@ public class SecurityConfig {
                                 .hasAuthority("ROLE_G4_ADMIN")
                         .pathMatchers(HttpMethod.GET, "/api/suivi-vehicules/**")
                                 .hasAnyAuthority("ROLE_ADMIN_G7", "ROLE_OPERATOR", "ROLE_TECHNICIAN")
-                        .pathMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                        .pathMatchers(HttpMethod.POST,
+                                "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                                "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**")
                                 .hasAuthority("ROLE_ADMIN_G7")
-                        .pathMatchers(HttpMethod.PUT, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                        .pathMatchers(HttpMethod.PUT,
+                                "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                                "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**")
                                 .hasAuthority("ROLE_ADMIN_G7")
-                        .pathMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**")
+                        .pathMatchers(HttpMethod.DELETE,
+                                "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                                "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**")
                                 .hasAuthority("ROLE_ADMIN_G7")
                         .pathMatchers(HttpMethod.POST, "/api/suivi-vehicules/positions", "/api/suivi-vehicules/positions/**")
                                 .hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")

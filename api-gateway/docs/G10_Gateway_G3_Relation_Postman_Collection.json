@@ -119,6 +119,21 @@
                          "key":  "isoNow",
                          "value":  "",
                          "type":  "string"
+                     },
+                     {
+                         "key":  "createdUserToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "createdUserRefreshToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "revokedToken",
+                         "value":  "",
+                         "type":  "string"
                      }
                  ],
     "item":  [
@@ -357,8 +372,10 @@
                                                                                     "pm.test(\u0027Login response contains G3 JWT\u0027, function () {",
                                                                                     "  const json = pm.response.json();",
                                                                                     "  pm.expect(json.token).to.be.a(\u0027string\u0027);",
+                                                                                    "  pm.expect(json.refreshToken).to.be.a(\u0027string\u0027);",
                                                                                     "  pm.expect(json.email).to.eql(pm.collectionVariables.get(\u0027testEmail\u0027));",
                                                                                     "  pm.collectionVariables.set(\u0027createdUserToken\u0027, json.token);",
+                                                                                    "  pm.collectionVariables.set(\u0027createdUserRefreshToken\u0027, json.refreshToken);",
                                                                                     "});"
                                                                                 ]
                                                                    }
@@ -1367,6 +1384,116 @@
                                                                            ]
                                                               },
                                                       "description":  "Confirme que l\u0027utilisateur de test a bien ete supprime."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - Refresh logout et blacklist G3 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "05.1 - 200 refresh token G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027G3 retourne un nouveau JWT et refreshToken\u0027, function () { const json = pm.response.json(); pm.expect(json.token).to.be.a(\u0027string\u0027); pm.expect(json.refreshToken).to.be.a(\u0027string\u0027); pm.collectionVariables.set(\u0027createdUserToken\u0027, json.token); pm.collectionVariables.set(\u0027createdUserRefreshToken\u0027, json.refreshToken); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/refresh",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"refreshToken\": \"{{createdUserRefreshToken}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05.2 - 204 logout G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.collectionVariables.set(\u0027revokedToken\u0027, pm.collectionVariables.get(\u0027createdUserToken\u0027));"
+                                                                                ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 204\u0027, function () { pm.response.to.have.status(204); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{createdUserToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/logout",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"refreshToken\": \"{{createdUserRefreshToken}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05.3 - 401 token revoque apres logout",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Erreur de token revoque ou invalide\u0027, function () { const json = pm.response.json(); pm.expect([\u0027TOKEN_REVOKED\u0027, \u0027INVALID_TOKEN\u0027, \u0027UNAUTHORIZED\u0027]).to.include(json.code); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{revokedToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/users"
                                                   }
                                   }
                               ]

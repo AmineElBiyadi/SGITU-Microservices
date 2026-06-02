@@ -248,6 +248,18 @@ class ApiGatewayApplicationTests {
                 .headers(headers -> headers.setBearerAuth(jwt("admin.g4@sgitu.ma", "ROLE_G4_ADMIN", "42")))
                 .exchange()
                 .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
+
+        webTestClient.get()
+                .uri("/api/v1/lignes")
+                .headers(headers -> headers.setBearerAuth(jwt("passenger@sgitu.ma", "ROLE_PASSENGER", "30")))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.get()
+                .uri("/api/v1/lignes")
+                .headers(headers -> headers.setBearerAuth(jwt("operator.g4@sgitu.ma", "ROLE_G4_OPERATOR", "40")))
+                .exchange()
+                .expectStatus().value(status -> assertThat(status).isNotIn(401, 403, 404));
     }
 
     @Test
@@ -273,6 +285,13 @@ class ApiGatewayApplicationTests {
                 .uri("/api/suivi-vehicules/vehicules")
                 .headers(headers -> headers.setBearerAuth(jwt("driver@sgitu.ma", "ROLE_DRIVER", "72")))
                 .bodyValue(Map.of("immatriculation", "BUS-GW-SEC", "type", "BUS", "ligne", "L1"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        webTestClient.post()
+                .uri("/api/suivi-vehicules/vehicles")
+                .headers(headers -> headers.setBearerAuth(jwt("driver@sgitu.ma", "ROLE_DRIVER", "72")))
+                .bodyValue(Map.of("immatriculation", "BUS-GW-SEC-ALIAS", "type", "BUS", "ligne", "L1"))
                 .exchange()
                 .expectStatus().isForbidden();
 
@@ -457,7 +476,11 @@ class ApiGatewayApplicationTests {
                     .contains(
                             "/api/g4",
                             "/api/g4/**",
-                            "/api/v1/operator/status"
+                            "/api/v1/operator/status",
+                            "/api/v1/lignes",
+                            "/api/v1/lignes/**",
+                            "/api/v1/arrets",
+                            "/api/v1/arrets/**"
                     )
                     .noneMatch(value -> value.equals("/api/coordination/**")
                             || value.equals("/api/routes/**")

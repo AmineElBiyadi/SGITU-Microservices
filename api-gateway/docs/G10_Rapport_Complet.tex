@@ -283,9 +283,7 @@ Ces endpoints sont exposes par G10 mais routes vers G3. G10 ne verifie pas le mo
 POST & \texttt{/auth/login} & G3 & Public \\
 POST & \texttt{/api/users} & G3 & Public, creation de compte \\
 POST & \texttt{/auth/refresh} & G3 & Public \\
-GET & \texttt{/auth/verify-email} & G3 & Public \\
-POST & \texttt{/auth/forgot-password} & G3 & Public \\
-POST & \texttt{/auth/reset-password} & G3 & Public \\
+POST & \texttt{/auth/logout} & G3 & JWT, revocation token \\
 \bottomrule
 \end{longtable}
 
@@ -610,8 +608,8 @@ G10 accepte aussi l'ancien format suivant pour faciliter l'integration :
 \textbf{Route} & \textbf{Regle de securite} \\
 \midrule
 \texttt{/auth/login}, \texttt{/auth/refresh} & Public, route vers G3. \\
+\texttt{/auth/logout} & JWT requis, route vers G3 pour revocation. \\
 \texttt{POST /api/users} & Public, creation de compte routee vers G3. \\
-\texttt{/auth/verify-email}, \texttt{/auth/forgot-password}, \texttt{/auth/reset-password} & Public, route vers G3. \\
 \texttt{GET /api/users} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/users/*/roles} & \texttt{ROLE\_ADMIN}. \\
 \texttt{/api/users/*/activate} & \texttt{ROLE\_ADMIN}. \\

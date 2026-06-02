@@ -1,548 +1,743 @@
-{
-  "info": {
-    "name": "SGITU - G10 Gateway x G7 Suivi Vehicules",
-    "description": "Tests Postman complets pour verifier la relation G10 -> G7. G10 valide le JWT, applique le RBAC G7, propage X-User-Id/X-User-Email/X-Roles/X-Correlation-Id et route /api/suivi-vehicules/** vers G7.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'true') { return; }",
-          "",
-          "const secret = pm.collectionVariables.get('jwtSecret');",
-          "function b64url(input) {",
-          "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
-          "}",
-          "function makeJwt(email, userId, roles, ttlSeconds) {",
-          "  const now = Math.floor(Date.now() / 1000);",
-          "  const header = { alg: 'HS256', typ: 'JWT' };",
-          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'g7-postman-' + Math.random().toString(36).slice(2) };",
-          "  const unsigned = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header))) + '.' + b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
-          "  const signature = b64url(CryptoJS.HmacSHA256(unsigned, secret));",
-          "  return unsigned + '.' + signature;",
-          "}",
-          "pm.collectionVariables.set('passengerToken', makeJwt('passenger.g7@sgitu.ma', '701', ['ROLE_PASSENGER'], 3600));",
-          "pm.collectionVariables.set('operatorToken', makeJwt('operator.g7@sgitu.ma', '702', ['ROLE_OPERATOR'], 3600));",
-          "pm.collectionVariables.set('technicianToken', makeJwt('technician.g7@sgitu.ma', '703', ['ROLE_TECHNICIAN'], 3600));",
-          "pm.collectionVariables.set('driverToken', makeJwt('driver.g7@sgitu.ma', '704', ['ROLE_DRIVER'], 3600));",
-          "pm.collectionVariables.set('adminG7Token', makeJwt('admin.g7@sgitu.ma', '705', ['ROLE_ADMIN_G7'], 3600));",
-          "pm.collectionVariables.set('expiredToken', makeJwt('expired.g7@sgitu.ma', '799', ['ROLE_ADMIN_G7'], -60));",
-          "pm.collectionVariables.set('invalidToken', 'invalid.jwt.token');",
-          "pm.collectionVariables.set('vehiclePlate', 'BUS-G10-G7-' + Date.now());"
-        ]
-      }
-    }
-  ],
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!" },
-    { "key": "autoGenerateTokens", "value": "true" },
-    { "key": "passengerToken", "value": "" },
-    { "key": "operatorToken", "value": "" },
-    { "key": "technicianToken", "value": "" },
-    { "key": "driverToken", "value": "" },
-    { "key": "adminG7Token", "value": "" },
-    { "key": "expiredToken", "value": "" },
-    { "key": "invalidToken", "value": "" },
-    { "key": "vehiclePlate", "value": "BUS-G10-G7-DEMO" },
-    { "key": "g7VehicleId", "value": "53c31262-591a-44d4-8872-51e84611ac5e" },
-    { "key": "g7AlertId", "value": "36b01ab6-31f8-47cb-82f4-5ffad4a90b95" }
-  ],
-  "item": [
-    {
-      "name": "00 - Verification Gateway et G7",
-      "item": [
-        {
-          "name": "00.1 - 200 health G10",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/actuator/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Gateway UP', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Health body', function () { pm.expect(pm.response.json().status).to.eql('UP'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "00.2 - 200 health G7 via G10 avec ROLE_OPERATOR",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-health" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/health"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('G7 health route via G10', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Correlation id propage', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g7-health'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "01 - Securite JWT avant G7",
-      "item": [
-        {
-          "name": "01.1 - 401 list vehicules sans JWT",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "X-Correlation-Id", "value": "g10-g7-no-jwt" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('JWT absent bloque par G10', function () { pm.response.to.have.status(401); });",
-                  "pm.test('Code UNAUTHORIZED', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "01.2 - 401 list vehicules JWT invalide",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-invalid-jwt" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('JWT invalide bloque par G10', function () { pm.response.to.have.status(401); });",
-                  "pm.test('Code INVALID_TOKEN', function () { pm.expect(pm.response.json().code).to.eql('INVALID_TOKEN'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "01.3 - 401 list vehicules JWT expire",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{expiredToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-expired-jwt" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('JWT expire bloque par G10', function () { pm.response.to.have.status(401); });",
-                  "pm.test('Erreur JSON Gateway', function () { pm.expect(pm.response.json().code).to.exist; });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "02 - RBAC lecture G7",
-      "item": [
-        {
-          "name": "02.1 - 403 ROLE_PASSENGER list vehicules",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-passenger-read" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_PASSENGER refuse par G10', function () { pm.response.to.have.status(403); });",
-                  "pm.test('Code FORBIDDEN', function () { pm.expect(pm.response.json().code).to.eql('FORBIDDEN'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "02.2 - 200 ROLE_OPERATOR list vehicules",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-operator-read" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_OPERATOR peut lire G7', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Reponse liste JSON', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "02.3 - 200 ROLE_TECHNICIAN stats alertes",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{technicianToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-technician-alert-stats" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/alerts/stats"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_TECHNICIAN peut lire les stats alertes', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Stats JSON', function () { pm.expect(pm.response.json()).to.have.property('totalAlertes'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "03 - Administration vehicules G7",
-      "item": [
-        {
-          "name": "03.1 - 403 ROLE_DRIVER create vehicule",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{driverToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-driver-create-vehicle" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"immatriculation\": \"{{vehiclePlate}}-FORBIDDEN\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
-            },
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_DRIVER ne cree pas vehicule', function () { pm.response.to.have.status(403); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "03.2 - 201 ROLE_ADMIN_G7 create vehicule",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminG7Token}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-admin-create-vehicle" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"immatriculation\": \"{{vehiclePlate}}\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
-            },
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Vehicule cree via G10 -> G7', function () { pm.response.to.have.status(201); });",
-                  "pm.test('Stocker id vehicule', function () {",
-                  "  const body = pm.response.json();",
-                  "  pm.expect(body.id).to.exist;",
-                  "  pm.collectionVariables.set('g7VehicleId', String(body.id));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "03.3 - 200 ROLE_OPERATOR get vehicule cree",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-get-created-vehicle" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules/{{g7VehicleId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Vehicule retrouve via G10', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Meme id', function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get('g7VehicleId')); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "03.4 - 200 ROLE_ADMIN_G7 changer statut vehicule",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{adminG7Token}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-admin-update-status" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules/{{g7VehicleId}}/statut?statut=EN_SERVICE"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Statut vehicule mis a jour', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Statut EN_SERVICE', function () { pm.expect(pm.response.json().statut).to.eql('EN_SERVICE'); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "04 - Positions GPS G7",
-      "item": [
-        {
-          "name": "04.1 - 403 ROLE_OPERATOR create position",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-operator-create-position" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
-            },
-            "url": "{{baseUrl}}/api/suivi-vehicules/positions"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_OPERATOR ne cree pas position GPS', function () { pm.response.to.have.status(403); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "04.2 - 201 ROLE_DRIVER create position",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{driverToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-driver-create-position" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
-            },
-            "url": "{{baseUrl}}/api/suivi-vehicules/positions"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Position creee via G10 -> G7', function () { pm.response.to.have.status(201); });",
-                  "pm.test('Vehicule id coherent', function () { pm.expect(String(pm.response.json().vehiculeId)).to.eql(pm.collectionVariables.get('g7VehicleId')); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "04.3 - 200 ROLE_OPERATOR position actuelle",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-current-position" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/positions/{{g7VehicleId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Position actuelle lue via G10', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Vehicule id coherent', function () { pm.expect(String(pm.response.json().vehiculeId)).to.eql(pm.collectionVariables.get('g7VehicleId')); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "05 - Alertes G7",
-      "item": [
-        {
-          "name": "05.1 - 200 ROLE_OPERATOR list alertes actives",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-active-alerts" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/alerts/active"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Alertes actives lues via G10', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Reponse liste JSON', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "05.2 - 403 ROLE_TECHNICIAN cancel alerte",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{technicianToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-technician-cancel-alert" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/alerts/{{g7AlertId}}/cancel"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('ROLE_TECHNICIAN ne modifie pas alerte', function () { pm.response.to.have.status(403); });"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "05.3 - 200/400/404 ROLE_OPERATOR cancel alerte",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-operator-cancel-alert" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/alerts/{{g7AlertId}}/cancel"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Route cancel alerte atteinte sans blocage G10', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });",
-                  "pm.test('Pas de 401/403', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "06 - Resilience manuelle G7",
-      "item": [
-        {
-          "name": "06.1 - 503 G7 indisponible via G10",
-          "description": "Pour ce test, arreter le conteneur G7 puis executer la requete. Commande: docker stop sgitu-int-g7-suivi-vehicules",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
-              { "key": "X-Correlation-Id", "value": "g10-g7-down" }
-            ],
-            "url": "{{baseUrl}}/api/suivi-vehicules/vehicules"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Si G7 est arrete, G10 retourne 503; sinon 200', function () {",
-                  "  if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }",
-                  "  else { pm.expect(pm.response.code).to.eql(200); }",
-                  "});"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
+﻿{
+    "info":  {
+                 "name":  "SGITU - G10 Gateway x G7 Suivi Vehicules",
+                 "description":  "Tests Postman complets pour verifier la relation G10 -\u003e G7. G10 valide le JWT, applique le RBAC G7, propage X-User-Id/X-User-Email/X-Roles/X-Correlation-Id et route /api/suivi-vehicules/** vers G7.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "if (pm.collectionVariables.get(\u0027autoGenerateTokens\u0027) !== \u0027true\u0027) { return; }",
+                                                  "",
+                                                  "const secret = pm.collectionVariables.get(\u0027jwtSecret\u0027);",
+                                                  "function b64url(input) {",
+                                                  "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/, \u0027\u0027).replace(/\\+/g, \u0027-\u0027).replace(/\\//g, \u0027_\u0027);",
+                                                  "}",
+                                                  "function makeJwt(email, userId, roles, ttlSeconds) {",
+                                                  "  const now = Math.floor(Date.now() / 1000);",
+                                                  "  const header = { alg: \u0027HS256\u0027, typ: \u0027JWT\u0027 };",
+                                                  "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: \u0027g7-postman-\u0027 + Math.random().toString(36).slice(2) };",
+                                                  "  const unsigned = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header))) + \u0027.\u0027 + b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+                                                  "  const signature = b64url(CryptoJS.HmacSHA256(unsigned, secret));",
+                                                  "  return unsigned + \u0027.\u0027 + signature;",
+                                                  "}",
+                                                  "pm.collectionVariables.set(\u0027passengerToken\u0027, makeJwt(\u0027passenger.g7@sgitu.ma\u0027, \u0027701\u0027, [\u0027ROLE_PASSENGER\u0027], 3600));",
+                                                  "pm.collectionVariables.set(\u0027operatorToken\u0027, makeJwt(\u0027operator.g7@sgitu.ma\u0027, \u0027702\u0027, [\u0027ROLE_OPERATOR\u0027], 3600));",
+                                                  "pm.collectionVariables.set(\u0027technicianToken\u0027, makeJwt(\u0027technician.g7@sgitu.ma\u0027, \u0027703\u0027, [\u0027ROLE_TECHNICIAN\u0027], 3600));",
+                                                  "pm.collectionVariables.set(\u0027driverToken\u0027, makeJwt(\u0027driver.g7@sgitu.ma\u0027, \u0027704\u0027, [\u0027ROLE_DRIVER\u0027], 3600));",
+                                                  "pm.collectionVariables.set(\u0027adminG7Token\u0027, makeJwt(\u0027admin.g7@sgitu.ma\u0027, \u0027705\u0027, [\u0027ROLE_ADMIN_G7\u0027], 3600));",
+                                                  "pm.collectionVariables.set(\u0027expiredToken\u0027, makeJwt(\u0027expired.g7@sgitu.ma\u0027, \u0027799\u0027, [\u0027ROLE_ADMIN_G7\u0027], -60));",
+                                                  "pm.collectionVariables.set(\u0027invalidToken\u0027, \u0027invalid.jwt.token\u0027);",
+                                                  "pm.collectionVariables.set(\u0027vehiclePlate\u0027, \u0027BUS-G10-G7-\u0027 + Date.now());"
+                                              ]
+                                 }
+                  }
+              ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080"
+                     },
+                     {
+                         "key":  "jwtSecret",
+                         "value":  "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!"
+                     },
+                     {
+                         "key":  "autoGenerateTokens",
+                         "value":  "true"
+                     },
+                     {
+                         "key":  "passengerToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "operatorToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "technicianToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "driverToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "adminG7Token",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "expiredToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "invalidToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "vehiclePlate",
+                         "value":  "BUS-G10-G7-DEMO"
+                     },
+                     {
+                         "key":  "g7VehicleId",
+                         "value":  "53c31262-591a-44d4-8872-51e84611ac5e"
+                     },
+                     {
+                         "key":  "g7AlertId",
+                         "value":  "36b01ab6-31f8-47cb-82f4-5ffad4a90b95"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "00 - Verification Gateway et G7",
+                     "item":  [
+                                  {
+                                      "name":  "00.1 - 200 health G10",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/actuator/health"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Gateway UP\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Health body\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027UP\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "00.2 - 200 health G7 via G10 avec ROLE_OPERATOR",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-health"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/health"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027G7 health route via G10\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Correlation id propage\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g7-health\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "01 - Securite JWT avant G7",
+                     "item":  [
+                                  {
+                                      "name":  "01.1 - 401 list vehicules sans JWT",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-no-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027JWT absent bloque par G10\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Code UNAUTHORIZED\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "01.2 - 401 list vehicules JWT invalide",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{invalidToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-invalid-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027JWT invalide bloque par G10\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Code INVALID_TOKEN\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027INVALID_TOKEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "01.3 - 401 list vehicules JWT expire",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{expiredToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-expired-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027JWT expire bloque par G10\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Erreur JSON Gateway\u0027, function () { pm.expect(pm.response.json().code).to.exist; });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - RBAC lecture G7",
+                     "item":  [
+                                  {
+                                      "name":  "02.1 - 403 ROLE_PASSENGER list vehicules",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-passenger-read"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_PASSENGER refuse par G10\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Code FORBIDDEN\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027FORBIDDEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "02.2 - 200 ROLE_OPERATOR list vehicules",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-operator-read"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_OPERATOR peut lire G7\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Reponse liste JSON\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "02.3 - 200 ROLE_TECHNICIAN stats alertes",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{technicianToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-technician-alert-stats"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/alerts/stats"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_TECHNICIAN peut lire les stats alertes\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Stats JSON\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027totalAlertes\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Administration vehicules G7",
+                     "item":  [
+                                  {
+                                      "name":  "03.1 - 403 ROLE_DRIVER create vehicule",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{driverToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-driver-create-vehicle"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"immatriculation\": \"{{vehiclePlate}}-FORBIDDEN\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_DRIVER ne cree pas vehicule\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "03.1b - 403 ROLE_DRIVER create vehicle alias",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{driverToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-create-vehicle-alias-driver"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"immatriculation\": \"{{vehiclePlate}}-FORBIDDEN\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicles"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Alias vehicles protege par G10\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Erreur FORBIDDEN coherente\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027FORBIDDEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "03.2 - 201 ROLE_ADMIN_G7 create vehicule",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminG7Token}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-admin-create-vehicle"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"immatriculation\": \"{{vehiclePlate}}\",\n  \"type\": \"BUS\",\n  \"ligne\": \"L1\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Vehicule cree via G10 -\u003e G7\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Stocker id vehicule\u0027, function () {",
+                                                                                    "  const body = pm.response.json();",
+                                                                                    "  pm.expect(body.id).to.exist;",
+                                                                                    "  pm.collectionVariables.set(\u0027g7VehicleId\u0027, String(body.id));",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "03.3 - 200 ROLE_OPERATOR get vehicule cree",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-get-created-vehicle"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules/{{g7VehicleId}}"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Vehicule retrouve via G10\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Meme id\u0027, function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get(\u0027g7VehicleId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "03.4 - 200 ROLE_ADMIN_G7 changer statut vehicule",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminG7Token}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-admin-update-status"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules/{{g7VehicleId}}/statut?statut=EN_SERVICE"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Statut vehicule mis a jour\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Statut EN_SERVICE\u0027, function () { pm.expect(pm.response.json().statut).to.eql(\u0027EN_SERVICE\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Positions GPS G7",
+                     "item":  [
+                                  {
+                                      "name":  "04.1 - 403 ROLE_OPERATOR create position",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-operator-create-position"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/positions"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_OPERATOR ne cree pas position GPS\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "04.2 - 201 ROLE_DRIVER create position",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{driverToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-driver-create-position"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"vehiculeId\": \"{{g7VehicleId}}\",\n  \"latitude\": 36.7372,\n  \"longitude\": 3.0865,\n  \"vitesse\": 45.5,\n  \"cap\": 180.0\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/positions"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Position creee via G10 -\u003e G7\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Vehicule id coherent\u0027, function () { pm.expect(String(pm.response.json().vehiculeId)).to.eql(pm.collectionVariables.get(\u0027g7VehicleId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "04.3 - 200 ROLE_OPERATOR position actuelle",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-current-position"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/positions/{{g7VehicleId}}"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Position actuelle lue via G10\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Vehicule id coherent\u0027, function () { pm.expect(String(pm.response.json().vehiculeId)).to.eql(pm.collectionVariables.get(\u0027g7VehicleId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - Alertes G7",
+                     "item":  [
+                                  {
+                                      "name":  "05.1 - 200 ROLE_OPERATOR list alertes actives",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-active-alerts"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/alerts/active"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Alertes actives lues via G10\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Reponse liste JSON\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "05.2 - 403 ROLE_TECHNICIAN cancel alerte",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{technicianToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-technician-cancel-alert"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/alerts/{{g7AlertId}}/cancel"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_TECHNICIAN ne modifie pas alerte\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "05.3 - 200/400/404 ROLE_OPERATOR cancel alerte",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-operator-cancel-alert"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/alerts/{{g7AlertId}}/cancel"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Route cancel alerte atteinte sans blocage G10\u0027, function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });",
+                                                                                    "pm.test(\u0027Pas de 401/403\u0027, function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "06 - Resilience manuelle G7",
+                     "item":  [
+                                  {
+                                      "name":  "06.1 - 503 G7 indisponible via G10",
+                                      "description":  "Pour ce test, arreter le conteneur G7 puis executer la requete. Commande: docker stop sgitu-int-g7-suivi-vehicules",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g7-down"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/suivi-vehicules/vehicules"
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Si G7 est arrete, G10 retourne 503; sinon 200\u0027, function () {",
+                                                                                    "  if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql(\u0027SERVICE_UNAVAILABLE\u0027); }",
+                                                                                    "  else { pm.expect(pm.response.code).to.eql(200); }",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 }
+             ]
 }

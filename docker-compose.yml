@@ -480,7 +480,11 @@ services:
       dockerfile: Dockerfile
     container_name: g8-ml-service
     networks:
-      - g8-private-network
+      sgitu-network:
+        aliases:
+          - g8-ml-service
+          - ml-service
+      g8-private-network: {}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -493,8 +497,8 @@ services:
       context: ./service-analytique
       dockerfile: Dockerfile
     container_name: g8-analytics-service
-    ports:
-      - "8088:8088"
+    expose:
+      - "8088"
     environment:
       MONGO_URI: mongodb://g8-mongo:27017/g8_analytics
       ML_SERVICE_URL: http://g8-ml-service:5000
@@ -510,8 +514,11 @@ services:
       kafka:
         condition: service_healthy
     networks:
-      - sgitu-network
-      - g8-private-network
+      sgitu-network:
+        aliases:
+          - g8-analytics-service
+          - g8-analytics
+      g8-private-network: {}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
       interval: 30s

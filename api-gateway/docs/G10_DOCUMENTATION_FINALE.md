@@ -103,7 +103,8 @@ Note integration : G10 expose `/auth/**`, mais transmet vers `/api/auth/**` dans
 
 Regles appliquees par G10 :
 
-- `/auth/login`, `/auth/refresh`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` sont publics et routes vers G3.
+- `/auth/login` et `/auth/refresh` sont publics et routes vers G3.
+- `/auth/logout` est protege par JWT et route vers G3 pour la revocation du token.
 - `POST /api/users` est public pour la creation de compte via G3.
 - `/api/v1/admin/**` demande `ROLE_ADMIN`.
 - `/api/v1/ticket-types/**` demande `ROLE_ADMIN`.

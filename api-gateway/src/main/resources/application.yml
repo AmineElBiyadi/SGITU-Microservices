@@ -56,7 +56,7 @@ spring:
         - id: g4-coordination
           uri: http://coordination-service:8084
           predicates:
-            - Path=/api/g4,/api/g4/**,/api/v1/operator/status
+            - Path=/api/g4,/api/g4/**,/api/v1/operator/status,/api/v1/lignes,/api/v1/lignes/**,/api/v1/arrets,/api/v1/arrets/**
 
         - id: g5-notifications
           uri: http://notification-service:8085
