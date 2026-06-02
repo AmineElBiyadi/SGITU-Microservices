@@ -57,7 +57,7 @@ public class TestNotificationController {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("PAYMENT_SUCCESS")
                 .channel("EMAIL")
                 .priority("NORMAL")

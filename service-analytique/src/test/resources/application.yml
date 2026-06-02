@@ -3,6 +3,36 @@ spring:
     mongodb:
       uri: mongodb://localhost:27017/g8_analytics_test
       database: g8_analytics_test
+  mongodb:
+    embedded:
+      version: 7.0.0
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: g8-analytics-group-test
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 100
+      fetch-max-wait-ms: 500
+      session-timeout-ms: 30000
+      heartbeat-interval-ms: 10000
+
+kafka:
+  topics:
+    ticketing: g2-ticketing-events-test
+    subscription: g3-subscription-events-test
+    payment: g4-payment-events-test
+    vehicle: g6-vehicle-events-test
+    incident: g7-incident-events-test
+    user: g1-user-events-test
+    dead-letter: g8-analytics-dlt-test
+    analytics-results: g8-analytics-results-test
+    ml-predictions: g8-ml-predictions-test
+  retry:
+    interval: 100
+    max-attempts: 2
+
+# CI-specific settings for slower environments
 
 g5:
   notification:
@@ -12,6 +42,27 @@ ml:
   service:
     url: http://localhost:5000
 
+g8:
+  scheduler:
+    auto-run: false
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      g5AlertCircuitBreaker:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 2
+
 logging:
   level:
     ma.sgitu.g8: WARN
+
+de:
+  flapdoodle:
+    mongodb:
+      embedded:
+        version: 7.0.0
+

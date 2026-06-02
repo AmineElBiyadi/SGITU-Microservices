@@ -1,6 +1,7 @@
 package ma.sgitu.g8.ml;
 
 import lombok.extern.slf4j.Slf4j;
+import ma.sgitu.g8.geo.CoordinateExtractor;
 import ma.sgitu.g8.model.SnapshotType;
 import ma.sgitu.g8.model.SourceType;
 import ma.sgitu.g8.model.StatSnapshot;
@@ -80,6 +81,7 @@ public class MlPredictionService {
             );
 
             StatSnapshot snapshot = new StatSnapshot();
+            snapshot.setSchemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION);
             snapshot.setStatId("PRED_01");
             snapshot.setSnapshotType(SnapshotType.PREDICTION);
             snapshot.setComputedAt(LocalDateTime.now());
@@ -129,8 +131,8 @@ public class MlPredictionService {
             Map<String, Integer> zoneSeverityMax = new HashMap<>();
 
             for (var event : events) {
-                Map<String, Object> payload = event.getPayload();
-                String zone     = String.valueOf(payload.getOrDefault("zone", "UNKNOWN"));
+                Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+                String zone = CoordinateExtractor.resolveZoneLabel(event);
                 String severity = String.valueOf(payload.getOrDefault("severity", "LOW"))
                                          .toUpperCase();
 
@@ -165,6 +167,7 @@ public class MlPredictionService {
             );
 
             StatSnapshot snapshot = new StatSnapshot();
+            snapshot.setSchemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION);
             snapshot.setStatId("PRED_02");
             snapshot.setSnapshotType(SnapshotType.PREDICTION);
             snapshot.setComputedAt(LocalDateTime.now());

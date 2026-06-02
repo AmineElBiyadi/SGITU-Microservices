@@ -136,24 +136,20 @@ public class TicketService {
             throw new TicketOperationException("Ticket " + ticketId + " has expired");
         }
 
+        // Appel réel au service de paiement sécurisé par Resilience4j
+        PaymentResponse paymentResponse = paymentServiceClient.pay(paymentRequest);
 
-//        PaymentResponse paymentResponse = paymentServiceClient.pay(paymentRequest);
-//
-//        if(paymentResponse.getPaymentStatus().equals("FAILED") ||
-//                paymentResponse.getInvoiceId() == null ||
-//                paymentResponse.getInvoiceNumber() == null) {
-//
-//            eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_FAILED, ticket);
-//            return ticketMapper.toResponse(ticket);
-//        }
-
-
+        if (paymentResponse == null || "FAILED".equals(paymentResponse.getPaymentStatus())) {
+            eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_FAILED, ticket);
+            throw new TicketOperationException("Le paiement a échoué : " +
+                    (paymentResponse != null ? paymentResponse.getMessage() : "Pas de réponse du service de paiement"));
+        }
 
         ticket.setStatus(TicketStatus.ISSUED);
         ticket.setIssuedAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        //eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_SUCCESS, saved);
+        eventPublisher.publish(KafkaTopics.TICKET_PAYMENT_SUCCESS, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -172,7 +168,7 @@ public class TicketService {
         ticket.setCancelledAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-//        eventPublisher.publish(KafkaTopics.TICKET_CANCELLED, saved);
+        eventPublisher.publish(KafkaTopics.TICKET_CANCELLED, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -184,24 +180,20 @@ public class TicketService {
 
         assertStatus(ticket, TicketStatus.ISSUED);
 
+        // Appel réel de remboursement sécurisé par Resilience4j
+        PaymentResponse paymentResponse = paymentServiceClient.refund(ticket.getId());
 
-
-//        PaymentResponse paymentResponse = paymentServiceClient.refund(ticket.getId());
-//
-//        if(paymentResponse.getPaymentStatus().equals("FAILED") ||
-//                paymentResponse.getInvoiceId() == null ||
-//                paymentResponse.getInvoiceNumber() == null) {
-//
-//            eventPublisher.publish(KafkaTopics.TICKET_REFUND_CANCELLED, ticket);
-//            return ticketMapper.toResponse(ticket);
-//        }
-
+        if (paymentResponse == null || "FAILED".equals(paymentResponse.getPaymentStatus())) {
+            eventPublisher.publish(KafkaTopics.TICKET_REFUND_CANCELLED, ticket);
+            throw new TicketOperationException("Le remboursement a échoué : " +
+                    (paymentResponse != null ? paymentResponse.getMessage() : "Pas de réponse du service de paiement"));
+        }
 
         ticket.setStatus(TicketStatus.REFUNDED);
         ticket.setRefundedAt(Instant.now());
         Ticket saved = ticketRepository.save(ticket);
 
-        //eventPublisher.publish(KafkaTopics.TICKET_REFUND_REQUESTED, saved);
+        eventPublisher.publish(KafkaTopics.TICKET_REFUND_REQUESTED, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -243,7 +235,7 @@ public class TicketService {
         ticket.setTransferredAt(Instant.now());
         Ticket savedOriginal = ticketRepository.save(ticket);
 
-//        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_INITIATED, savedOriginal);
+        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_INITIATED, savedOriginal);
 
         return new TicketTransferResponse(
                 ticketMapper.toResponse(savedOriginal),
@@ -282,7 +274,7 @@ public class TicketService {
         fromTicket.setTransferredAt(Instant.now());
         ticketRepository.save(fromTicket);
 
-        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_COMPLETED, saved);
+        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_COMPLETED, saved);
         return ticketMapper.toResponse(saved);
     }
 
@@ -317,7 +309,7 @@ public class TicketService {
         pendingTicket.setCancelledAt(Instant.now());
         Ticket savedPending = ticketRepository.save(pendingTicket);
 
-        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_REJECTED, savedOriginal);
+        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_REJECTED, savedOriginal);
 
         return new TicketTransferResponse(
                 ticketMapper.toResponse(savedOriginal),
@@ -345,8 +337,8 @@ public class TicketService {
         ticket.setUpdatedAt(Instant.now());
         history.removeLast();
 
-        //eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_CANCELLED, saved);
         Ticket saved = ticketRepository.save(ticket);
+        eventPublisher.publish(KafkaTopics.TICKET_TRANSFER_CANCELLED, saved);
         return ticketMapper.toResponse(saved);
     }
 

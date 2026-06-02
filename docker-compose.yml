@@ -29,6 +29,48 @@ services:
   # ---------------------------------------------------------------
   #  G1 — (ajoutez votre service ici)
   # ---------------------------------------------------------------
+  service-billetterie:
+    build:
+      context: ./service-billetterie
+      dockerfile: Dockerfile
+    container_name: service-billetterie
+    hostname: service-billetterie
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      MONGO_URI: mongodb://${billetterie_MONGO_ROOT_USERNAME}:${billetterie_MONGO_ROOT_PASSWORD}@billetterie-mongo:27017/${billetterie_MONGO_DATABASE}?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PAYMENT_SERVICE_URL: ${G6_BASE_URL:-http://service-paiement:8086}
+      COORDINATION_SERVICE_URL: ${G4_BASE_URL:-http://g4-coordination:8084}
+    depends_on:
+      billetterie-mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+      - billetterie-db-network
+
+  billetterie-mongo:
+    image: mongo:7
+    container_name: billetterie-mongo
+    hostname: billetterie-mongo
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${billetterie_MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${billetterie_MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${billetterie_MONGO_DATABASE}
+    volumes:
+      - billetterie_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - billetterie-db-network
 
   # ---------------------------------------------------------------
   #  G2 — Service Abonnement (port 8082)
@@ -114,6 +156,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
       G8_BASE_URL: ${G8_BASE_URL:-}
+
     depends_on:
       g3-users-db:
         condition: service_healthy
@@ -402,6 +445,66 @@ services:
   # ---------------------------------------------------------------
   #  G8 — (ajoutez votre service ici)
   # ---------------------------------------------------------------
+  g8-mongo:
+    image: mongo:7.0
+    container_name: g8-mongo
+    volumes:
+      - g8_mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: g8_analytics
+    networks:
+      - g8-private-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  g8-ml-service:
+    build:
+      context: ./service-analytique/ml-service
+      dockerfile: Dockerfile
+    container_name: g8-ml-service
+    networks:
+      - g8-private-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  g8-analytics-service:
+    build:
+      context: ./service-analytique
+      dockerfile: Dockerfile
+    container_name: g8-analytics-service
+    ports:
+      - "8088:8088"
+    environment:
+      MONGO_URI: mongodb://g8-mongo:27017/g8_analytics
+      ML_SERVICE_URL: http://g8-ml-service:5000
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      G5_NOTIFICATION_URL: http://notification-service:8085/api/notifications/send
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      g8-mongo:
+        condition: service_healthy
+      g8-ml-service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sgitu-network
+      - g8-private-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: on-failure
 
   # ---------------------------------------------------------------
   #  G9 — (ajoutez votre service ici)
@@ -463,6 +566,7 @@ services:
     depends_on:
       - g7-service
       - user-service
+      - g8-analytics-service
 
   grafana:
     image: grafana/grafana:latest
@@ -528,18 +632,25 @@ networks:
     driver: bridge
   users-db-network:
     driver: bridge
+  billetterie-db-network:
+    driver: bridge
   g7-db-network:
     driver: bridge
   payment-db-network:
+    driver: bridge
   g4-db-network:
+    driver: bridge
+  g8-private-network:
     driver: bridge
 
 volumes:
   g3_users_data:
   abonnement_data:
+  billetterie_mongo_data:
   g7_db_data:
   g4_pg_data:
   kafka_data:
   payment_data:
   grafana-data:
   mysql_notification_data:
+  g8_mongo_data:

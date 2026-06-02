@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: service-analytique
+  labels:
+    name: service-analytique
+    environment: production
+  annotations:
+    description: "Namespace pour le microservice d'analyse de données"

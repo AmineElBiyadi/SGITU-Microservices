@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1
+kind: Kustomization
+
+metadata:
+  name: service-analytique
+
+resources:
+- namespace.yaml
+- configmap.yaml
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+
+commonLabels:
+  app: service-analytique
+  component: backend
+  version: v1
+
+commonAnnotations:
+  managed-by: kustomize
+  created-by: service-analytique-team
+
+namespace: service-analytique
+
+replicas:
+- name: service-analytique
+  count: 2
+
+images:
+- name: microservice-analyse-multi
+  newTag: v1
+
+configMapGenerator:
+- name: service-analytique-config
+  literals:
+  - MONGO_URI=mongodb://mongodb-service:27017/g8_analytics
+  - LOG_LEVEL=INFO
+  - SPRING_PROFILES_ACTIVE=kubernetes
+  - JAVA_OPTS=-Xmx512m -Xms256m -XX:+UseG1GC
+  - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+  - ANALYSIS_TIMEOUT_MINUTES=30
+  - MAX_CONCURRENT_ANALYSES=10
+
+patchesStrategicMerge:
+- deployment.yaml
+
+patches:
+- path: deployment-patch.yaml
+  target:
+    kind: Deployment
+    name: service-analytique
+
+vars:
+- name: POD_NAME
+  objref:
+    kind: Deployment
+    name: service-analytique
+    fieldref:
+      fieldpath: metadata.name

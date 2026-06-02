@@ -5,6 +5,8 @@ networks:
 volumes:
   mongo_data:
   kafka_data:
+  prometheus_data:
+  grafana_data:
 
 services:
   mongodb:
@@ -26,6 +28,42 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: billetterie-prometheus
+    hostname: prometheus
+    networks:
+      - billetterie-network
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    depends_on:
+      - service-billetterie
+
+
+  grafana:
+    image: grafana/grafana-enterprise:latest
+    container_name: billetterie-grafana
+    hostname: grafana
+    networks:
+      - billetterie-network
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
 
   kafka:
     image: confluentinc/cp-kafka:7.8.7

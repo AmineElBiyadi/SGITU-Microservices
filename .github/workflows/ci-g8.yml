@@ -1,0 +1,112 @@
+name: G8 Analytics CI/CD
+
+on:
+  push:
+    branches: [ main, alae, merge-test ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  # ─── JOB 1 : Build & Test ────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test (Java 17)
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven (skip tests)
+        working-directory: service-analytique
+        run: mvn clean package -DskipTests
+
+      - name: Run tests
+        working-directory: service-analytique
+        run: mvn test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: service-analytique/target/surefire-reports/
+
+  # ─── JOB 2 : Docker Build ────────────────────────────────────────────────
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (analytics service)
+        working-directory: service-analytique
+        run: |
+          docker build -t sgitu/g8-analytics-service:latest .
+          echo "✅ Docker image built successfully"
+
+      - name: Build Docker image (ML service)
+        working-directory: service-analytique/ml-service
+        run: |
+          docker build -t sgitu/g8-ml-service:latest .
+          echo "✅ ML service Docker image built successfully"
+
+      - name: Validate docker-compose config
+        working-directory: service-analytique
+        run: |
+          docker compose config
+          echo "✅ docker-compose.yml is valid"
+
+  # ─── JOB 3 : Code Quality ────────────────────────────────────────────────
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Check for compilation warnings
+        working-directory: service-analytique
+        run: mvn compile -Xlint:all 2>&1 | tail -20
+
+      - name: Verify project structure
+        working-directory: service-analytique
+        run: |
+          echo "── Project structure ──"
+          find src/main/java -name "*.java" | sort
+          echo ""
+          echo "── Test classes ──"
+          find src/test/java -name "*.java" | sort

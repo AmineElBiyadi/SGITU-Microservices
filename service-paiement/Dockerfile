@@ -29,7 +29,7 @@ USER appuser
 EXPOSE 8086
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1
+  CMD wget --no-verbose --no-check-certificate --tries=1 --spider https://localhost:8086/health || exit 1
 
 ENTRYPOINT ["java", \
     "-XX:MaxRAMPercentage=75.0", \

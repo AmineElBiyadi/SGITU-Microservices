@@ -41,6 +41,7 @@ public class SubscriptionAggregation {
             log.info("Computing SUB_01 active_subscriptions");
             List<IncomingEvent> subscriptions = eventRepository.findBySourceTypeAndProcessedFalse(SourceType.SUBSCRIPTION);
             long active = subscriptions.stream()
+                    .filter(event -> event != null)
                     .filter(event -> "SUBSCRIPTION_CREATED".equals(event.getEventType())
                             || "SUBSCRIPTION_RENEWED".equals(event.getEventType()))
                     .count();
@@ -130,11 +131,15 @@ public class SubscriptionAggregation {
     }
 
     private List<IncomingEvent> subscriptions(LocalDateTime from, LocalDateTime to) {
-        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.SUBSCRIPTION, from, to);
+        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.SUBSCRIPTION, from, to)
+                .stream()
+                .filter(event -> event != null && event.getTimestamp() != null)
+                .toList();
     }
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         StatSnapshot snapshot = StatSnapshot.builder()
+                .schemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION)
                 .snapshotType(SnapshotType.SUBSCRIPTIONS)
                 .statId(statId)
                 .granularity(granularity)
@@ -151,7 +156,7 @@ public class SubscriptionAggregation {
     }
 
     private String payload(IncomingEvent event, String key, String defaultValue) {
-        Object value = event.getPayload() == null ? null : event.getPayload().get(key);
+        Object value = event == null || event.getPayload() == null ? null : event.getPayload().get(key);
         if (value == null || String.valueOf(value).isBlank()) {
             return defaultValue;
         }

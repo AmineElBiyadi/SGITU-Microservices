@@ -137,7 +137,10 @@ public class TicketAggregation {
             log.info("Computing FREQ_07 weekend_vs_weekday_ratio");
             LocalDate today = LocalDate.now();
             List<IncomingEvent> tickets = validatedTickets(today.minusDays(6).atStartOfDay(), today.plusDays(1).atStartOfDay());
-            long weekend = tickets.stream().filter(event -> isWeekend(event.getTimestamp().getDayOfWeek())).count();
+            long weekend = tickets.stream()
+                    .filter(this::hasTimestamp)
+                    .filter(event -> isWeekend(event.getTimestamp().getDayOfWeek()))
+                    .count();
             long weekday = tickets.size() - weekend;
             double ratio = weekday == 0 ? 0 : weekend / (double) weekday;
 
@@ -151,11 +154,15 @@ public class TicketAggregation {
     private List<IncomingEvent> validatedTickets(LocalDateTime from, LocalDateTime to) {
         return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.TICKETING, from, to)
                 .stream()
+                .filter(this::hasTimestamp)
                 .filter(this::isValidatedTicket)
                 .toList();
     }
 
     private boolean isValidatedTicket(IncomingEvent event) {
+        if (event == null) {
+            return false;
+        }
         if ("TICKET_VALIDATED".equalsIgnoreCase(event.getEventType())) {
             return true;
         }
@@ -164,6 +171,7 @@ public class TicketAggregation {
 
     private Map<String, Long> hourlyDistribution(List<IncomingEvent> tickets) {
         Map<String, Long> counts = tickets.stream()
+                .filter(this::hasTimestamp)
                 .collect(Collectors.groupingBy(event -> String.valueOf(event.getTimestamp().getHour()), Collectors.counting()));
         Map<String, Long> distribution = new LinkedHashMap<>();
         IntStream.range(0, 24).forEach(hour -> distribution.put(String.valueOf(hour), counts.getOrDefault(String.valueOf(hour), 0L)));
@@ -172,6 +180,7 @@ public class TicketAggregation {
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         StatSnapshot snapshot = StatSnapshot.builder()
+                .schemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION)
                 .snapshotType(SnapshotType.TRIPS)
                 .statId(statId)
                 .granularity(granularity)
@@ -184,6 +193,9 @@ public class TicketAggregation {
     }
 
     private String lineId(IncomingEvent event) {
+        if (event == null) {
+            return "UNKNOWN";
+        }
         if (event.getLineId() == null || event.getLineId().isBlank()) {
             return "UNKNOWN";
         }
@@ -191,11 +203,15 @@ public class TicketAggregation {
     }
 
     private String payload(IncomingEvent event, String key, String defaultValue) {
-        Object value = event.getPayload() == null ? null : event.getPayload().get(key);
+        Object value = event == null || event.getPayload() == null ? null : event.getPayload().get(key);
         if (value == null || String.valueOf(value).isBlank()) {
             return defaultValue;
         }
         return String.valueOf(value);
+    }
+
+    private boolean hasTimestamp(IncomingEvent event) {
+        return event != null && event.getTimestamp() != null;
     }
 
     private boolean isWeekend(DayOfWeek day) {

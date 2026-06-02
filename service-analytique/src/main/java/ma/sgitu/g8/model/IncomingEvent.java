@@ -17,8 +17,11 @@ import java.util.Map;
 @Document(collection = "incoming_events")
 public class IncomingEvent {
 
+    public static final int CURRENT_SCHEMA_VERSION = 1;
+
     @Id
     private String id;
+    private int schemaVersion;
     private SourceType sourceType;
     private String sourceId;
     private String eventType;

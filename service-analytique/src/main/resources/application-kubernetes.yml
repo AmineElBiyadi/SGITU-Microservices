@@ -1,0 +1,86 @@
+# Configuration spécifique pour Kubernetes
+server:
+  port: ${SERVER_PORT:8088}
+  servlet:
+    context-path: ${SERVER_SERVLET_CONTEXT_PATH:/}
+
+# Configuration Actuator pour les health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,metrics,prometheus}
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:always}
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: "liveness"
+          show-details: always
+        readiness:
+          include: "readiness,db"
+          show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: ${MICROMETER_METRICS_EXPORT_PROMETHEUS_ENABLED:true}
+    tags:
+      application: service-analytique
+      environment: kubernetes
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# Configuration MongoDB pour Kubernetes
+spring:
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/g8_analytics}
+      database: ${MONGO_DATABASE:g8_analytics}
+  application:
+    name: service-analytique
+  
+# Configuration du logging
+logging:
+  level:
+    ma.sgitu.g8: ${LOG_LEVEL:INFO}
+    org.springframework.data.mongodb: WARN
+    org.mongodb.driver: WARN
+  pattern:
+    console: ${LOG_PATTERN:%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n}
+    file: ${LOG_PATTERN:%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n}
+
+# Configuration OpenAPI pour Kubernetes
+springdoc:
+  api-docs:
+    path: ${SPRINGDOC_API_DOCS_PATH:/api-docs}
+  swagger-ui:
+    path: ${SPRINGDOC_SWAGGER_UI_PATH:/swagger-ui.html}
+    operations-sorter: method
+    tags-sorter: alpha
+  info:
+    title: Data Analysis API
+    description: API for launching, monitoring and managing data analyses
+    version: 1.0.0
+    contact:
+      name: SGITU Team
+      email: support@sgitu.ma
+  servers:
+    - url: http://service-analytique:8088
+      description: Kubernetes cluster service
+    - url: http://localhost:30001
+      description: Local NodePort access
+
+# Configuration spécifique à l'application
+app:
+  analysis:
+    timeout-minutes: ${ANALYSIS_TIMEOUT_MINUTES:30}
+    max-concurrent: ${MAX_CONCURRENT_ANALYSES:10}
+    cleanup-hours: ${ANALYSIS_CLEANUP_HOURS:24}

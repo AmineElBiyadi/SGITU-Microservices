@@ -2,17 +2,35 @@
   "info": {
     "_postman_id": "g8-analytics-collection",
     "name": "G8 Analytics Service",
-    "description": "Full test suite for the G8 Analytics Service. Run requests in order:\n1. Ingest data (01-06)\n2. Wait ~60 seconds for the scheduler\n3. Read analytics (07-13)\n4. Generate and fetch a report (14-15)",
+    "description": "Full test suite for the G8 Analytics Service.\n\nRun in order:\n0. Security (Phase 0) — verify 401 then generate JWT token\n1. Ingest data (01-06)\n2. Wait ~60 seconds for the scheduler\n3. Read analytics (07-13) + monitoring (16-17)\n4. Generate and fetch a report (14-15)\n5. Grafana: http://localhost:3000 (admin / sgitu2026)\n\nNOTE: Request '00b - Generate JWT Token' MUST be run before any authenticated call. The token is saved automatically into {{authToken}} and applied to every subsequent request via the collection-level pre-request script.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
   },
   "event": [
     {
       "listen": "prerequest",
       "script": {
         "exec": [
-          "// Auto-set today's date (YYYY-MM-DD) for report period",
+          "// Auto-set date variables",
           "var today = new Date().toISOString().split('T')[0];",
-          "pm.collectionVariables.set('today', today);"
+          "pm.collectionVariables.set('today', today);",
+          "pm.collectionVariables.set('ts08', today + 'T08:00:00Z');",
+          "pm.collectionVariables.set('ts09', today + 'T09:00:00Z');",
+          "pm.collectionVariables.set('ts10', today + 'T10:00:00Z');",
+          "pm.collectionVariables.set('ts11', today + 'T11:00:00Z');",
+          "pm.collectionVariables.set('ts14', today + 'T14:00:00Z');",
+          "pm.collectionVariables.set('ts15', today + 'T15:30:00Z');",
+          "pm.collectionVariables.set('ts17', today + 'T17:00:00Z');",
+          "pm.collectionVariables.set('ts18', today + 'T18:00:00Z');"
         ],
         "type": "text/javascript"
       }
@@ -25,19 +43,155 @@
       "type": "string"
     },
     {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "Populated automatically after running request '00b - Generate JWT Token'"
+    },
+    {
       "key": "reportId",
       "value": "",
       "type": "string",
-      "description": "Populated automatically after running request 14"
+      "description": "Populated automatically after running request 15"
     },
     {
       "key": "today",
       "value": "",
       "type": "string",
       "description": "Auto-set to today's date (YYYY-MM-DD) by the collection pre-request script"
+    },
+    {
+      "key": "jwtSecret",
+      "value": "sgitu_g8_secret_key_2025_very_long_secret_for_analytics",
+      "type": "string",
+      "description": "Shared dev secret matching application.yml jwt.secret"
     }
   ],
   "item": [
+    {
+      "name": "--- PHASE 0: Security ---",
+      "item": [
+        {
+          "name": "00a - No Token (Expect 401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 401 Unauthorized without a JWT token', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Response body contains error field', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.eql('Unauthorized');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            },
+            "description": "Sends a request with NO Authorization header.\n\nExpected: 401 Unauthorized\n\nThis confirms the JWT security filter is active and rejects unauthenticated callers."
+          }
+        },
+        {
+          "name": "00b - Generate JWT Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Build a HS256 JWT using the CryptoJS library bundled in Postman",
+                  "var secret = pm.collectionVariables.get('jwtSecret');",
+                  "",
+                  "// Header",
+                  "var header = { alg: 'HS256', typ: 'JWT' };",
+                  "",
+                  "// Payload — mirror what seed-dashboard-data.ps1 generates",
+                  "var now = Math.floor(Date.now() / 1000);",
+                  "var payload = {",
+                  "    sub: 'admin',",
+                  "    roles: ['ROLE_ADMIN', 'ROLE_ANALYTICS'],",
+                  "    iat: now,",
+                  "    exp: now + 86400  // 24 hours",
+                  "};",
+                  "",
+                  "function base64url(str) {",
+                  "    return btoa(str)",
+                  "        .replace(/\\+/g, '-')",
+                  "        .replace(/\\//g, '_')",
+                  "        .replace(/=/g, '');",
+                  "}",
+                  "",
+                  "var encodedHeader  = base64url(JSON.stringify(header));",
+                  "var encodedPayload = base64url(JSON.stringify(payload));",
+                  "var signingInput   = encodedHeader + '.' + encodedPayload;",
+                  "",
+                  "// HMAC-SHA256 via CryptoJS",
+                  "var signature = CryptoJS.HmacSHA256(signingInput, secret);",
+                  "var encodedSig = CryptoJS.enc.Base64.stringify(signature)",
+                  "    .replace(/\\+/g, '-')",
+                  "    .replace(/\\//g, '_')",
+                  "    .replace(/=/g, '');",
+                  "",
+                  "var token = signingInput + '.' + encodedSig;",
+                  "pm.collectionVariables.set('authToken', token);",
+                  "console.log('JWT generated and stored in {{authToken}}');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Token was generated and stored', function () {",
+                  "    var token = pm.collectionVariables.get('authToken');",
+                  "    pm.expect(token).to.be.a('string').and.to.have.length.above(20);",
+                  "    console.log('authToken is now: ' + token.substring(0, 40) + '...');",
+                  "});",
+                  "pm.test('Dashboard responds 200 OK with valid JWT', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "dashboard"]
+            },
+            "description": "Generates a signed HS256 JWT token in the pre-request script using the shared dev secret, saves it into {{authToken}}, then immediately uses it to hit the dashboard endpoint.\n\nExpected: 200 OK (confirming the token is valid).\n\nAfter this request, ALL subsequent requests in the collection automatically carry the token via the collection-level Bearer auth."
+          }
+        }
+      ]
+    },
     {
       "name": "--- PHASE 1: Ingest Data ---",
       "item": [
@@ -58,14 +212,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"userId\": \"USR-001\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"ticketId\": \"TCK-001\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-002\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:45:00Z\",\n    \"ticketId\": \"TCK-002\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"userId\": \"USR-003\",\n    \"status\": \"expired\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"ticketId\": \"TCK-003\"\n  },\n  {\n    \"userId\": \"USR-004\",\n    \"status\": \"validated\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"2026-05-04T17:10:00Z\",\n    \"ticketId\": \"TCK-004\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-005\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-15\",\n    \"timestamp\": \"2026-05-04T17:30:00Z\",\n    \"ticketId\": \"TCK-005\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"userId\": \"USR-006\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T17:50:00Z\",\n    \"ticketId\": \"TCK-006\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"userId\": \"USR-007\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-20\",\n    \"timestamp\": \"2026-05-04T18:05:00Z\",\n    \"ticketId\": \"TCK-007\",\n    \"scanType\": \"NFC\"\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-001\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{ts08}}\",\n    \"ticketId\": \"TCK-001\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-002\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{ts09}}\",\n    \"ticketId\": \"TCK-002\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-003\",\n    \"status\": \"expired\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"{{ts09}}\",\n    \"ticketId\": \"TCK-003\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-004\",\n    \"status\": \"validated\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"{{ts17}}\",\n    \"ticketId\": \"TCK-004\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-005\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-15\",\n    \"timestamp\": \"{{ts17}}\",\n    \"ticketId\": \"TCK-005\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-006\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{ts18}}\",\n    \"ticketId\": \"TCK-006\",\n    \"scanType\": \"QR\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-007\",\n    \"status\": \"validated\",\n    \"line\": \"L3\",\n    \"stationId\": \"ST-20\",\n    \"timestamp\": \"{{ts18}}\",\n    \"ticketId\": \"TCK-007\",\n    \"scanType\": \"NFC\"\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Simulates ticket validations from validators on multiple lines. Includes validated, expired, and various times of day to trigger peak-hour analysis.\n\nExpected response: 201 Created with status=SUCCESS"
+            "description": "Simulates ticket validations from validators on multiple lines.\n\nExpected response: 201 Created with status=SUCCESS"
           }
         },
         {
@@ -85,14 +239,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"incidentId\": \"INC-001\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\",\n    \"severity\": \"HIGH\",\n    \"description\": \"Vehicle collision near main station\"\n  },\n  {\n    \"incidentId\": \"INC-002\",\n    \"type\": \"breakdown\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\",\n    \"severity\": \"CRITICAL\",\n    \"description\": \"Engine failure on bus 404\",\n    \"resolutionMinutes\": 30\n  },\n  {\n    \"incidentId\": \"INC-003\",\n    \"type\": \"delay\",\n    \"line\": \"L3\",\n    \"zone\": \"Z_SOUTH\",\n    \"timestamp\": \"2026-05-04T14:00:00Z\",\n    \"severity\": \"MEDIUM\",\n    \"resolutionMinutes\": 15\n  },\n  {\n    \"incidentId\": \"INC-004\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T15:30:00Z\",\n    \"severity\": \"MEDIUM\",\n    \"description\": \"Minor collision, road cleared\",\n    \"resolutionMinutes\": 20\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"incidentId\": \"INC-001\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"latitude\": 33.5731,\n    \"longitude\": -7.5898,\n    \"timestamp\": \"{{ts10}}\",\n    \"severity\": \"HIGH\",\n    \"description\": \"Vehicle collision near main station\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"incidentId\": \"INC-002\",\n    \"type\": \"breakdown\",\n    \"line\": \"L1\",\n    \"latitude\": 33.5800,\n    \"longitude\": -7.6000,\n    \"timestamp\": \"{{ts11}}\",\n    \"severity\": \"CRITICAL\",\n    \"description\": \"Engine failure on bus 404\",\n    \"resolutionMinutes\": 30\n  },\n  {\n    \"schemaVersion\": 1,\n    \"incidentId\": \"INC-003\",\n    \"type\": \"delay\",\n    \"line\": \"L3\",\n    \"latitude\": 33.5900,\n    \"longitude\": -7.6100,\n    \"timestamp\": \"{{ts14}}\",\n    \"severity\": \"MEDIUM\",\n    \"resolutionMinutes\": 15\n  },\n  {\n    \"schemaVersion\": 1,\n    \"incidentId\": \"INC-004\",\n    \"type\": \"accident\",\n    \"line\": \"L2\",\n    \"latitude\": 33.5731,\n    \"longitude\": -7.5898,\n    \"timestamp\": \"{{ts15}}\",\n    \"severity\": \"MEDIUM\",\n    \"description\": \"Minor collision, road cleared\",\n    \"resolutionMinutes\": 20\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Simulates incident reports from different zones and severities. Z_NORTH will appear as a repeat-incident zone, triggering INC_05.\n\nExpected response: 201 Created with status=SUCCESS"
+            "description": "GPS-based zones (rounded to 2 decimals). INC-001 and INC-004 share coordinates → repeat zone \"33.57,-7.59\".\n\nExpected response: 201 Created with status=SUCCESS"
           }
         },
         {
@@ -112,14 +266,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"transactionId\": \"TXN-001\",\n    \"status\": \"completed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  },\n  {\n    \"transactionId\": \"TXN-002\",\n    \"status\": \"completed\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"amount\": 10.00,\n    \"method\": \"CASH\"\n  },\n  {\n    \"transactionId\": \"TXN-003\",\n    \"status\": \"completed\",\n    \"line\": \"L2\",\n    \"timestamp\": \"2026-05-04T10:15:00Z\",\n    \"amount\": 50.00,\n    \"method\": \"CARD\"\n  },\n  {\n    \"transactionId\": \"TXN-004\",\n    \"status\": \"completed\",\n    \"line\": \"L3\",\n    \"timestamp\": \"2026-05-04T12:00:00Z\",\n    \"amount\": 15.75,\n    \"method\": \"CASH\"\n  },\n  {\n    \"transactionId\": \"TXN-005\",\n    \"status\": \"failed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"2026-05-04T13:00:00Z\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"transactionId\": \"TXN-001\",\n    \"status\": \"completed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"{{ts08}}\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"transactionId\": \"TXN-002\",\n    \"status\": \"completed\",\n    \"timestamp\": \"{{ts09}}\",\n    \"amount\": 10.00,\n    \"method\": \"CASH\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"transactionId\": \"TXN-003\",\n    \"status\": \"completed\",\n    \"line\": \"L2\",\n    \"timestamp\": \"{{ts10}}\",\n    \"amount\": 50.00,\n    \"method\": \"CARD\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"transactionId\": \"TXN-004\",\n    \"status\": \"completed\",\n    \"line\": \"L3\",\n    \"timestamp\": \"{{ts11}}\",\n    \"amount\": 15.75,\n    \"method\": \"CASH\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"transactionId\": \"TXN-005\",\n    \"status\": \"failed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"{{ts14}}\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Simulates payment transactions via POS and kiosk terminals. Includes both CARD and CASH methods, plus one failed transaction.\n\nExpected response: 201 Created with status=SUCCESS"
+            "description": "Simulates payment transactions via POS and kiosk terminals. Includes CARD and CASH methods, plus one failed transaction.\n\nExpected response: 201 Created with status=SUCCESS"
           }
         },
         {
@@ -139,14 +293,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"userId\": \"USR-101\",\n    \"action\": \"created\",\n    \"planType\": \"MONTHLY_STUDENT\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-102\",\n    \"action\": \"renewed\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T09:15:00Z\"\n  },\n  {\n    \"userId\": \"USR-103\",\n    \"action\": \"renewed\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-104\",\n    \"action\": \"cancelled\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"reason\": \"PAYMENT_FAILED\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-105\",\n    \"action\": \"created\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"2026-05-04T14:00:00Z\"\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-101\",\n    \"action\": \"created\",\n    \"planType\": \"MONTHLY_STUDENT\",\n    \"timestamp\": \"{{ts09}}\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-102\",\n    \"action\": \"renewed\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"{{ts09}}\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-103\",\n    \"action\": \"renewed\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"timestamp\": \"{{ts10}}\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-104\",\n    \"action\": \"cancelled\",\n    \"planType\": \"MONTHLY_STANDARD\",\n    \"reason\": \"PAYMENT_FAILED\",\n    \"timestamp\": \"{{ts11}}\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-105\",\n    \"action\": \"created\",\n    \"planType\": \"YEARLY_STANDARD\",\n    \"timestamp\": \"{{ts14}}\"\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Simulates subscription lifecycle events: new registrations, renewals, and a cancellation. Tests SUB_01 through SUB_05 aggregations.\n\nExpected response: 201 Created with status=SUCCESS"
+            "description": "Simulates subscription lifecycle events: new registrations, renewals, and a cancellation.\n\nExpected response: 201 Created with status=SUCCESS"
           }
         },
         {
@@ -166,14 +320,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"vehicleId\": \"BUS_101\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"2026-05-04T08:00:00Z\",\n    \"speed\": 42.5,\n    \"occupancy\": 80,\n    \"delayMinutes\": 0\n  },\n  {\n    \"vehicleId\": \"BUS_202\",\n    \"status\": \"in_service\",\n    \"line\": \"L2\",\n    \"zone\": \"Z_NORTH\",\n    \"timestamp\": \"2026-05-04T08:05:00Z\",\n    \"speed\": 35.0,\n    \"occupancy\": 120,\n    \"delayMinutes\": 8\n  },\n  {\n    \"vehicleId\": \"TRAM_01\",\n    \"status\": \"out_of_service\",\n    \"line\": \"T1\",\n    \"zone\": \"Z_EAST\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"speed\": 0.0,\n    \"alertCode\": \"ENG_TEMP_HIGH\"\n  },\n  {\n    \"vehicleId\": \"BUS_303\",\n    \"status\": \"in_service\",\n    \"line\": \"L3\",\n    \"zone\": \"Z_SOUTH\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\",\n    \"speed\": 50.0,\n    \"occupancy\": 45,\n    \"delayMinutes\": 2\n  },\n  {\n    \"vehicleId\": \"BUS_404\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_WEST\",\n    \"timestamp\": \"2026-05-04T11:00:00Z\",\n    \"speed\": 38.0,\n    \"occupancy\": 95,\n    \"delayMinutes\": 5\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"vehicleId\": \"BUS_101\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"timestamp\": \"{{ts08}}\",\n    \"speed\": 42.5,\n    \"occupancy\": 80,\n    \"delayMinutes\": 0\n  },\n  {\n    \"schemaVersion\": 1,\n    \"vehicleId\": \"BUS_202\",\n    \"status\": \"in_service\",\n    \"line\": \"L2\",\n    \"timestamp\": \"{{ts08}}\",\n    \"speed\": 35.0,\n    \"occupancy\": 120,\n    \"delayMinutes\": 8\n  },\n  {\n    \"schemaVersion\": 1,\n    \"vehicleId\": \"TRAM_01\",\n    \"status\": \"out_of_service\",\n    \"line\": \"T1\",\n    \"timestamp\": \"{{ts09}}\",\n    \"speed\": 0.0,\n    \"alertCode\": \"ENG_TEMP_HIGH\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"vehicleId\": \"BUS_303\",\n    \"status\": \"in_service\",\n    \"line\": \"L3\",\n    \"timestamp\": \"{{ts10}}\",\n    \"speed\": 50.0,\n    \"occupancy\": 45,\n    \"delayMinutes\": 2\n  },\n  {\n    \"schemaVersion\": 1,\n    \"vehicleId\": \"BUS_404\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"timestamp\": \"{{ts11}}\",\n    \"speed\": 38.0,\n    \"occupancy\": 95,\n    \"delayMinutes\": 5\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "NOTE: In production, G7 sends vehicle data via Kafka. This REST endpoint is for testing only.\n\nSimulates telemetry from active buses and one tram in maintenance. BUS_202 is overcapacity (occupancy=120) and will affect VEH_03.\n\nExpected response: 201 Created with status=SUCCESS"
+            "description": "NOTE: In production, G7 sends vehicle data via Kafka. This REST endpoint is for testing only.\n\nExpected response: 201 Created with status=SUCCESS"
           }
         },
         {
@@ -193,7 +347,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"userId\": \"USR-201\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T08:00:00Z\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"userId\": \"USR-202\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T08:10:00Z\",\n    \"deviceOS\": \"Android\"\n  },\n  {\n    \"userId\": \"USR-203\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T09:00:00Z\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"userId\": \"USR-204\",\n    \"action\": \"inactive\",\n    \"timestamp\": \"2026-05-04T10:00:00Z\"\n  },\n  {\n    \"userId\": \"USR-205\",\n    \"action\": \"active\",\n    \"timestamp\": \"2026-05-04T17:00:00Z\",\n    \"deviceOS\": \"Android\"\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-201\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{ts08}}\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-202\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{ts08}}\",\n    \"deviceOS\": \"Android\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-203\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{ts09}}\",\n    \"deviceOS\": \"iOS\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-204\",\n    \"action\": \"inactive\",\n    \"timestamp\": \"{{ts10}}\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-205\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{ts17}}\",\n    \"deviceOS\": \"Android\"\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
@@ -209,16 +363,19 @@
       "name": "--- WAIT ~60 SECONDS FOR SCHEDULER ---",
       "item": [
         {
-          "name": "07 - Health Check (Ping)",
+          "name": "07 - Actuator Health (Public — No Token Required)",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/analytics/dashboard",
+              "raw": "{{baseUrl}}/actuator/health",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "analytics", "dashboard"]
+              "path": ["actuator", "health"]
             },
-            "description": "Send this immediately after ingesting to confirm the service is alive. The values will still be zero until the scheduler runs (every 60 seconds). After ~60 seconds, re-send this request and the values should reflect your ingested data."
+            "description": "Spring Boot health endpoint — public, no JWT needed. Expect status UP when MongoDB is reachable."
           }
         }
       ]
@@ -228,6 +385,20 @@
       "item": [
         {
           "name": "08 - GET Dashboard (All Snapshots)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -236,11 +407,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "dashboard"]
             },
-            "description": "Returns ALL current snapshots in one call. This is the main dashboard endpoint used by G10.\n\nExpected: 200 OK with an array of all StatSnapshot documents (FREQ_01 through SUB_05)."
+            "description": "Returns ALL current snapshots in one call. Main dashboard endpoint used by G10.\n\nExpected: 200 OK with an array of all StatSnapshot documents."
           }
         },
         {
           "name": "09 - GET Trips Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -249,11 +431,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "trips", "summary"]
             },
-            "description": "Returns only TRIPS snapshots (FREQ_01 through FREQ_07):\n- FREQ_01: Total validations count\n- FREQ_02: Peak hour distribution map\n- FREQ_03: Peak hours list\n- FREQ_04: Avg daily passengers\n- FREQ_05: Line usage ranking\n- FREQ_06: Station footfall\n- FREQ_07: Weekend vs weekday ratio"
+            "description": "Returns TRIPS snapshots (FREQ_01 through FREQ_07)."
           }
         },
         {
           "name": "10 - GET Revenue Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -262,11 +455,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "revenue", "summary"]
             },
-            "description": "Returns REVENUE snapshots (REV_01 through REV_05):\n- REV_01: Total revenue\n- REV_02: Revenue by ticket type\n- REV_03: Avg revenue per passenger\n- REV_04: Payment method breakdown (CARD vs CASH)\n- REV_05: Revenue trend"
+            "description": "Returns REVENUE snapshots (REV_01 through REV_05)."
           }
         },
         {
           "name": "11 - GET Incidents Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -275,11 +479,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "incidents", "stats"]
             },
-            "description": "Returns INCIDENTS snapshots (INC_01 through INC_05):\n- INC_01: Total incidents count\n- INC_02: Incidents by type (accident, breakdown, delay)\n- INC_03: Incidents by zone\n- INC_04: Average resolution time in minutes\n- INC_05: Repeat incident zones (zones with more than 1 incident)"
+            "description": "Returns INCIDENTS snapshots (INC_01 through INC_05)."
           }
         },
         {
           "name": "12 - GET Vehicles Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -288,11 +503,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "vehicles", "activity"]
             },
-            "description": "Returns VEHICLES snapshots (VEH_01 through VEH_05):\n- VEH_01: Active vehicle count\n- VEH_02: Average punctuality rate (%)\n- VEH_03: Delay distribution / overcapacity count\n- VEH_04: Vehicle utilization rate\n- VEH_05: Average speed by line"
+            "description": "Returns VEHICLES snapshots (VEH_01 through VEH_05)."
           }
         },
         {
           "name": "13 - GET Subscriptions Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -301,11 +527,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "subscriptions", "stats"]
             },
-            "description": "Returns SUBSCRIPTIONS snapshots (SUB_01 through SUB_05):\n- SUB_01: Active subscriptions count\n- SUB_02: New subscriptions today\n- SUB_03: Renewal rate\n- SUB_04: Churn rate (%)\n- SUB_05: Subscription type distribution"
+            "description": "Returns SUBSCRIPTIONS snapshots (SUB_01 through SUB_05)."
           }
         },
         {
           "name": "14 - GET Users Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -329,6 +566,7 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
                   "var json = pm.response.json();",
                   "if (json && json.id) {",
                   "    pm.collectionVariables.set('reportId', json.id);",
@@ -361,11 +599,22 @@
                 }
               }
             },
-            "description": "Generates a full analytics report for today bundling all requested snapshot types.\n\nThe test script in this request automatically saves the returned report ID into the {{reportId}} collection variable, so request 16 can use it directly.\n\nExpected: 200 OK with a Report object containing all snapshots."
+            "description": "Generates a full analytics report for today. The test script automatically saves the returned report ID into {{reportId}} for use in request 16."
           }
         },
         {
           "name": "16 - GET Report by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -374,7 +623,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "analytics", "reports", "{{reportId}}"]
             },
-            "description": "Retrieves the report generated in request 15 using the {{reportId}} variable that was automatically saved.\n\nExpected: 200 OK with the full Report object.\nIf you get 404, make sure you ran request 15 first so the reportId variable is populated."
+            "description": "Retrieves the report generated in request 15 using the {{reportId}} variable.\n\nExpected: 200 OK with the full Report object.\nIf you get 404, make sure you ran request 15 first."
           }
         }
       ]
@@ -384,6 +633,17 @@
       "item": [
         {
           "name": "17 - Ingest Empty Batch (Expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', function () { pm.response.to.have.status(400); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -406,11 +666,28 @@
                 }
               }
             },
-            "description": "Sends an empty array to test validation. The @NotEmpty constraint on the controller should reject this.\n\nExpected: 400 Bad Request"
+            "description": "Sends an empty array to test the @NotEmpty validation constraint.\n\nExpected: 400 Bad Request"
           }
         },
         {
           "name": "18 - Ingest with Missing Timestamp (Expect 207 PARTIAL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 207 Multi-Status', function () { pm.response.to.have.status(207); });",
+                  "pm.test('Body has PARTIAL status', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('PARTIAL');",
+                  "    pm.expect(json.totalAccepted).to.eql(1);",
+                  "    pm.expect(json.totalRejected).to.eql(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -426,18 +703,29 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"userId\": \"USR-GOOD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"2026-05-04T08:30:00Z\",\n    \"ticketId\": \"TCK-GOOD\"\n  },\n  {\n    \"userId\": \"USR-BAD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"ticketId\": \"TCK-BAD\"\n  }\n]",
+              "raw": "[\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-GOOD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{ts08}}\",\n    \"ticketId\": \"TCK-GOOD\"\n  },\n  {\n    \"schemaVersion\": 1,\n    \"userId\": \"USR-BAD\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"ticketId\": \"TCK-BAD\"\n  }\n]",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Sends a batch where one event is valid and one is missing its required timestamp field.\n\nExpected: 207 Multi-Status with status=PARTIAL, totalAccepted=1, totalRejected=1"
+            "description": "Sends a mixed batch: one valid event and one missing its required timestamp.\n\nExpected: 207 Multi-Status with status=PARTIAL, totalAccepted=1, totalRejected=1"
           }
         },
         {
           "name": "19 - GET Report with Invalid ID (Expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', function () { pm.response.to.have.status(404); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],

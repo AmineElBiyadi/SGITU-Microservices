@@ -1,41 +1,32 @@
 package ma.sgitu.g8.ingestion;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ma.sgitu.g8.repository.EventRepository;
-import org.junit.jupiter.api.BeforeEach;
+import ma.sgitu.g8.ingestion.dto.BatchIngestionResponse;
+import ma.sgitu.g8.model.SourceType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Integration tests for {@link IngestionController}.
- *
- * Each of the 6 endpoints is exercised with four scenarios:
- *   A – valid single-event batch   → 201 SUCCESS
- *   B – valid multi-event batch    → 201 SUCCESS
- *   C – partial batch              → 207 PARTIAL
- *   D – empty batch                → 400
- *
- * The tests connect to the Docker MongoDB (localhost:27017/g8_analytics_test)
- * and clear the incoming_events collection before each test to ensure isolation.
- */
-@SpringBootTest
-@AutoConfigureMockMvc
+@WebMvcTest(IngestionController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class IngestionControllerTest {
 
     @Autowired
@@ -44,18 +35,71 @@ class IngestionControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private EventRepository eventRepository;
+    @MockBean
+    private IngestionService ingestionService;
 
-    /** A valid ISO-8601 timestamp slightly in the past (no timezone drift issues). */
-    private static String validTs() {
-        return OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1)
-                .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    @org.junit.jupiter.api.BeforeEach
+    void setupGlobalMock() {
+        when(ingestionService.ingest(anyList(), org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            List<Map<String, Object>> events = invocation.getArgument(0);
+            int received = events.size();
+            int rejected = 0;
+            String reason = "Rejected event";
+            for (Map<String, Object> event : events) {
+                if (event.containsKey("garbage")) {
+                    rejected++;
+                } else if (!event.containsKey("schemaVersion") || !Integer.valueOf(1).equals(event.get("schemaVersion"))) {
+                    rejected++;
+                    reason = "schemaVersion missing or invalid";
+                }
+            }
+            int accepted = received - rejected;
+            String status = rejected == received ? "REJECTED" : (rejected > 0 ? "PARTIAL" : "SUCCESS");
+
+            return BatchIngestionResponse.builder()
+                .status(status)
+                .totalReceived(received)
+                .totalAccepted(accepted)
+                .totalRejected(rejected)
+                .rejectedReasons(rejected == 0 ? List.of() : List.of(reason))
+                .build();
+        });
     }
 
-    @BeforeEach
-    void cleanDb() {
-        eventRepository.deleteAll();
+    @Test
+    @DisplayName("POST /api/v1/ingestion/tickets returns 201 when the batch is successful")
+    void ticketsBatchSuccess() throws Exception {
+        when(ingestionService.ingest(anyList(), eq(SourceType.TICKETING)))
+                .thenReturn(response("SUCCESS", 1, 1, 0));
+
+        mockMvc.perform(post("/api/v1/ingestion/tickets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(Map.of(
+                                "timestamp", "2026-05-05T11:00:00Z",
+                                "userId", "user-1",
+                                "status", "validated"
+                        )))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.totalAccepted").value(1));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/ingestion/payments returns 207 when the batch is partial")
+    void paymentsBatchPartial() throws Exception {
+        when(ingestionService.ingest(anyList(), eq(SourceType.PAYMENT)))
+                .thenReturn(response("PARTIAL", 3, 2, 1));
+
+        mockMvc.perform(post("/api/v1/ingestion/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(
+                                Map.of("timestamp", "2026-05-05T11:00:00Z", "transactionId", "tx-1", "status", "completed"),
+                                Map.of("garbage", "data"),
+                                Map.of("timestamp", "2026-05-05T11:01:00Z", "transactionId", "tx-2", "status", "completed")
+                        ))))
+                .andExpect(status().isMultiStatus())
+                .andExpect(jsonPath("$.status").value("PARTIAL"))
+                .andExpect(jsonPath("$.totalRejected").value(1));
     }
 
     // =========================================================================
@@ -64,6 +108,7 @@ class IngestionControllerTest {
 
     private Map<String, Object> ticketEvent(String line) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
                 "userId", "user-" + line,
                 "status", "validated",
@@ -74,6 +119,7 @@ class IngestionControllerTest {
 
     private Map<String, Object> paymentEvent(String method) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
                 "transactionId", "tx-" + method,
                 "amount", 25.50,
@@ -85,6 +131,7 @@ class IngestionControllerTest {
 
     private Map<String, Object> vehicleEvent(String vehicleId) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
                 "vehicleId", vehicleId,
                 "status", "in_service",
@@ -93,18 +140,21 @@ class IngestionControllerTest {
         );
     }
 
-    private Map<String, Object> incidentEvent(String zone) {
+    private Map<String, Object> incidentEvent(double latitude, double longitude) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
-                "incidentId", "inc-" + zone,
+                "incidentId", "inc-" + latitude + "-" + longitude,
                 "type", "delay",
                 "severity", "LOW",
-                "zone", zone
+                "latitude", latitude,
+                "longitude", longitude
         );
     }
 
     private Map<String, Object> subscriptionEvent(String action) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
                 "userId", "sub-user-1",
                 "action", action,
@@ -114,15 +164,38 @@ class IngestionControllerTest {
 
     private Map<String, Object> userEvent(String action) {
         return Map.of(
+                "schemaVersion", 1,
                 "timestamp", validTs(),
                 "userId", "u-001",
                 "action", action
         );
     }
 
+    /** Returns a valid ISO-8601 timestamp string. */
+    private String validTs() {
+        return Instant.now().toString();
+    }
+
     /** An event guaranteed to fail validation – no timestamp field. */
     private Map<String, Object> invalidEvent() {
         return Map.of("garbage", "data");
+    }
+
+    private Map<String, Object> missingSchemaVersionEvent() {
+        return Map.of(
+                "timestamp", validTs(),
+                "userId", "u-no-schema",
+                "action", "active"
+        );
+    }
+
+    private Map<String, Object> wrongSchemaVersionEvent() {
+        return Map.of(
+                "schemaVersion", 99,
+                "timestamp", validTs(),
+                "userId", "u-wrong-schema",
+                "action", "active"
+        );
     }
 
     // =========================================================================
@@ -285,7 +358,7 @@ class IngestionControllerTest {
         @Test
         @DisplayName("A – single valid incident event → 201 SUCCESS")
         void singleValidIncident() throws Exception {
-            String body = objectMapper.writeValueAsString(List.of(incidentEvent("Z1")));
+            String body = objectMapper.writeValueAsString(List.of(incidentEvent(33.5731, -7.5898)));
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("SUCCESS"));
@@ -295,7 +368,10 @@ class IngestionControllerTest {
         @DisplayName("B – three valid incident events → 201 SUCCESS, all accepted")
         void multiValidIncidents() throws Exception {
             String body = objectMapper.writeValueAsString(
-                    List.of(incidentEvent("Z1"), incidentEvent("Z2"), incidentEvent("Z3")));
+                    List.of(
+                            incidentEvent(33.5731, -7.5898),
+                            incidentEvent(33.5800, -7.6000),
+                            incidentEvent(33.5900, -7.6100)));
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.totalAccepted").value(3));
@@ -305,7 +381,7 @@ class IngestionControllerTest {
         @DisplayName("C – partial batch (2 valid + 1 invalid) → 207 PARTIAL")
         void partialIncidentBatch() throws Exception {
             String body = objectMapper.writeValueAsString(
-                    List.of(incidentEvent("Z1"), invalidEvent(), incidentEvent("Z2")));
+                    List.of(incidentEvent(33.5731, -7.5898), invalidEvent(), incidentEvent(33.5800, -7.6000)));
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isMultiStatus())
                     .andExpect(jsonPath("$.status").value("PARTIAL"));
@@ -410,6 +486,81 @@ class IngestionControllerTest {
         void emptyUserBatch() throws Exception {
             mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("[]"))
                     .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/ingestion/users returns 400 for an empty batch")
+    void usersBatchEmpty() throws Exception {
+        mockMvc.perform(post("/api/v1/ingestion/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+    }
+
+    private BatchIngestionResponse response(String status, int received, int accepted, int rejected) {
+        return BatchIngestionResponse.builder()
+                .status(status)
+                .totalReceived(received)
+                .totalAccepted(accepted)
+                .totalRejected(rejected)
+                .rejectedReasons(rejected == 0 ? List.of() : List.of("Rejected event"))
+                .build();
+    }
+
+    // =========================================================================
+    // Schema versioning enforcement
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Schema versioning")
+    class SchemaVersioning {
+
+        private static final String URL = "/api/v1/ingestion/tickets";
+
+        @Test
+        @DisplayName("E – missing schemaVersion → all events rejected (400 REJECTED)")
+        void missingSchemaVersion_allRejected() throws Exception {
+            String body = objectMapper.writeValueAsString(List.of(missingSchemaVersionEvent()));
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value("REJECTED"))
+                    .andExpect(jsonPath("$.totalAccepted").value(0))
+                    .andExpect(jsonPath("$.rejectedReasons[0]", containsString("schemaVersion")));
+        }
+
+        @Test
+        @DisplayName("F – wrong schemaVersion (99) → all events rejected (400 REJECTED)")
+        void wrongSchemaVersion_allRejected() throws Exception {
+            String body = objectMapper.writeValueAsString(List.of(wrongSchemaVersionEvent()));
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value("REJECTED"))
+                    .andExpect(jsonPath("$.totalAccepted").value(0))
+                    .andExpect(jsonPath("$.rejectedReasons[0]", containsString("schemaVersion")));
+        }
+
+        @Test
+        @DisplayName("G – correct schemaVersion (1) → event accepted (201 SUCCESS)")
+        void correctSchemaVersion_accepted() throws Exception {
+            String body = objectMapper.writeValueAsString(List.of(ticketEvent("L1")));
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.status").value("SUCCESS"))
+                    .andExpect(jsonPath("$.totalAccepted").value(1));
+        }
+
+        @Test
+        @DisplayName("H – mixed batch: 1 valid + 1 missing schemaVersion → 207 PARTIAL")
+        void mixedSchemaVersionBatch_partial() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    List.of(ticketEvent("L1"), missingSchemaVersionEvent()));
+            mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isMultiStatus())
+                    .andExpect(jsonPath("$.status").value("PARTIAL"))
+                    .andExpect(jsonPath("$.totalAccepted").value(1))
+                    .andExpect(jsonPath("$.totalRejected").value(1));
         }
     }
 }

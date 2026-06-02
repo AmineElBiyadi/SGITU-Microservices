@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: sgitu
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # Utiliser hostpath pour Minikube/Docker Desktop
+  # Pour production cloud, utiliser: standard, gp2, etc.
+  storageClassName: hostpath

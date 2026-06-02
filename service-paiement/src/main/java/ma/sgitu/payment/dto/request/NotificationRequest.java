@@ -32,7 +32,7 @@ public class NotificationRequest {
 
     /**
      * Service source
-     * Valeur fixe pour G6 : "PAYMENT"
+     * Valeur fixe pour G6 : "G6_PAYMENT"
      */
     private String sourceService;
 

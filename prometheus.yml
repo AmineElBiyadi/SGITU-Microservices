@@ -39,9 +39,15 @@ scrape_configs:
       - targets: ['notification-service:8085']
     metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
-  #  G6 — (ajoutez votre bloc ici)
+  #  G6 — Service Paiement (SGITU)
   # ---------------------------------------------------------------
-
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['g6-payment-service:8086']
+    metrics_path: '/actuator/prometheus'
+    scheme: 'https'
+    tls_config:
+      insecure_skip_verify: true
   # ---------------------------------------------------------------
   #  G7 — Service Suivi des Véhicules (SGITU)
   # ---------------------------------------------------------------
@@ -53,6 +59,10 @@ scrape_configs:
   # ---------------------------------------------------------------
   #  G8 — (ajoutez votre bloc ici)
   # ---------------------------------------------------------------
+  - job_name: 'g8-analytics'
+    static_configs:
+      - targets: ['g8-analytics-service:8088']
+    metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G9 — (ajoutez votre bloc ici)

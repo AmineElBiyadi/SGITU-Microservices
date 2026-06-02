@@ -3,13 +3,15 @@ package ma.sgitu.g8.ml;
 import ma.sgitu.g8.model.IncomingEvent;
 import ma.sgitu.g8.model.SourceType;
 import ma.sgitu.g8.repository.EventRepository;
-import ma.sgitu.g8.repository.StatSnapshotRepository;
+import ma.sgitu.g8.service.SnapshotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,119 +20,75 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-/**
- * Tests for {@link MlPredictionService}.
- *
- * Scenarios A and B verify graceful handling of an empty database (no data →
- * early return, no exception).
- *
- * Scenario C uses {@link MockBean} to replace the real {@link RestTemplate}
- * with a mock that throws {@link ResourceAccessException}, simulating an
- * unavailable Python ML service.  Because {@link MlPredictionService} wraps
- * every call in a broad try/catch, the exception must never propagate to the
- * caller.
- */
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 class MlPredictionServiceTest {
 
-    @Autowired
-    private MlPredictionService mlPredictionService;
-
-    @Autowired
+    @Mock
     private EventRepository eventRepository;
 
-    @Autowired
-    private StatSnapshotRepository statSnapshotRepository;
+    @Mock
+    private SnapshotService snapshotService;
 
-    /**
-     * Declared as @MockBean so Spring replaces the real RestTemplate bean in the
-     * entire context for this test class.  This affects ThresholdAlertService too,
-     * but that is acceptable because all alert sends are also wrapped in try/catch.
-     */
-    @MockBean
+    @Mock
     private RestTemplate restTemplate;
 
+    @InjectMocks
+    private MlPredictionService mlPredictionService;
+
     @BeforeEach
-    void cleanDb() {
-        eventRepository.deleteAll();
-        statSnapshotRepository.deleteAll();
+    void setUp() {
+        ReflectionTestUtils.setField(mlPredictionService, "mlServiceUrl", "http://ml-service:5000");
     }
 
-    // -------------------------------------------------------------------------
-    // Scenario A – computePeakHoursPrediction with no data
-    // -------------------------------------------------------------------------
-
     @Test
-    @DisplayName("A – computePeakHoursPrediction() on empty DB → no exception, graceful skip")
-    void peakHoursPrediction_emptyDatabase_noException() {
-        // No events in DB – service must log a warning and return early
+    @DisplayName("computePeakHoursPrediction skips cleanly when there is no ticket data")
+    void peakHoursPredictionEmptyDatabase() {
+        when(eventRepository.findBySourceTypeAndTimestampBetween(eq(SourceType.TICKETING), any(), any()))
+                .thenReturn(List.of());
+
         assertThatCode(() -> mlPredictionService.computePeakHoursPrediction())
                 .doesNotThrowAnyException();
 
-        // RestTemplate must NOT have been called since there is no data
         verifyNoInteractions(restTemplate);
     }
 
-    // -------------------------------------------------------------------------
-    // Scenario B – computeIncidentPrediction with no data
-    // -------------------------------------------------------------------------
-
     @Test
-    @DisplayName("B – computeIncidentPrediction() on empty DB → no exception, graceful skip")
-    void incidentPrediction_emptyDatabase_noException() {
+    @DisplayName("computeIncidentPrediction skips cleanly when there is no incident data")
+    void incidentPredictionEmptyDatabase() {
+        when(eventRepository.findBySourceTypeAndTimestampBetween(eq(SourceType.INCIDENT), any(), any()))
+                .thenReturn(List.of());
+
         assertThatCode(() -> mlPredictionService.computeIncidentPrediction())
                 .doesNotThrowAnyException();
 
         verifyNoInteractions(restTemplate);
     }
 
-    // -------------------------------------------------------------------------
-    // Scenario C – ML service unavailable
-    // -------------------------------------------------------------------------
-
     @Test
-    @DisplayName("C – ML service unavailable (ResourceAccessException) → no exception propagates")
-    void peakHoursPrediction_mlServiceDown_noException() {
-        // Insert validated ticket data so the service reaches the RestTemplate call
-        LocalDateTime pastHour = LocalDateTime.now().minusHours(1);
-        eventRepository.saveAll(List.of(
-                buildTicketEvent("user-A", pastHour, "L1"),
-                buildTicketEvent("user-B", pastHour.minusMinutes(15), "L1"),
-                buildTicketEvent("user-C", pastHour.minusMinutes(30), "L2")
-        ));
+    @DisplayName("ML service outages do not propagate exceptions to callers")
+    void peakHoursPredictionHandlesMlServiceFailure() {
+        when(eventRepository.findBySourceTypeAndTimestampBetween(eq(SourceType.TICKETING), any(), any()))
+                .thenReturn(List.of(buildTicketEvent("user-1", 8), buildTicketEvent("user-2", 8)));
+        when(restTemplate.postForObject(contains("/predict/peak-hours"), any(), eq(Map.class)))
+                .thenThrow(new ResourceAccessException("connection refused"));
 
-        // Mock RestTemplate to simulate a network failure when calling the ML service
-        when(restTemplate.postForObject(
-                contains("/predict/peak-hours"),
-                any(),
-                eq(Map.class)
-        )).thenThrow(new ResourceAccessException("ML service connection refused"));
-
-        // The service must catch the exception internally and not propagate it
         assertThatCode(() -> mlPredictionService.computePeakHoursPrediction())
                 .doesNotThrowAnyException();
     }
 
-    // -------------------------------------------------------------------------
-    // Helper
-    // -------------------------------------------------------------------------
-
-    private IncomingEvent buildTicketEvent(String userId, LocalDateTime ts, String line) {
+    private IncomingEvent buildTicketEvent(String userId, int hour) {
         return IncomingEvent.builder()
                 .sourceType(SourceType.TICKETING)
                 .sourceId(userId)
                 .eventType("TICKET_VALIDATED")
-                .lineId(line)
-                .timestamp(ts)
-                .receivedAt(LocalDateTime.now())
-                .payload(Map.of(
-                        "status", "validated",
-                        "line", line,
-                        "userId", userId
-                ))
+                .timestamp(LocalDateTime.now().minusDays(1).withHour(hour))
+                .payload(Map.of("status", "validated", "userId", userId))
                 .processed(false)
                 .build();
     }

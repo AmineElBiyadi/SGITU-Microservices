@@ -120,6 +120,7 @@ public class RevenueAggregation {
             LocalDate start = today.minusDays(29);
             Map<String, Double> totalsByDate = successfulPayments(start.atStartOfDay(), today.plusDays(1).atStartOfDay())
                     .stream()
+                    .filter(this::hasTimestamp)
                     .collect(Collectors.groupingBy(
                             event -> event.getTimestamp().toLocalDate().toString(),
                             Collectors.summingDouble(this::amount)
@@ -145,22 +146,27 @@ public class RevenueAggregation {
 
     private List<IncomingEvent> successfulPayments(LocalDateTime from, LocalDateTime to) {
         return payments(from, to).stream()
-                .filter(event -> "PAYMENT_COMPLETED".equals(event.getEventType()))
+                .filter(event -> event != null && "PAYMENT_COMPLETED".equals(event.getEventType()))
                 .toList();
     }
 
     private List<IncomingEvent> payments(LocalDateTime from, LocalDateTime to) {
-        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.PAYMENT, from, to);
+        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.PAYMENT, from, to)
+                .stream()
+                .filter(this::hasTimestamp)
+                .toList();
     }
 
     private double snapshotValue(String statId) {
         return snapshotRepository.findFirstByStatIdOrderByComputedAtDesc(statId)
                 .map(StatSnapshot::getValue)
+                .filter(value -> value != null)
                 .orElse(0.0);
     }
 
     private void save(String statId, String displayId, String granularity, String period, double value, Map<String, Object> data) {
         StatSnapshot snapshot = StatSnapshot.builder()
+                .schemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION)
                 .snapshotType(SnapshotType.REVENUE)
                 .statId(statId)
                 .granularity(granularity)
@@ -177,7 +183,7 @@ public class RevenueAggregation {
     }
 
     private String payload(IncomingEvent event, String key, String defaultValue) {
-        Object value = event.getPayload() == null ? null : event.getPayload().get(key);
+        Object value = event == null || event.getPayload() == null ? null : event.getPayload().get(key);
         if (value == null || String.valueOf(value).isBlank()) {
             return defaultValue;
         }
@@ -185,14 +191,18 @@ public class RevenueAggregation {
     }
 
     private double amount(IncomingEvent event) {
-        Object value = event.getPayload() == null ? null : event.getPayload().get("amount");
+        Object value = event == null || event.getPayload() == null ? null : event.getPayload().get("amount");
         if (value instanceof Number number) {
-            return number.doubleValue();
+            return Math.max(0, number.doubleValue());
         }
         try {
-            return value == null ? 0 : Double.parseDouble(String.valueOf(value));
+            return value == null ? 0 : Math.max(0, Double.parseDouble(String.valueOf(value)));
         } catch (NumberFormatException ex) {
             return 0;
         }
+    }
+
+    private boolean hasTimestamp(IncomingEvent event) {
+        return event != null && event.getTimestamp() != null;
     }
 }

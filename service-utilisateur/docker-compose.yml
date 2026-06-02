@@ -18,7 +18,9 @@ services:
       JAVA_TOOL_OPTIONS: "-Dspring.redis.host=redis -Dspring.redis.port=6379"
       # G8 — Analyse & données: ask them for their container name and port
       G8_BASE_URL: ${G8_BASE_URL:-}
+      # Kafka configuration (pour G8 Analytics)
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       users-db:
         condition: service_healthy

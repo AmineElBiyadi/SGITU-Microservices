@@ -1,5 +1,8 @@
 # SGITU Analytics Service (service-analytique)
 
+> **Status: 🟢 Integration Complete**  
+> The `integration/merged-analytique` branch has been fully merged into `main`. All endpoints are secured with JWT authentication, Kafka topics are fully integrated with the pipeline, and all automated end-to-end integration tests are passing.
+
 This is the main analytics engine for the SGITU microservices architecture. It is responsible for aggregating data from various sources (ticketing, incidents, vehicles, revenue, subscriptions), detecting threshold breaches, and calling external Machine Learning services to generate predictions.
 
 ## Features Implemented
@@ -13,7 +16,7 @@ The service runs scheduled jobs every 60 seconds to compute various metrics from
 *   **Subscriptions (SUB_*)**: Active subscriptions, new subscriptions, renewal rate, churn rate, subscription type distribution.
 
 ### 2. Alerts System
-*   **ThresholdAlertService**: Monitors incoming events and aggregations on every scheduler tick (every 60 seconds). If specific business rules are violated, it immediately sends targeted notifications to the **G5 Notification Service** (`http://localhost:8085/notifications`). *(Note: The G5 service may not be running locally, so connection refused errors in the logs are expected if it is offline).*
+*   **ThresholdAlertService**: Monitors incoming events and aggregations on every scheduler tick (every 60 seconds). If specific business rules are violated, it immediately sends targeted notifications to the **G5 Notification Service** via the API Gateway (`http://api-gateway:8080/api/notifications/send`). *(Note: The G5 service may not be running locally, so connection refused errors in the logs are expected if it is offline).*
 
 #### Configured Thresholds & Triggers:
 The service evaluates the following 5 critical thresholds:
@@ -42,10 +45,12 @@ The `MlPredictionService` integrates with the standalone Python ML microservice 
 
 ## Architecture
 
-The environment is containerized and consists of 3 main services:
-1.  **`g8-analytics-service`**: This Spring Boot Java application.
-2.  **`g8-ml-service`**: A Python FastAPI (Uvicorn) application serving machine learning models (running on port 5000).
-3.  **`g8-mongo`**: MongoDB database (running on port 27017) to store `incoming_events` and `stat_snapshots`.
+The environment is containerized and consists of these services:
+1.  **`g8-analytics-service`**: Spring Boot Java application (host port **8088**).
+2.  **`g8-ml-service`**: Python FastAPI ML service (internal only — not exposed on the host).
+3.  **`g8-mongo`**: MongoDB (port **27017**).
+4.  **`g8-prometheus`**: Metrics scraper (internal).
+5.  **`g8-grafana`**: Dashboards (host port **3000**, login `admin` / `sgitu2026`).
 
 ---
 
@@ -62,10 +67,10 @@ docker-compose up --build
 
 You should see logs indicating that MongoDB has started, the Python ML service is running, and the Spring Boot application has started successfully.
 
-### 5. Database GUI (Mongo Express)
-A web-based graphical interface is included to easily view and manage your MongoDB data without using the terminal. 
-*   Once the containers are running, open your browser and go to **http://localhost:9099**
-*   You will see the `g8_analytics` database where you can visually inspect the `incoming_events` and `stat_snapshots` collections.
+### 5. Monitoring (Prometheus + Grafana)
+*   **Prometheus metrics:** `http://localhost:8088/actuator/prometheus` (after the stack is up).
+*   **Grafana dashboard:** `http://localhost:3000` — provisioned dashboard **SGITU — Analytique G8**.
+*   Incident zones use GPS coordinates rounded to 2 decimals (e.g. `33.57,-7.59`).
 
 ---
 

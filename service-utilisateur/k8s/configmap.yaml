@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: sgitu
+data:
+  # Application
+  SERVER_PORT: "8083"
+  SPRING_APPLICATION_NAME: "user-service"
+  SERVER_SERVLET_CONTEXT_PATH: "/api"
+  
+  # Database
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-service:5432/users_db"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
+  
+  # JPA
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.PostgreSQLDialect"
+  
+  # Redis
+  SPRING_REDIS_HOST: "redis-service"
+  SPRING_REDIS_PORT: "6379"
+  
+  # Kafka
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  EVENTS_USER_STATUS_TOPIC: "g8-user-events"
+  
+  # JWT
+  JWT_EXPIRATION: "900"
+  JWT_REFRESH_EXPIRATION: "604800"
+  
+  # Swagger
+  SPRINGDOC_API_DOCS_PATH: "/v3/api-docs"
+  SPRINGDOC_SWAGGER_UI_PATH: "/swagger-ui.html"
+  
+  # Actuator & Prometheus
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+  MANAGEMENT_METRICS_TAGS_APPLICATION: "user-service"

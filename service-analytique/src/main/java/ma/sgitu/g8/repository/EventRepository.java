@@ -18,4 +18,6 @@ public interface EventRepository extends MongoRepository<IncomingEvent, String> 
     );
 
     long countBySourceTypeAndProcessedFalse(SourceType sourceType);
+
+    long countBySourceType(SourceType sourceType);
 }

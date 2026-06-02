@@ -111,10 +111,10 @@ public class TicketController {
             @RequestHeader("X-User-Email") String email,
             @RequestHeader("X-User-Roles") String rolesStr,
             @RequestBody TicketPurchaseRequest request) {
-        
+
         System.out.println("Achat de ticket initié par l'utilisateur ID: " + userId);
         // Traitement métier de la billetterie (G1)...
-        
+
         return ResponseEntity.ok(new TicketResponse("SUCCESS", userId));
     }
 }

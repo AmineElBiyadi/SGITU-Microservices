@@ -47,6 +47,7 @@ public class UserAggregation {
             long activeCount = events.stream()
                     .filter(event -> "USER_ACTIVE".equals(event.getEventType()))
                     .map(IncomingEvent::getSourceId)
+                    .filter(sourceId -> sourceId != null && !sourceId.isBlank())
                     .distinct()
                     .count();
 
@@ -127,6 +128,8 @@ public class UserAggregation {
             // Group active events by date → distinct user count per day
             Map<String, Long> activeByDate = events.stream()
                     .filter(event -> "USER_ACTIVE".equals(event.getEventType()))
+                    .filter(event -> event.getSourceId() != null && !event.getSourceId().isBlank())
+                    .filter(event -> event.getTimestamp() != null)
                     .collect(Collectors.groupingBy(
                             event -> event.getTimestamp().toLocalDate().toString(),
                             Collectors.collectingAndThen(
@@ -158,12 +161,16 @@ public class UserAggregation {
     // ──────────────────────────────────────────────────────────────────────────
 
     private List<IncomingEvent> events(LocalDateTime from, LocalDateTime to) {
-        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.USER, from, to);
+        return eventRepository.findBySourceTypeAndTimestampBetween(SourceType.USER, from, to)
+                .stream()
+                .filter(event -> event != null && event.getTimestamp() != null)
+                .toList();
     }
 
     private void save(String statId, String displayId, String granularity, String period,
                       double value, Map<String, Object> data) {
         StatSnapshot snapshot = StatSnapshot.builder()
+                .schemaVersion(StatSnapshot.CURRENT_SCHEMA_VERSION)
                 .snapshotType(SnapshotType.USERS)
                 .statId(statId)
                 .granularity(granularity)
@@ -176,7 +183,7 @@ public class UserAggregation {
     }
 
     private String payload(IncomingEvent event, String key, String defaultValue) {
-        Object value = event.getPayload() == null ? null : event.getPayload().get(key);
+        Object value = event == null || event.getPayload() == null ? null : event.getPayload().get(key);
         if (value == null || String.valueOf(value).isBlank()) {
             return defaultValue;
         }

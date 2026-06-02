@@ -8,6 +8,35 @@ spring:
     mongodb:
       uri: ${MONGO_URI:mongodb://localhost:27017/g8_analytics}
       database: g8_analytics
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: g8-analytics-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      missing-topics-fatal: false
+
+kafka:
+  topics:
+    ticketing: ${KAFKA_TOPIC_TICKETING:ticket.validated}
+    subscription: ${KAFKA_TOPIC_SUBSCRIPTION:abonnement.souscription}
+    payment: ${KAFKA_TOPIC_PAYMENT:payment.transaction.completed}
+    vehicle: ${KAFKA_TOPIC_VEHICLE:g8.vehicule.status}
+    incident: ${KAFKA_TOPIC_INCIDENT:incident.analytique.topic}
+    user: ${KAFKA_TOPIC_USER:g8-user-events}
+    dead-letter: ${KAFKA_TOPIC_DLT:g8-analytics-dlt}
+    analytics-results: ${KAFKA_TOPIC_ANALYTICS:g8-analytics-results}
+    ml-predictions: ${KAFKA_TOPIC_ML_PREDICTIONS:g8-ml-predictions}
+  topic:
+    crossgroup: sgitu.crossgroup.events
+  retry:
+    interval: 1000
+    max-attempts: 3
+
 
 logging:
   level:
@@ -15,7 +44,58 @@ logging:
 
 g5:
   notification:
-    url: ${G5_NOTIFICATION_URL:http://localhost:8085/api/notifications/send}
+    url: ${G5_NOTIFICATION_URL:http://api-gateway:8080/api/notifications/send}
+
 ml:
   service:
     url: ${ML_SERVICE_URL:http://localhost:5000}
+
+# JWT
+jwt:
+  secret: sgitu_g8_secret_key_2025_very_long_secret_for_analytics
+  expiration: 86400000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      g5AlertCircuitBreaker:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+
+# SpringDoc OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  info:
+    title: Data Analysis API
+    description: API for launching, monitoring and managing data analyses
+    version: 1.0.0
+    contact:
+      name: SGITU Team
+      email: support@sgitu.ma
+  servers:
+    - url: http://localhost:8088
+      description: Development server
+    - url: https://api.sgitu.ma
+      description: Production server

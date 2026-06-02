@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-analytique
+  namespace: service-analytique
+  labels:
+    app: service-analytique
+    component: backend
+    version: v1
+  annotations:
+    kubernetes.io/change-cause: "Initial deployment with 2 replicas and resource limits"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: service-analytique
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: service-analytique
+        component: backend
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8088"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+      - name: service-analytique
+        image: microservice-analyse-multi:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8088
+          protocol: TCP
+        env:
+        # Variables d'environnement depuis la ConfigMap
+        - name: MONGO_URI
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: MONGO_URI
+        - name: MONGO_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: MONGO_DATABASE
+        - name: G5_NOTIFICATION_URL
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: G5_NOTIFICATION_URL
+        - name: ML_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: ML_SERVICE_URL
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: LOG_LEVEL
+        - name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: SPRING_PROFILES_ACTIVE
+        - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+        - name: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
+        - name: SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: SERVER_PORT
+        - name: JAVA_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: service-analytique-config
+              key: JAVA_OPTS
+        # Variables directes
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Ressources limites et requêtes
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health Checks avec Spring Boot Actuator
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        
+        # Configuration du cycle de vie
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "curl -X POST http://localhost:8088/actuator/shutdown || true"]
+        
+        # Volume pour les logs (optionnel)
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+          readOnly: false
+      
+      volumes:
+      - name: logs
+        emptyDir: {}
+      
+      # Configuration du pod
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      
+      # Tolérations et affinités (optionnel pour Mac/ARM)
+      tolerations:
+      - key: "arm64"
+        operator: "Exists"
+        effect: "NoSchedule"
+      
+      nodeSelector:
+        kubernetes.io/arch: arm64

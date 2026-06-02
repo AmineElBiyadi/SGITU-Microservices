@@ -7,7 +7,7 @@ Le microservice G6 a été entièrement dockerisé et intégré au fichier `dock
 Pour tester G6 indépendamment des autres groupes lourds, exécutez la commande suivante à la racine du projet :
 
 ```bash
-docker compose up --build -d payment-service g6-payment-db kafka
+docker compose up -d payment-service g6-payment-db kafka prometheus grafana
 ```
 
 - **payment-service** : Le backend Spring Boot du G6 (Port 8086).
