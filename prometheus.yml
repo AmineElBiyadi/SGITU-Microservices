@@ -70,8 +70,12 @@ scrape_configs:
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
-  #  G9 — (ajoutez votre bloc ici)
+  #  G9 — Service Gestion des Incidents (SGITU)
   # ---------------------------------------------------------------
+  - job_name: 'g9-gestion-incidents'
+    static_configs:
+      - targets: ['service-gestion-incidents:8089']
+    metrics_path: '/api/incidents/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G10 — (ajoutez votre bloc ici)

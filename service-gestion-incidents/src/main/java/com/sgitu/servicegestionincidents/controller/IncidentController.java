@@ -31,6 +31,7 @@ public class IncidentController {
             @Valid @RequestBody SignalementRequestDTO request,
             @RequestHeader("X-User-Id") Long userId,
             @RequestHeader("X-User-Role") String userRole) {
+        request.setRole(userRole);
         SignalementResponseDTO response = incidentService.signalerIncident(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
