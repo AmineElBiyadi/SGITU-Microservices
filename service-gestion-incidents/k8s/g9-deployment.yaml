@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g9-service
+  namespace: service-gestion-incidents
+  labels:
+    app: g9-service
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g9-service
+  template:
+    metadata:
+      labels:
+        app: g9-service
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8089"
+        prometheus.io/path: "/api/incidents/actuator/prometheus"
+    spec:
+      initContainers:
+      - name: wait-for-mysql
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z mysql-service 3306; do echo waiting for mysql; sleep 2; done;']
+      - name: wait-for-kafka
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z kafka-service 9092; do echo waiting for kafka; sleep 2; done;']
+      containers:
+      - name: g9-service
+        image: sgitu/service-gestion-incidents:1.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8089
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: g9-config
+        - secretRef:
+            name: g9-secrets
+        startupProbe:
+          httpGet:
+            path: /api/incidents/actuator/health
+            port: 8089
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 24
+        livenessProbe:
+          httpGet:
+            path: /api/incidents/actuator/health/liveness
+            port: 8089
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/incidents/actuator/health/readiness
+            port: 8089
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"

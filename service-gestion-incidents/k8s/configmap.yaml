@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: g9-config
+  namespace: service-gestion-incidents
+data:
+  SPRING_PROFILES_ACTIVE: "docker"
+  DB_URL: "jdbc:mysql://mysql-service:3306/sgitu_incidents?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC"
+  DB_USERNAME: "root"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+  MANAGEMENT_METRICS_TAGS_APPLICATION: "service-gestion-incidents"
