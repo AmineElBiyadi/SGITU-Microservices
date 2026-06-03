@@ -9,6 +9,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -79,6 +81,29 @@ public class GlobalExceptionHandler {
         response.put("error", "Not Found");
         response.put("message", "La ressource ou l'endpoint demandé n'existe pas : " + ex.getResourcePath());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+
+    // 400 - Requête HTTP non lisible ou JSON malformé
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", 400);
+        response.put("error", "Bad Request");
+        response.put("message", "Le corps de la requête est malformé ou illisible (JSON syntax error).");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    // 400 - Opération ou transition d'état invalide
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("timestamp", LocalDateTime.now());
+        response.put("status", 400);
+        response.put("error", "Bad Request");
+        response.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     // 500 - Erreur interne non gérée (Sécurisée)

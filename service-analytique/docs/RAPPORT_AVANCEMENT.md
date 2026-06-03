@@ -1,7 +1,7 @@
 # Rapport d'Avancement : Microservice Analytique (G8)
 
 **Équipe :** Service Analytique (`service-analytique`)  
-**Dernière mise à jour :** 1 juin 2026  
+**Dernière mise à jour :** 2 juin 2026  
 **Rôle dans SGITU :** Collecte, agrégation et exposition des indicateurs (KPI) et prédictions à partir des événements des autres microservices (billetterie G2, abonnements G3, paiements G4, véhicules G6, incidents G7, utilisateurs G1).
 
 ---
@@ -209,6 +209,8 @@ La collection Postman (`docs/G8_Analytics_Postman_Collection.json`) reste **vali
 
 Elle n'est cependant **pas nécessaire pour valider le pipeline** : le harness PowerShell (`run-integration-tests.ps1`) et le script de seed (`seed-dashboard-data.ps1`) suffisent pour un cycle complet. La collection Postman peut être conservée comme complément.
 
+> **Nouveau :** Une seconde collection `docs/G8_G3_Showcase_Postman_Collection.json` a été ajoutée pour démontrer spécifiquement l'intégration de bout-en-bout entre G3 (création d'un utilisateur) et G8 (mise à jour des statistiques avec JWT).
+
 > **Note :** La collection inclut désormais un dossier **Phase 0: Security**. L'exécution de la requête `00b - Generate JWT Token` génère automatiquement un jeton JWT en local (via `CryptoJS`) et l'injecte dans toutes les requêtes suivantes via l'authentification `Bearer` au niveau de la collection. Il n'est plus nécessaire d'ajouter les headers manuellement.
 
 ### 5.4 Tests manuels
@@ -304,11 +306,18 @@ docker-compose up --build
 - [x] Harness d'intégration A-to-Z (`run-integration-tests.ps1`) — **10/10 tests PASS**.
 - [x] Contrats de données documentés (`docs/DATA_CONTRACTS.md`) et référence dashboard (`docs/DASHBOARD_REFERENCE.md`).
 - [x] **Integration avec G3 (utilisateurs)** — Stage 2 ✅ PASS (10/10 tests). Kafka topic `g8-user-events`, injection automatique de `schemaVersion` pour compatibilité.
+- [x] **Correction drift Kafka** — les listeners Kafka acceptent maintenant les objets JSON simples et ajoutent automatiquement `schemaVersion=1` avant validation.
+- [x] **Normalisation de compatibilité inter-services** — adaptation des champs hérités connus (`vehiculeId`, `retardMinutes`, `paymentMethod`, `dateIncident`, etc.) sans demander de modification immédiate aux autres groupes.
+- [x] **Stage 3 G5 prêt à relancer** — le problème Dockerfile côté G5 est annoncé corrigé ; le script `test-g5-alert-integration.ps1` peut maintenant être exécuté dans le compose racine.
+- [x] **Stage 4 préparé** — scripts PowerShell créés pour tester un sender à la fois : billetterie, abonnements, paiements, suivi véhicule et incidents.
 
 ### En cours / à finaliser
 
-- [ ] **Intégration E2E avec G5** (notifications/alertes) dans l'environnement complet du projet (compose racine / CI). Stage 3 prêt à tester.
-- [ ] **Intégration avec G7** (incidents en temps réel) — vérifier que le flux `g7-incident-events` envoie réellement des messages (actuellement pas de producteur wired à un endpoint G7).
+- [ ] **Intégration E2E avec G5** (notifications/alertes) dans l'environnement complet du projet (compose racine / CI). Stage 3 prêt à exécuter maintenant que G5 démarre.
+- [ ] **Stage 4 sender-by-sender** — exécuter les scripts ajoutés et qualifier chaque échec comme sender-side, G8 consumer-side, ou agrégation/alerte.
+- [ ] **Paiements G6** — vérifier si G6 publie bien un événement analytique sur `payment.transaction.completed` ou seulement une notification sur `payment.notification`.
+- [ ] **Suivi véhicule G7** — vérifier si le flux normal appelle bien le producteur `g8.vehicule.status`, ou seulement `vehicule-positions`.
+- [ ] **Incidents** — brancher le service incidents au broker Kafka partagé et vérifier `incident.analytique.topic`.
 - [ ] Alignement des **schémas d'événements** avec chaque équipe (versions `schemaVersion` > 1 si évolution des contrats).
 - [ ] Routage gateway : vérifier la cohérence des chemins (`/api/v1/analytics` vs `/api/analytics` documentés côté gateway).
 - [ ] Optimisation des agrégations sur gros volumes (index MongoDB, fenêtres temporelles).
@@ -341,6 +350,15 @@ docker-compose up --build
     - Modifié `consumeUserEvents()` pour accepter un single `Map<String, Object>` (au lieu d'une liste)
     - Injection automatique de `schemaVersion: 1` dans le listener pour compatibilité avec G3
   - **Résultat** : End-to-end test Stage 2 ✅ 10/10 PASS (voir `G8_INTEGRATION_TESTING_PLAN.md`)
+- **G2 → G3 Abonnement Authentification (Identifié 🔍)** : 
+  - **Problème** : `test-g2-subscription-events.ps1` échoue lors de la création d'abonnement.
+  - **Cause** : Le client Feign `UtilisateurServiceClient` de G2 n'injecte pas le header d'authentification JWT lors de la requête synchrone vers G3, entraînant un `401 Unauthorized`.
+  - **Action requise** : L'équipe G2 doit ajouter un `RequestInterceptor` Feign pour propager le token.
+- **Contract drift inter-services (RÉSOLU côté G8 / à valider côté senders)** :
+  - Les messages Kafka sans `schemaVersion` sont adaptés automatiquement par G8.
+  - Les listeners G8 acceptent maintenant les objets JSON simples et les batches.
+  - Les champs hérités des senders sont normalisés avant validation.
+  - Les scripts Stage 4 permettent d'identifier proprement les cas où un sender publie sur un topic de notification au lieu du topic analytique attendu.
 
 ## 11. Structure du dépôt (référence)
 

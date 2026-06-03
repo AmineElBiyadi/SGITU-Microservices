@@ -27,6 +27,7 @@ public class IngestionService {
     private static final int MAX_BATCH_SIZE = 1000;
 
     private final EventRepository eventRepository;
+    private final SourceEventNormalizer sourceEventNormalizer;
 
     public BatchIngestionResponse ingest(List<Map<String, Object>> rawEvents, SourceType sourceType) {
         if (rawEvents == null || rawEvents.isEmpty()) {
@@ -53,7 +54,7 @@ public class IngestionService {
         List<String> rejectedReasons = new ArrayList<>();
 
         for (int index = 0; index < rawEvents.size(); index++) {
-            Map<String, Object> rawEvent = rawEvents.get(index);
+            Map<String, Object> rawEvent = sourceEventNormalizer.normalize(rawEvents.get(index), sourceType);
             String validationError = validate(rawEvent, sourceType);
 
             if (validationError != null) {

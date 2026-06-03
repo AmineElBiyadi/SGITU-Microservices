@@ -39,7 +39,7 @@ services:
       SERVER_PORT: 8081
       MONGO_URI: mongodb://${billetterie_MONGO_ROOT_USERNAME}:${billetterie_MONGO_ROOT_PASSWORD}@billetterie-mongo:27017/${billetterie_MONGO_DATABASE}?authSource=admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      PAYMENT_SERVICE_URL: ${G6_BASE_URL:-http://service-paiement:8086}
+      PAYMENT_SERVICE_URL: ${G6_BASE_URL:-http://payment-service:8086}
       COORDINATION_SERVICE_URL: ${G4_BASE_URL:-http://g4-coordination:8084}
     depends_on:
       billetterie-mongo:
@@ -147,6 +147,8 @@ services:
       SPRING_REDIS_HOST: g3-redis
       SPRING_REDIS_PORT: 6379
       SERVER_PORT: 8083
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
       G8_BASE_URL: ${G8_BASE_URL:-}
@@ -361,7 +363,7 @@ services:
       SERVER_PORT: 8086
       SPRING_KAFKA_BOOTSTRAP_SERVERS: sgitu-kafka:9092
       SUBSCRIPTION_SERVICE_URL: ${G2_BASE_URL:-http://service-abonnement:8082}
-      TICKET_SERVICE_URL: ${G1_BASE_URL:-http://g1-user-service:8081}
+      TICKET_SERVICE_URL: ${G1_BASE_URL:-http://service-billetterie:8081}
       NOTIFICATION_SERVICE_URL: ${G5_BASE_URL:-http://g5-notification-service:8085}
     depends_on:
       g6-payment-db:
@@ -558,6 +560,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    hostname: prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -569,6 +572,9 @@ services:
       - g7-service
       - user-service
       - g8-analytics-service
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
       - g9-service
 
   grafana:
@@ -580,6 +586,12 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana-data:/var/lib/grafana
+      # Configuration Prometeus DataSource
+      - ./service-paiement/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      # Configuration Dashboards Provisioning
+      - ./service-paiement/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Dashboards JSON
+      - ./service-paiement/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     networks:
       - sgitu-network
     depends_on:

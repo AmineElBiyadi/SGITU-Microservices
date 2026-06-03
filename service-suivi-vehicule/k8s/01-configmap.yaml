@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: g7-suivi-config
+  namespace: sgitu-g7
+  labels:
+    app: g7-suivi-vehicule
+data:
+  SERVER_PORT: "8087"
+  SPRING_APPLICATION_NAME: "g7-suivi-vehicules"
+
+  # PostgreSQL (service interne K8s)
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-g7:5432/g7_vehicules"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: "org.postgresql.Driver"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.PostgreSQLDialect"
+
+  # Kafka (service interne K8s — voir 04-kafka.yaml)
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka-g7:9092"
+  SPRING_KAFKA_CONSUMER_GROUP_ID: "g7-group"
+
+  # Topics (alignés sur application.properties)
+  KAFKA_TOPIC_ANOMALIE: "anomalies-terrain"
+  KAFKA_TOPIC_POSITION: "vehicule-positions"
+  KAFKA_TOPIC_INCIDENT: "suivi-vehicule.incident.topic"
+  KAFKA_TOPIC_TELEMETRIE: "g7.telemetrie.stream"
+  KAFKA_TOPIC_G8: "g8.vehicule.status"
+  KAFKA_TOPIC_VEHICLE_REGISTERED: "vehicle.registered"
+
+  # Intégrations inter-groupes (adapter si G5/G9 déjà en K8s — voir K8S_DEPLOYMENT_GUIDE.md)
+  G5_NOTIFICATION_URL: "http://notification-service:8085/api/notifications/send"
+  G9_INTEGRATION_URL: "http://host.docker.internal:8089/api/v1/incidents"
+
+  # Actuator / Swagger
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  SPRINGDOC_SWAGGER_UI_ENABLED: "true"

@@ -89,6 +89,31 @@ public class RefundService {
         return toSuccessResponse(refund);
     }
 
+    @Transactional
+    public RefundResponse processRefundByTicketSourceId(String ticketId, RefundRequest request) {
+        log.info("Demande de remboursement compatibilite G1 pour ticket ID: {}", ticketId);
+
+        Payment payment = paymentRepository
+                .findFirstBySourceTypeAndSourceIdAndStatusOrderByCreatedAtDesc(
+                        SourceType.TICKET,
+                        ticketId,
+                        PaymentStatus.SUCCESS
+                )
+                .orElseThrow(() -> new BadRequestException(
+                        "Aucun paiement SUCCESS trouve pour le ticket ID: " + ticketId
+                ));
+
+        RefundRequest effectiveRequest = request;
+        if (effectiveRequest == null || effectiveRequest.getAmount() == null) {
+            effectiveRequest = RefundRequest.builder()
+                    .amount(payment.getAmount())
+                    .reason("Remboursement ticket G1")
+                    .build();
+        }
+
+        return processRefund(payment.getId(), effectiveRequest);
+    }
+
     @Transactional(readOnly = true)
     public RefundResponse getRefundById(Long refundId) {
         Refund refund = refundRepository.findById(refundId)

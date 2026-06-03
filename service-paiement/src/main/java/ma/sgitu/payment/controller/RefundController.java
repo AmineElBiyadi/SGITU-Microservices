@@ -1,13 +1,16 @@
 package ma.sgitu.payment.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ma.sgitu.payment.dto.request.RefundRequest;
 import ma.sgitu.payment.dto.response.RefundResponse;
+import ma.sgitu.payment.exception.BadRequestException;
 import ma.sgitu.payment.service.RefundService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +21,7 @@ import java.util.List;
 public class RefundController {
 
     private final RefundService refundService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/payments/{paymentId}/refund")
     public ResponseEntity<RefundResponse> processRefund(
@@ -29,6 +33,31 @@ public class RefundController {
         HttpStatus status = "REFUNDED".equals(response.getStatus())
                 ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(response);
+    }
+
+    @PostMapping("/payments/{ticketId}/cancel")
+    public ResponseEntity<RefundResponse> processTicketRefundCompatibility(
+            @PathVariable String ticketId,
+            @RequestBody(required = false) String requestBody) {
+
+        log.info("POST /payments/{}/cancel appele en mode compatibilite G1", ticketId);
+        RefundRequest request = parseOptionalRefundRequest(requestBody);
+        RefundResponse response = refundService.processRefundByTicketSourceId(ticketId, request);
+        HttpStatus status = "REFUNDED".equals(response.getStatus())
+                ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(response);
+    }
+
+    private RefundRequest parseOptionalRefundRequest(String requestBody) {
+        if (!StringUtils.hasText(requestBody)) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(requestBody, RefundRequest.class);
+        } catch (Exception e) {
+            throw new BadRequestException("Format body remboursement invalide");
+        }
     }
 
     @GetMapping("/refunds/{refundId}")

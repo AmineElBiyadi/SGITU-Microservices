@@ -6,13 +6,32 @@ on:
     # Déclenche uniquement si des fichiers dans le microservice G7 sont modifiés
     paths:
       - "service-suivi-vehicule/**"
-      - "ci-cd-g7.yml"
+      - ".github/workflows/ci-cd-g7.yml"
   pull_request:
     branches: [ "main" ]
     paths:
       - "service-suivi-vehicule/**"
 
 jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: service-suivi-vehicule
+    steps:
+    - name: Récupérer le code
+      uses: actions/checkout@v4
+
+    - name: Configurer Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: Analyser la qualité du code (Warnings)
+      run: mvn clean compile -Dmaven.compiler.showWarnings=true -Dmaven.compiler.compilerArgs=-Xlint:all
+
   build-and-test:
     runs-on: ubuntu-latest
     
@@ -32,11 +51,21 @@ jobs:
         distribution: 'temurin'
         cache: 'maven' # Met en cache les dépendances Maven pour accélérer les builds suivants
 
-    - name: Compiler et exécuter les tests
-      run: mvn clean test -Dspring.profiles.active=test
+    - name: Compiler le projet
+      run: mvn clean package -DskipTests
+
+    - name: Exécuter les tests unitaires
+      run: mvn test -Dspring.profiles.active=test
+
+    - name: Publier les rapports de test Surefire
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: surefire-reports
+        path: service-suivi-vehicule/target/surefire-reports/
 
   docker-build:
-    needs: build-and-test
+    needs: [build-and-test, code-quality]
     runs-on: ubuntu-latest
     # Ne s'exécute pas sur les PR, uniquement sur les pushs validés
     if: github.event_name == 'push'

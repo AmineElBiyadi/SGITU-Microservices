@@ -295,6 +295,15 @@ Add-Result "G8 health endpoint is reachable" $g8Ok "http://localhost:8088/actuat
 
 $g5Ok = Wait-HttpOk -Url "http://localhost:8085/api/notifications/health" -Timeout $TimeoutSeconds
 Add-Result "G5 health endpoint is reachable" $g5Ok "http://localhost:8085/api/notifications/health"
+if (-not $g5Ok) {
+    Write-Host "[DIAGNOSIS] G5 is not HTTP-ready; stopping before triggering G8 alerts so the circuit breaker does not drop them." -ForegroundColor Yellow
+    Write-Step "Summary"
+    Write-Host "Total: $($Script:Results.Total), Passed: $($Script:Results.Pass), Failed: $($Script:Results.Fail)"
+    exit 1
+}
+
+Write-Host "[INFO] G5 is HTTP-ready. Waiting 35 seconds for G8's G5 circuit breaker to leave OPEN state if earlier scheduled jobs hit G5 while it was down." -ForegroundColor Yellow
+Start-Sleep -Seconds 35
 
 Write-Step "Baseline G5 state"
 $beforeCount = Get-G5NotificationCount
@@ -322,13 +331,13 @@ for ($i = 1; $i -le 60; $i++) {
     }
 }
 $vehicleResponse = Invoke-G8JsonPost -Path "/api/v1/ingestion/vehicles" -Body $vehicles -Headers $headers
-Add-Result "Delayed vehicle events ingested" $true ($vehicleResponse | ConvertTo-Json -Compress)
+Add-Result "Delayed vehicle events ingested" ($vehicleResponse.totalAccepted -ge 60) ($vehicleResponse | ConvertTo-Json -Compress)
 
 $incidents = @()
 for ($i = 1; $i -le 12; $i++) {
     $incidents += @{
         schemaVersion = 1
-        timestamp = $now.AddMinutes($i).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        timestamp = $now.AddSeconds($i).ToString("yyyy-MM-ddTHH:mm:ssZ")
         incidentId = "g8-alert-$runId-inc-$i"
         type = "breakdown"
         severity = "CRITICAL"
@@ -338,7 +347,7 @@ for ($i = 1; $i -le 12; $i++) {
     }
 }
 $incidentResponse = Invoke-G8JsonPost -Path "/api/v1/ingestion/incidents" -Body $incidents -Headers $headers
-Add-Result "Incident threshold events ingested" $true ($incidentResponse | ConvertTo-Json -Compress)
+Add-Result "Incident threshold events ingested" ($incidentResponse.totalAccepted -ge 12) ($incidentResponse | ConvertTo-Json -Compress)
 
 Write-Step "Run analytics and alert detection"
 try {

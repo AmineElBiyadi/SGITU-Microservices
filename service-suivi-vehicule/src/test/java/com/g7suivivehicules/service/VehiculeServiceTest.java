@@ -25,6 +25,12 @@ class VehiculeServiceTest {
     @Mock
     private VehiculeRepository vehiculeRepository;
 
+    @Mock
+    private com.g7suivivehicules.kafka.KafkaProducerService kafkaProducerService;
+
+    @Mock
+    private G5NotificationService g5NotificationService;
+
     @InjectMocks
     private VehiculeService vehiculeService;
 

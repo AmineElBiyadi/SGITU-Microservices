@@ -21,29 +21,29 @@ public class HeaderAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest req,
-                                    HttpServletResponse res, FilterChain chain)
+            HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
 
         String userId = req.getHeader("X-User-Id");
+        String userEmail = req.getHeader("X-User-Email");
         String rolesHeader = req.getHeader("X-Roles");
 
         if (userId == null || rolesHeader == null) {
-            // Allow the request to continue, Spring Security will handle authorization
-            // based on the absence of authentication in the context.
             chain.doFilter(req, res);
             return;
         }
 
-        List<GrantedAuthority> authorities =
-                Arrays.stream(rolesHeader.split(","))
-                        .map(String::trim)
-                        .filter(role -> !role.isEmpty())
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
+        List<GrantedAuthority> authorities = Arrays.stream(rolesHeader.split(","))
+                .map(String::trim)
+                .filter(role -> !role.isEmpty())
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
 
-        UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(
-                        userId, null, authorities);
+        // On utilise l'email comme principal si disponible, sinon le userId
+        String principal = (userEmail != null) ? userEmail : userId;
+
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                principal, null, authorities);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
         chain.doFilter(req, res);

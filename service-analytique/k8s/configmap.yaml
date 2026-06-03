@@ -12,7 +12,7 @@ data:
   MONGO_DATABASE: "g8_analytics"
   
   # Configuration des services externes
-  G5_NOTIFICATION_URL: "http://api-gateway:8080/api/notifications/send"
+  G5_NOTIFICATION_URL: "http://localhost:8085/api/notifications/send"
   ML_SERVICE_URL: "http://ml-service:5000"
   
   # Configuration du logging

@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: g7-suivi-vehicule
+  namespace: sgitu-g7
+  labels:
+    app: g7-suivi-vehicule
+    group: G7
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: g7-suivi-vehicule
+  template:
+    metadata:
+      labels:
+        app: g7-suivi-vehicule
+        group: G7
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8087"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: g7-suivi-vehicule
+          image: sgitu/g7-suivi-vehicule:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8087
+          envFrom:
+            - configMapRef:
+                name: g7-suivi-config
+            - secretRef:
+                name: g7-suivi-secret
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8087
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            failureThreshold: 3
