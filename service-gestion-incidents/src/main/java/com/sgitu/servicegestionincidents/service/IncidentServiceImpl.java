@@ -47,7 +47,6 @@ public class IncidentServiceImpl implements IncidentService {
     private Double duplicateRadiusMeters;
 
     // ============================================================
-    // Task 1.1 — signalerIncident()
     // Dual duplicate detection + default gravity per type + source tracking
     // ============================================================
     @Override
@@ -70,9 +69,7 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     // ============================================================
-    // Task 1.2 — affecterResponsable()
     // Validate ANALYSE/ESCALADE status → ASSIGNE, fire G5 notification
-    // Note: G4 CONFIRME is sent at NOUVEAU → ANALYSE (in mettreAJourStatut)
     // ============================================================
     @Override
     public void affecterResponsable(Long id, Long responsableId, Long auteurId) {
@@ -161,7 +158,6 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     // ============================================================
-    // Task 1.3 — mettreAJourStatut()
     // Transitions EN_TRAITEMENT et RESOLU avec vérification
     // ============================================================
     @Override
@@ -196,13 +192,6 @@ public class IncidentServiceImpl implements IncidentService {
         incidentRepository.save(incident);
         log.info("Incident {} — Statut mis à jour: {} → {}", incident.getReference(), ancienStatut, nouveauStatut);
 
-        // Déclencher G4 (Transport) — CONFIRME dès que le Dispatcher confirme l'incident
-        if (nouveauStatut == StatutIncident.ANALYSE) {
-            envoyerEvenementTransport(incident, "CONFIRME");
-            incident.setTransportNotifie(true);
-            incidentRepository.save(incident);
-        }
-
         // Déclencher G4 (Transport) — RESOLU quand le technicien termine
         if (nouveauStatut == StatutIncident.RESOLU) {
             envoyerEvenementTransport(incident, "RESOLU");
@@ -212,10 +201,6 @@ public class IncidentServiceImpl implements IncidentService {
         notificationService.envoyerChangementStatut(incident, ancienStatut.name());
     }
 
-    // ============================================================
-    // Task 1.4 — escaladerIncident()
-    // Gravité → CRITIQUE, Statut → ESCALADE, G5 alerte urgence
-    // ============================================================
     @Override
     public void escaladerIncident(Long id, String motif, Long auteurId) {
         log.info("Escalade de l'incident {} — Motif: {} par {}", id, motif, auteurId);
@@ -259,9 +244,6 @@ public class IncidentServiceImpl implements IncidentService {
 
         // Déclencher G5 (Notification) — alerte rouge vers la direction
         notificationService.envoyerEscalade(incident, motif);
-
-        // Déclencher G4 (Transport) — notification d'escalade
-        envoyerEvenementTransport(incident, "ESCALADE");
     }
 
     @Override
@@ -329,7 +311,6 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     // ============================================================
-    // Task 1.5 — cloturerIncident()
     // Vérification RESOLU → CLOTURE, envoi G8 analytique
     // ============================================================
     @Override
@@ -371,7 +352,6 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     // ============================================================
-    // Task 1.6 — annulerIncident()
     // ANNULE + G4 REJETE si transportNotifie + G8 analytique
     // ============================================================
     @Override
@@ -496,15 +476,12 @@ public class IncidentServiceImpl implements IncidentService {
         if (role == null || role.isBlank()) {
             return "VOYAGEUR"; // Par défaut, un utilisateur non défini clairement est traité comme un voyageur
         }
-        return switch (role.toUpperCase()) {
-            case "CONDUCTEUR", "ROLE_CONDUCTEUR" -> "CONDUCTEUR";
-            default -> "VOYAGEUR";
-        };
+
+        return "ROLE_DRIVER".equalsIgnoreCase(role) ? "CONDUCTEUR" : "VOYAGEUR";
     }
 
     /**
-     * Détection de doublon : par vehiculeId si présent, sinon par localisation +
-     * type.
+     * Détection de doublon : par vehiculeId si présent, sinon par localisation + type.
      */
     private Optional<Incident> detecterDoublon(SignalementRequestDTO request) {
         // Stratégie 1 : Doublon par vehiculeId
@@ -537,8 +514,7 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     /**
-     * Traite un doublon : enrichit l'incident existant avec une action de
-     * confirmation.
+     * Traite un doublon : enrichit l'incident existant avec une action de confirmation.
      */
     private SignalementResponseDTO traiterDoublon(Incident existing, SignalementRequestDTO request, String source,
             Long declarantId) {
@@ -625,8 +601,15 @@ public class IncidentServiceImpl implements IncidentService {
 
         // Notification G5 — confirmation au déclarant
         notificationService.envoyerConfirmation(saved);
-        // Alerte aux dispatchers
-        notificationService.envoyerAlerteDispatchers(saved);
+
+        // Déclencher G4 (Transport) — CONFIRME au moment du signalement
+        try {
+            envoyerEvenementTransport(saved, "CONFIRME");
+            saved.setTransportNotifie(true);
+            saved = incidentRepository.save(saved);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'événement CONFIRME à G4 (Transport) pour l'incident {}", saved.getReference(), e);
+        }
 
         return SignalementResponseDTO.builder()
                 .incidentId(saved.getId())
@@ -640,8 +623,7 @@ public class IncidentServiceImpl implements IncidentService {
 
     /**
      * Valide les transitions de statut autorisées selon la machine à états.
-     * Seules EN_TRAITEMENT et RESOLU sont gérées ici (les autres ont des méthodes
-     * dédiées).
+     * Seules EN_TRAITEMENT et RESOLU sont gérées ici (les autres ont des méthodes dédiées).
      */
     private void validerTransition(StatutIncident ancien, StatutIncident nouveau) {
         boolean valide = switch (nouveau) {

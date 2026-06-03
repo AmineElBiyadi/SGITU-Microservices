@@ -1,7 +1,6 @@
 package ma.sgitu.g8.scheduler;
 
 import ma.sgitu.g8.model.IncomingEvent;
-import ma.sgitu.g8.model.SnapshotType;
 import ma.sgitu.g8.model.SourceType;
 import ma.sgitu.g8.model.StatSnapshot;
 import ma.sgitu.g8.repository.EventRepository;
@@ -26,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * Tests for {@link ScheduledAnalyticsJob}.
  *
  * The scheduler is called directly (bypassing the 60-second timer) and the
- * results are asserted against the real MongoDB (Docker, localhost:27017).
+ * results are asserted against the MongoDB database.
  *
  * All aggregation classes catch their own exceptions, so runAnalytics() must
  * complete without propagating any exception even when the database is empty.
@@ -54,9 +53,9 @@ class ScheduledAnalyticsJobTest {
         statSnapshotRepository.deleteAll();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Scenario A – job runs without errors on empty database
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     @Test
     @DisplayName("A – runAnalytics() completes without exception on empty DB")
@@ -65,16 +64,15 @@ class ScheduledAnalyticsJobTest {
                 .doesNotThrowAnyException();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Scenario B – job writes snapshots after ingesting mock events
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     @Test
     @DisplayName("B – runAnalytics() writes at least one snapshot after seeding events")
     void runAnalyticsAfterSeeding_createsSnapshots() {
         // ---- seed 5 IncomingEvent documents covering several source types ----
         List<IncomingEvent> events = new ArrayList<>();
-
         LocalDateTime baseTime = LocalDateTime.now().minusMinutes(10);
 
         // TICKETING – validated ticket
@@ -145,9 +143,9 @@ class ScheduledAnalyticsJobTest {
         assertThat(snapshots).isNotEmpty();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Scenario C – snapshot has correct structure
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     @Test
     @DisplayName("C – snapshots have non-null statId, snapshotType, and computedAt")
@@ -183,13 +181,13 @@ class ScheduledAnalyticsJobTest {
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Scenario D – Upsert creates exactly one snapshot per statId
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     @Test
     @DisplayName("D – Call runAnalytics() twice, expect exactly one snapshot per statId")
-    void runAnalyticsTwice_validatesUpsert() {
+    void runAnalyticsTwice_validatesUpsert() throws InterruptedException {
         LocalDateTime now = LocalDateTime.now().minusMinutes(5);
         eventRepository.save(IncomingEvent.builder()
                 .sourceType(SourceType.TICKETING)
@@ -202,8 +200,13 @@ class ScheduledAnalyticsJobTest {
                 .processed(false)
                 .build());
 
+        // First run
         scheduledAnalyticsJob.runAnalytics();
+        Thread.sleep(500); // Allow time for async operations
+
+        // Second run - should update existing snapshots (upsert)
         scheduledAnalyticsJob.runAnalytics();
+        Thread.sleep(500); // Allow time for async operations
 
         List<StatSnapshot> snapshots = statSnapshotRepository.findAll();
         assertThat(snapshots).isNotEmpty();
@@ -214,7 +217,59 @@ class ScheduledAnalyticsJobTest {
         }
 
         groupedByStatId.forEach((statId, docs) -> {
-            assertThat(docs).as("statId %s should have exactly 1 document", statId).hasSize(1);
+            assertThat(docs).as("statId %s should have exactly 1 document (upsert)", statId).hasSize(1);
         });
+    }
+
+    // =========================================================================
+    // Scenario E – malformed historical events do not break aggregations
+    // =========================================================================
+
+    @Test
+    @DisplayName("E – malformed historical events do not break aggregations")
+    void malformedEvents_doNotBreakScheduler() {
+        LocalDateTime now = LocalDateTime.now().minusMinutes(5);
+
+        eventRepository.saveAll(List.of(
+                IncomingEvent.builder()
+                        .sourceType(SourceType.TICKETING)
+                        .sourceId("bad-ticket")
+                        .eventType("TICKET_VALIDATED")
+                        .timestamp(null)
+                        .receivedAt(LocalDateTime.now())
+                        .payload(null)
+                        .processed(false)
+                        .build(),
+                IncomingEvent.builder()
+                        .sourceType(SourceType.PAYMENT)
+                        .sourceId("bad-payment")
+                        .eventType("PAYMENT_COMPLETED")
+                        .timestamp(now)
+                        .receivedAt(LocalDateTime.now())
+                        .payload(Map.of("amount", "not-a-number"))
+                        .processed(false)
+                        .build(),
+                IncomingEvent.builder()
+                        .sourceType(SourceType.VEHICLE)
+                        .sourceId("bad-vehicle")
+                        .eventType("VEHICLE_IN_SERVICE")
+                        .timestamp(now)
+                        .receivedAt(LocalDateTime.now())
+                        .payload(null)
+                        .processed(false)
+                        .build(),
+                IncomingEvent.builder()
+                        .sourceType(SourceType.USER)
+                        .sourceId(null)
+                        .eventType("USER_ACTIVE")
+                        .timestamp(now)
+                        .receivedAt(LocalDateTime.now())
+                        .payload(null)
+                        .processed(false)
+                        .build()
+        ));
+
+        assertThatCode(() -> scheduledAnalyticsJob.runAnalytics())
+                .doesNotThrowAnyException();
     }
 }

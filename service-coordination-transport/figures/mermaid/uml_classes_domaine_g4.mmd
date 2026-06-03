@@ -1,0 +1,14 @@
+classDiagram
+    class Ligne { +Long id +String code +String nom }
+    class Trajet { +Long id +String code }
+    class Arret { +Long id +String nom +Double latitude +Double longitude }
+    class Horaire { +Long id +LocalTime heureDepart }
+    class Mission { +Long id +String vehiculeId +String chauffeurId +StatutMission statut }
+    class AffectationVehiculeLigne { +Long id +String vehiculeId }
+    class CoordinationEventEntity { +Long id +CoordinationEventType type }
+    Ligne --> Trajet
+    Ligne --> Arret
+    Ligne --> Horaire
+    Ligne --> AffectationVehiculeLigne
+    Ligne --> Mission
+    Mission --> CoordinationEventEntity

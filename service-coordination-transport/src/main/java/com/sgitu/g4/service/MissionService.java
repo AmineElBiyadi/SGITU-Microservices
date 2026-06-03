@@ -3,7 +3,6 @@ package com.sgitu.g4.service;
 import com.sgitu.g4.dto.MissionRequest;
 import com.sgitu.g4.dto.MissionResponse;
 import com.sgitu.g4.dto.MissionStatusResponse;
-import com.sgitu.g4.dto.G1MissionLifecycleMessage;
 import com.sgitu.g4.entity.AffectationVehiculeLigne;
 import com.sgitu.g4.entity.Ligne;
 import com.sgitu.g4.entity.Mission;
@@ -13,7 +12,6 @@ import com.sgitu.g4.exception.BadRequestException;
 import com.sgitu.g4.exception.ConflictException;
 import com.sgitu.g4.exception.ForbiddenOperationException;
 import com.sgitu.g4.exception.ResourceNotFoundException;
-import com.sgitu.g4.integration.G1BilletterieClient;
 import com.sgitu.g4.integration.G3UserClient;
 import com.sgitu.g4.integration.G7VehicleClient;
 import com.sgitu.g4.mapper.EntityMapper;
@@ -27,11 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,21 +37,25 @@ public class MissionService {
 	private final LigneRepository ligneRepository;
 	private final TrajetRepository trajetRepository;
 	private final AffectationRepository affectationRepository;
-	private final G1BilletterieClient g1BilletterieClient;
+	private final G1MissionLifecyclePublisher g1MissionLifecyclePublisher;
 	private final G7VehicleClient g7VehicleClient;
 	private final G3UserClient g3UserClient;
+	private final VehiculeReferentielService vehiculeReferentielService;
+	private final G5ContractNotificationService g5ContractNotificationService;
 	private final SupervisionLogService supervisionLogService;
 
 	@Transactional
 	public MissionResponse create(MissionRequest request) {
-		assertVehicleAvailableForActiveMission(request.getVehiculeId().trim(), null, request.getStatut());
+		String vehiculeId = VehiculeReferentielService.normalizeVehiculeId(request.getVehiculeId());
+		assertVehicleAvailableForActiveMission(vehiculeId, null, request.getStatut());
+		vehiculeReferentielService.assertReadyForMission(vehiculeId, request.getLigneId());
 		g3UserClient.assertDriverExistsIfEnabled(request.getChauffeurId());
 		Ligne ligne = ligneRepository.findById(request.getLigneId())
 				.orElseThrow(() -> new ResourceNotFoundException("Ligne introuvable : " + request.getLigneId()));
 		Trajet trajet = resolveTrajet(request.getTrajetId(), ligne);
 		AffectationVehiculeLigne affectation = resolveAffectation(request.getAffectationId(), ligne);
 		Mission mission = Mission.builder()
-				.vehiculeId(request.getVehiculeId().trim())
+				.vehiculeId(vehiculeId)
 				.chauffeurId(trimToNull(request.getChauffeurId()))
 				.ligne(ligne)
 				.trajet(trajet)
@@ -69,7 +68,10 @@ public class MissionService {
 				.build();
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("INFO", "MISSION", "Créée id=" + saved.getId());
-		publishG1BilletterieLifecycle(saved, "MISSION_PLANIFIED", "DEBUT_MISSION");
+		g1MissionLifecyclePublisher.publish(saved, "MISSION_PLANIFIED", "DEBUT_MISSION");
+		if (saved.getStatut() == StatutMission.EN_COURS) {
+			g1MissionLifecyclePublisher.publish(saved, "ON_GOING", "TRAJET_EN_COURS");
+		}
 		return EntityMapper.toDto(saved);
 	}
 
@@ -93,8 +95,10 @@ public class MissionService {
 	public MissionStatusResponse status(Long id) {
 		Mission mission = missionRepository.findById(id)
 				.orElseThrow(() -> new ResourceNotFoundException("Mission introuvable : " + id));
-		g7VehicleClient.fetchStatus(mission.getVehiculeId());
-		return EntityMapper.toStatus(mission);
+		Map<String, Object> vehiculeStatut = g7VehicleClient.fetchStatus(mission.getVehiculeId());
+		MissionStatusResponse response = EntityMapper.toStatus(mission);
+		response.setVehiculeStatutG7(vehiculeStatut);
+		return response;
 	}
 
 	@Transactional
@@ -104,11 +108,13 @@ public class MissionService {
 			throw new ForbiddenOperationException("Mission terminée ou annulée");
 		}
 		StatutMission oldStatus = mission.getStatut();
-		assertVehicleAvailableForActiveMission(request.getVehiculeId().trim(), id, request.getStatut());
+		String vehiculeId = VehiculeReferentielService.normalizeVehiculeId(request.getVehiculeId());
+		assertVehicleAvailableForActiveMission(vehiculeId, id, request.getStatut());
+		vehiculeReferentielService.assertReadyForMission(vehiculeId, request.getLigneId());
 		g3UserClient.assertDriverExistsIfEnabled(request.getChauffeurId());
 		Ligne ligne = ligneRepository.findById(request.getLigneId())
 				.orElseThrow(() -> new ResourceNotFoundException("Ligne introuvable : " + request.getLigneId()));
-		mission.setVehiculeId(request.getVehiculeId().trim());
+		mission.setVehiculeId(vehiculeId);
 		mission.setChauffeurId(trimToNull(request.getChauffeurId()));
 		mission.setLigne(ligne);
 		mission.setTrajet(resolveTrajet(request.getTrajetId(), ligne));
@@ -120,7 +126,7 @@ public class MissionService {
 		mission.setNotes(request.getNotes());
 		Mission saved = missionRepository.save(mission);
 		if (oldStatus != StatutMission.EN_COURS && saved.getStatut() == StatutMission.EN_COURS) {
-			publishG1BilletterieLifecycle(saved, "ON_GOING", "TRAJET_EN_COURS");
+			g1MissionLifecyclePublisher.publish(saved, "ON_GOING", "TRAJET_EN_COURS");
 		}
 		return EntityMapper.toDto(saved);
 	}
@@ -135,7 +141,9 @@ public class MissionService {
 		mission.setEndedAt(Instant.now());
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("INFO", "MISSION", "Clôturée id=" + id);
-		publishG1BilletterieLifecycle(saved, "MISSION_CLOSED", "FIN_MISSION");
+		g1MissionLifecyclePublisher.publish(saved, "MISSION_CLOSED", "FIN_MISSION");
+		vehiculeReferentielService.tryReleaseVehicleIfIdle(saved.getVehiculeId());
+		g5ContractNotificationService.postMissionFinDeService(saved);
 		return EntityMapper.toDto(saved);
 	}
 
@@ -155,47 +163,11 @@ public class MissionService {
 		Mission saved = missionRepository.save(mission);
 		supervisionLogService.add("WARN", "MISSION", "Annulée id=" + id);
 		if (notifierG1) {
-			publishG1BilletterieLifecycle(saved, "MISSION_CANCELLED", "ANNULATION");
+			g1MissionLifecyclePublisher.publish(saved, "MISSION_CANCELLED", "ANNULATION");
 		}
+		vehiculeReferentielService.tryReleaseVehicleIfIdle(saved.getVehiculeId());
+		g5ContractNotificationService.postMissionCancelledArretNonDesservi(saved, null);
 		return EntityMapper.toDto(saved);
-	}
-
-	private void publishG1BilletterieLifecycle(Mission mission, String eventType, String reason) {
-		G1MissionLifecycleMessage msg = G1MissionLifecycleMessage.builder()
-				.notificationId(UUID.randomUUID().toString())
-				.eventType(eventType)
-				.metadata(G1MissionLifecycleMessage.Metadata.builder()
-						.reason(reason)
-						.missionDetails(G1MissionLifecycleMessage.MissionDetails.builder()
-								.missionId("M-" + mission.getId())
-								.status(mapBilletterieLifecycleStatus(mission.getStatut()))
-								.horaire(Map.of(
-										"depart", formatInstant(mission.getPlannedStart()),
-										"arrivee", formatInstant(mission.getEndedAt())))
-								.trajet(Map.of(
-										"lieuDepart", mission.getLigne().getNom(),
-										"lieuArrivee", mission.getTrajet() != null ? mission.getTrajet().getNom() : mission.getLigne().getNom()))
-								.build())
-						.variables(Map.of("vehiculeId", mission.getVehiculeId()))
-						.build())
-				.build();
-		g1BilletterieClient.publishMissionLifecycleEvent(String.valueOf(mission.getId()), msg);
-	}
-
-	private String mapBilletterieLifecycleStatus(StatutMission statut) {
-		return switch (statut) {
-			case PLANIFIEE -> "PLANIFIED";
-			case EN_COURS -> "ON_GOING";
-			case CLOTUREE -> "CLOSED";
-			case ANNULEE -> "CANCELLED";
-		};
-	}
-
-	private String formatInstant(Instant instant) {
-		if (instant == null) {
-			return "";
-		}
-		return DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneOffset.UTC).format(instant);
 	}
 
 	private Trajet resolveTrajet(Long trajetId, Ligne ligne) {

@@ -1,0 +1,22 @@
+@startuml packages-src-g4
+title G4 — Packages (structure src/main/java)
+
+package "com.sgitu.g4" {
+  package controller
+  package service
+  package repository
+  package entity
+  package dto
+  package mapper
+  package integration
+  package config
+  package security
+  package exception
+}
+controller --> service
+service --> repository
+service --> integration
+repository --> entity
+controller --> dto
+service --> mapper
+@enduml

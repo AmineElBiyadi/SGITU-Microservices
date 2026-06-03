@@ -1,8 +1,8 @@
 package com.sgitu.g4.integration;
 
+import com.sgitu.g4.config.IntegrationProperties;
 import com.sgitu.g4.dto.NotificationSendRequest;
 import com.sgitu.g4.dto.NotificationSendResponse;
-import com.sgitu.g4.config.IntegrationProperties;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
 public class G5NotificationClient {
 
 	private final IntegrationProperties integrationProperties;
+	private final G5NotificationWireAdapter wireAdapter;
 
 	@CircuitBreaker(name = "g5Notification", fallbackMethod = "dispatchFallback")
 	public NotificationSendResponse dispatch(NotificationSendRequest request) {
@@ -28,7 +29,7 @@ public class G5NotificationClient {
 					.post()
 					.uri(integrationProperties.getG5NotificationPath())
 					.contentType(MediaType.APPLICATION_JSON)
-					.body(request)
+					.body(wireAdapter.toWirePayload(request))
 					.retrieve()
 					.toBodilessEntity();
 			return NotificationSendResponse.builder()

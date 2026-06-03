@@ -1,0 +1,20 @@
+@startuml seq-mission-create-g3
+title G4 — Séquence : création mission + validation G3
+
+actor Client
+participant "G4 MissionController" as C
+participant "MissionService" as S
+participant "G3UserClient" as G3
+database "PostgreSQL" as DB
+
+Client -> C : POST /api/g4/missions + JWT
+C -> S : create(request)
+S -> S : assertVehicleAvailable (409 si conflit)
+alt SGITU_G3_VALIDATION_ENABLED
+  S -> G3 : GET /api/users/drivers/ids
+  G3 --> S : [ids chauffeurs]
+end
+S -> DB : save(mission)
+S --> C : MissionResponse
+C --> Client : 201 Created
+@enduml

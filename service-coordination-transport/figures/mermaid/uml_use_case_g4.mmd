@@ -1,0 +1,34 @@
+flowchart TB
+    subgraph Acteurs
+        OP["Gestionnaire reseau ROLE_G4_OPERATOR"]
+        DISP["Gestionnaire flotte ROLE_DISPATCHER"]
+        ADM["Admin technique ROLE_G4_ADMIN"]
+        G10["G10 Gateway"]
+        G3["G3 Utilisateurs"]
+        G7["G7 Suivi vehicules"]
+        G9["G9 Incidents"]
+    end
+    subgraph G4["Microservice G4"]
+        UC1["Gerer referentiel reseau"]
+        UC2["Gerer affectations"]
+        UC3["Creer et suivre missions"]
+        UC4["Declarer evenements coordination"]
+        UC5["Enregistrer impact incident G9"]
+        UC6["Envoyer notification"]
+        UC7["Superviser health logs"]
+        UC8["Consommer positions Kafka G7"]
+        UC9["Consommer incidents Kafka G9"]
+    end
+    OP --> UC1
+    DISP --> UC2
+    DISP --> UC3
+    DISP --> UC4
+    DISP --> UC5
+    DISP --> UC6
+    ADM --> UC7
+    G10 --> UC3
+    G3 -.-> UC3
+    G7 --> UC8
+    G9 --> UC9
+    UC8 --> UC4
+    UC9 --> UC5

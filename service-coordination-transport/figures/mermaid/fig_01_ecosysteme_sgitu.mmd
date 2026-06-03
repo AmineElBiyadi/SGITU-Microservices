@@ -1,0 +1,9 @@
+flowchart LR
+    G10[G10] --> G4[G4 :8084]
+    G4 --> G3[G3 :8083]
+    G4 --> G5[G5 :8085]
+    G7[G7 :8087] -->|Kafka positions| G4
+    G9[G9 :8089] -->|Kafka incidents| G4
+    G4 -->|Kafka lifecycle| G1[G1 :8081]
+    G4 --> PG[(PostgreSQL)]
+    G4 --> K{{Kafka}}

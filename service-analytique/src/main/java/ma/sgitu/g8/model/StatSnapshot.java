@@ -17,8 +17,11 @@ import java.util.Map;
 @Document(collection = "stat_snapshots")
 public class StatSnapshot {
 
+    public static final int CURRENT_SCHEMA_VERSION = 1;
+
     @Id
     private String id;
+    private int schemaVersion;
     private SnapshotType snapshotType;
     private String statId;
     private String period;

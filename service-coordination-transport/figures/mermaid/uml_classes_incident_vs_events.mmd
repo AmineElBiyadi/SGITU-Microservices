@@ -1,0 +1,8 @@
+classDiagram
+    class Mission { +Long id +String vehiculeId }
+    class CoordinationEventEntity { +CoordinationEventType type RETARD DEVIATION PANNE }
+    class MissionIncidentImpact { +String g9ReferenceIncident +String vehiculeId }
+    class IncidentG9 { <<externe>> +String reference }
+    Mission --> CoordinationEventEntity : evenements operationnels
+    Mission --> MissionIncidentImpact : impacts incident
+    MissionIncidentImpact ..> IncidentG9 : reference

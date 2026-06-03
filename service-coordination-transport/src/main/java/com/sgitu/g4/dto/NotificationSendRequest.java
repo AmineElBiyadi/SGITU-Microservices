@@ -28,8 +28,8 @@ public class NotificationSendRequest {
 	@Size(max = 32)
 	private String channel;
 
+	/** Obligatoire sur chaque POST G5 ; rempli par G3 (broadcast) ou par l'appelant manuel. */
 	@Valid
-	@NotNull
 	private Recipient recipient;
 
 	@Valid

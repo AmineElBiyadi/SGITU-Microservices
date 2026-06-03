@@ -18,8 +18,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Builds the local Spring Security context from headers already trusted by the
- * API Gateway. JWT signature validation is centralized in the gateway.
+ * Filtre pour les requêtes venant de l'API Gateway (Trafic Externe / Frontend).
+ * La Gateway a déjà validé le JWT et nous transmet l'identité via les headers.
  */
 @Slf4j
 @Component
@@ -37,6 +37,12 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
+
+        // Si l'authentification a déjà été faite par le JWTAuthenticationFilter, on ignore.
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String correlationId = resolveCorrelationId(request);
         response.setHeader(X_CORRELATION_ID, correlationId);
@@ -56,10 +62,7 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
             authentication.setDetails(userId);
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            log.info("[GATEWAY-AUTH] CorrelationId={} | User={} | Roles={} | SourceGroup={}",
-                    correlationId, principal, rolesHeader, sourceGroup);
-        } else {
-            log.debug("[GATEWAY-AUTH] CorrelationId={} | No gateway identity headers found", correlationId);
+            log.info("[GATEWAY-AUTH] User={} | Roles={} | SourceGroup={}", principal, rolesHeader, sourceGroup);
         }
 
         filterChain.doFilter(request, response);
@@ -67,23 +70,14 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
 
     private String resolveCorrelationId(HttpServletRequest request) {
         String correlationId = request.getHeader(X_CORRELATION_ID);
-        if (!isBlank(correlationId)) {
-            return correlationId;
-        }
-
+        if (!isBlank(correlationId)) return correlationId;
         String traceId = request.getHeader(X_TRACE_ID);
-        if (!isBlank(traceId)) {
-            return traceId;
-        }
-
+        if (!isBlank(traceId)) return traceId;
         return UUID.randomUUID().toString();
     }
 
     private List<SimpleGrantedAuthority> extractAuthorities(String rolesHeader) {
-        if (isBlank(rolesHeader)) {
-            return List.of(new SimpleGrantedAuthority("ROLE_USER"));
-        }
-
+        if (isBlank(rolesHeader)) return List.of(new SimpleGrantedAuthority("ROLE_USER"));
         return Arrays.stream(rolesHeader.split(","))
                 .map(String::trim)
                 .filter(role -> !role.isBlank())

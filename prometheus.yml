@@ -1,11 +1,18 @@
-global:
+﻿global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
   # ---------------------------------------------------------------
-  #  G1 — (ajoutez votre bloc ici)
+  #  G1 — Service Billetterie (SGITU)
   # ---------------------------------------------------------------
+  - job_name: 'service-billetterie'
+    static_configs:
+      - targets: ['service-billetterie:8081']
+        labels:
+          group: G1
+          service: billetterie
+    metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G2 — Service Abonnement (SGITU)
@@ -13,6 +20,9 @@ scrape_configs:
   - job_name: 'service-abonnement'
     static_configs:
       - targets: ['service-abonnement:8082']
+        labels:
+          group: G2
+          service: abonnement
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -21,15 +31,23 @@ scrape_configs:
   - job_name: 'g3-user-service'
     static_configs:
       - targets: ['g3-user-service:8083']
+        labels:
+          group: G3
+          service: utilisateurs
     metrics_path: '/api/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G4 — Coordination des transports (Groupe G4)
+  #  hostname = docker-compose racine : g4-coordination (service g4-coordination)
   # ---------------------------------------------------------------
   - job_name: 'g4-coordination'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
     static_configs:
       - targets: ['g4-coordination:8084']
-    metrics_path: '/actuator/prometheus'
+        labels:
+          group: G4
+          service: coordination-transport
 
   # ---------------------------------------------------------------
   #  G5 — Service de Notifications (SGITU)
@@ -37,27 +55,60 @@ scrape_configs:
   - job_name: 'g5-notification'
     static_configs:
       - targets: ['notification-service:8085']
+        labels:
+          group: G5
+          service: notifications
     metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
-  #  G6 — (ajoutez votre bloc ici)
+  #  G6 — Service Paiement (SGITU)
   # ---------------------------------------------------------------
-
+  - job_name: 'payment-service'
+    static_configs:
+      - targets: ['g6-payment-service:8086']
+        labels:
+          group: G6
+          service: paiement
+    metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
   #  G7 — Service Suivi des Véhicules (SGITU)
   # ---------------------------------------------------------------
   - job_name: 'service-suivi-vehicule'
     static_configs:
       - targets: ['g7-service:8087']
+        labels:
+          group: G7
+          service: suivi-vehicules
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G8 — (ajoutez votre bloc ici)
   # ---------------------------------------------------------------
+  - job_name: 'g8-analytics'
+    static_configs:
+      - targets: ['g8-analytics-service:8088']
+        labels:
+          group: G8
+          service: analytique
+    metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
-  #  G9 — (ajoutez votre bloc ici)
+  #  G9 — Service Gestion des Incidents (SGITU)
   # ---------------------------------------------------------------
+  - job_name: 'g9-gestion-incidents'
+    static_configs:
+      - targets: ['service-gestion-incidents:8089']
+        labels:
+          group: G9
+          service: gestion-incidents
+    metrics_path: '/api/incidents/actuator/prometheus'
 
   # ---------------------------------------------------------------
   #  G10 — (ajoutez votre bloc ici)
   # ---------------------------------------------------------------
+  - job_name: 'g10-api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8080']
+        labels:
+          group: G10
+          service: api-gateway
+    metrics_path: '/actuator/prometheus'

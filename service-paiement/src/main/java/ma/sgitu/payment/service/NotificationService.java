@@ -31,7 +31,7 @@ public class NotificationService {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("PAYMENT_METHOD_OTP")
                 .channel("EMAIL")
                 .priority("HIGH")
@@ -62,7 +62,7 @@ public class NotificationService {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("PAYMENT_SUCCESS")
                 .channel("EMAIL")
                 .priority("NORMAL")
@@ -94,7 +94,7 @@ public class NotificationService {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("PAYMENT_FAILED")
                 .channel("EMAIL")
                 .priority("HIGH")
@@ -124,7 +124,7 @@ public class NotificationService {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("PAYMENT_CANCELLED")
                 .channel("EMAIL")
                 .priority("NORMAL")
@@ -157,7 +157,7 @@ public class NotificationService {
 
         NotificationRequest request = NotificationRequest.builder()
                 .notificationId(UUID.randomUUID().toString())
-                .sourceService("PAYMENT")
+                .sourceService("G6_PAYMENT")
                 .eventType("INVOICE_GENERATED")
                 .channel("EMAIL")
                 .priority("NORMAL")

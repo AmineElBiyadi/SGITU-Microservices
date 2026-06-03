@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'g9-gestion-incidents'
+    static_configs:
+      - targets: [ 'service-gestion-incidents-local:8089', 'service-gestion-incidents:8089' ]
+    metrics_path: '/api/incidents/actuator/prometheus'

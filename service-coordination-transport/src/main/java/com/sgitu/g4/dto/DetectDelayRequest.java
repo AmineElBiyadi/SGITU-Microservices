@@ -14,4 +14,6 @@ public class DetectDelayRequest {
 	@Positive
 	private Integer retardMinutes;
 	private String cause;
+	/** Nom de l'arrêt (détection auto GPS) — utilisé pour la notification G5 {@code arret}. */
+	private String arret;
 }

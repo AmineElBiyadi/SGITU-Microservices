@@ -1,0 +1,17 @@
+@startuml deployment-docker-g4
+title G4 — Déploiement Docker (compose local)
+
+node "Hôte développeur" {
+  node "Docker network: sgitu-network" {
+    artifact "g4-coordination:8084" as G4
+    database "postgres:5432\n(host 5434)" as PG
+    queue "kafka:9092" as K
+    artifact "prometheus:9090" as P #LightBlue
+    artifact "grafana:3000" as GR #LightBlue
+  }
+}
+G4 --> PG
+G4 --> K
+P ..> G4 : scrape /actuator/prometheus
+GR ..> P
+@enduml

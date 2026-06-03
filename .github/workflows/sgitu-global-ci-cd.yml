@@ -1,0 +1,363 @@
+name: SGITU Global CI/CD
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+    paths:
+      - "api-gateway/**"
+      - "service-*/**"
+      - "docker-compose.yml"
+      - "prometheus.yml"
+      - "monitoring/**"
+      - "k8s/**"
+      - ".github/workflows/sgitu-global-ci-cd.yml"
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
+    inputs:
+      run_all_tests:
+        description: "Run mvn test for every Java microservice"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  group: sgitu-global-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  maven-package:
+    name: Maven package - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            java: "17"
+          - service: service-abonnement
+            java: "21"
+          - service: service-analytique
+            java: "17"
+          - service: service-billetterie
+            java: "21"
+          - service: service-coordination-transport
+            java: "17"
+          - service: service-gestion-incidents
+            java: "21"
+          - service: service-notification
+            java: "21"
+          - service: service-paiement
+            java: "17"
+          - service: service-suivi-vehicule
+            java: "17"
+          - service: service-utilisateur
+            java: "21"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Package service
+        working-directory: ${{ matrix.service }}
+        run: mvn -B -DskipTests package
+
+      - name: Upload jar artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-target
+          path: ${{ matrix.service }}/target/*.jar
+          if-no-files-found: ignore
+
+  g10-tests:
+    name: G10 API Gateway tests
+    runs-on: ubuntu-latest
+    needs: maven-package
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Run G10 tests
+        working-directory: api-gateway
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
+
+      - name: Upload G10 test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g10-surefire-reports
+          path: api-gateway/target/surefire-reports/
+          if-no-files-found: ignore
+
+  all-service-tests:
+    name: Optional full tests - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_all_tests == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            java: "17"
+          - service: service-abonnement
+            java: "21"
+          - service: service-analytique
+            java: "17"
+          - service: service-billetterie
+            java: "21"
+          - service: service-coordination-transport
+            java: "17"
+          - service: service-gestion-incidents
+            java: "21"
+          - service: service-notification
+            java: "21"
+          - service: service-paiement
+            java: "17"
+          - service: service-suivi-vehicule
+            java: "17"
+          - service: service-utilisateur
+            java: "21"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run service tests
+        working-directory: ${{ matrix.service }}
+        run: mvn -B test
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-surefire-reports
+          path: ${{ matrix.service }}/target/surefire-reports/
+          if-no-files-found: ignore
+
+  configuration-validation:
+    name: Docker, Prometheus and Kubernetes validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate root Docker Compose
+        run: docker compose config --quiet
+
+      - name: Validate G10 Docker Compose
+        working-directory: api-gateway
+        run: docker compose config --quiet
+
+      - name: Validate Prometheus configs
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/prometheus.yml:/etc/prometheus/prometheus.yml:ro" prom/prometheus:latest check config /etc/prometheus/prometheus.yml
+          docker run --rm --entrypoint promtool -v "$PWD/api-gateway/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" prom/prometheus:latest check config /etc/prometheus/prometheus.yml
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Render Kubernetes manifests
+        run: |
+          kubectl kustomize k8s/global > /tmp/sgitu-global-rendered.yaml
+          test -s /tmp/sgitu-global-rendered.yaml
+
+      - name: Upload rendered Kubernetes manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: sgitu-global-k8s-rendered
+          path: /tmp/sgitu-global-rendered.yaml
+
+  docker-build:
+    name: Docker build - ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    needs:
+      - maven-package
+      - configuration-validation
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api-gateway
+            context: api-gateway
+            dockerfile: api-gateway/Dockerfile
+          - image: service-abonnement
+            context: service-abonnement
+            dockerfile: service-abonnement/Dockerfile
+          - image: service-analytique
+            context: service-analytique
+            dockerfile: service-analytique/Dockerfile
+          - image: g8-ml-service
+            context: service-analytique/ml-service
+            dockerfile: service-analytique/ml-service/Dockerfile
+          - image: service-billetterie
+            context: service-billetterie
+            dockerfile: service-billetterie/Dockerfile
+          - image: service-coordination-transport
+            context: service-coordination-transport
+            dockerfile: service-coordination-transport/Dockerfile
+          - image: service-gestion-incidents
+            context: service-gestion-incidents
+            dockerfile: service-gestion-incidents/Dockerfile
+          - image: service-notification
+            context: service-notification
+            dockerfile: service-notification/Dockerfile
+          - image: service-paiement
+            context: service-paiement
+            dockerfile: service-paiement/Dockerfile
+          - image: service-suivi-vehicule
+            context: service-suivi-vehicule
+            dockerfile: service-suivi-vehicule/Dockerfile
+          - image: service-utilisateur
+            context: service-utilisateur
+            dockerfile: service-utilisateur/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: sgitu/${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  publish-ghcr:
+    name: Publish Docker images to GHCR
+    runs-on: ubuntu-latest
+    needs:
+      - g10-tests
+      - docker-build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api-gateway
+            context: api-gateway
+            dockerfile: api-gateway/Dockerfile
+          - image: service-abonnement
+            context: service-abonnement
+            dockerfile: service-abonnement/Dockerfile
+          - image: service-analytique
+            context: service-analytique
+            dockerfile: service-analytique/Dockerfile
+          - image: g8-ml-service
+            context: service-analytique/ml-service
+            dockerfile: service-analytique/ml-service/Dockerfile
+          - image: service-billetterie
+            context: service-billetterie
+            dockerfile: service-billetterie/Dockerfile
+          - image: service-coordination-transport
+            context: service-coordination-transport
+            dockerfile: service-coordination-transport/Dockerfile
+          - image: service-gestion-incidents
+            context: service-gestion-incidents
+            dockerfile: service-gestion-incidents/Dockerfile
+          - image: service-notification
+            context: service-notification
+            dockerfile: service-notification/Dockerfile
+          - image: service-paiement
+            context: service-paiement
+            dockerfile: service-paiement/Dockerfile
+          - image: service-suivi-vehicule
+            context: service-suivi-vehicule
+            dockerfile: service-suivi-vehicule/Dockerfile
+          - image: service-utilisateur
+            context: service-utilisateur
+            dockerfile: service-utilisateur/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute lowercase repository
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.REPO_LC }}/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  ci-summary:
+    name: CI/CD summary
+    runs-on: ubuntu-latest
+    needs:
+      - maven-package
+      - g10-tests
+      - configuration-validation
+      - docker-build
+    if: always()
+
+    steps:
+      - name: Print summary
+        run: |
+          echo "SGITU Global CI/CD"
+          echo "Maven package: ${{ needs.maven-package.result }}"
+          echo "G10 tests: ${{ needs.g10-tests.result }}"
+          echo "Config validation: ${{ needs.configuration-validation.result }}"
+          echo "Docker build: ${{ needs.docker-build.result }}"
+          if [ "${{ needs.maven-package.result }}" != "success" ] || \
+             [ "${{ needs.g10-tests.result }}" != "success" ] || \
+             [ "${{ needs.configuration-validation.result }}" != "success" ] || \
+             [ "${{ needs.docker-build.result }}" != "success" ]; then
+            exit 1
+          fi

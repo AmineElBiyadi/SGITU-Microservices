@@ -43,24 +43,29 @@ public class SecurityConfig {
                 // Public -- login & refresh (G3 issues the JWT)
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/verify-email").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/resend-code").permitAll()
                 //.requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
 
                 // Public -- account creation (called by G10 on registration)
                 .requestMatchers(HttpMethod.POST, "/users").permitAll()
 
-                // Swagger / OpenAPI, Actuator & Error endpoint
+                // Swagger / OpenAPI, Actuator, Chaos & Error endpoint
                 .requestMatchers(
                     "/error",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/v3/api-docs/**",
                     "/v3/api-docs.yaml",
-                    "/actuator/**"
+                    "/actuator/**",
+                    "/chaos/**"
                 ).permitAll()
 
                 // Existence check -- any authenticated service
                 .requestMatchers(HttpMethod.GET, "/users/*/exists").authenticated()
                 .requestMatchers(HttpMethod.GET, "/users/drivers/ids").authenticated()
+                // Allow G4 service to fetch notification recipients (requires ROLE_G4_OPERATOR or ROLE_G4_SERVICE in token)
+                .requestMatchers(HttpMethod.GET, "/users/notification-recipients").hasAnyRole("G4_OPERATOR", "DISPATCHER")
 
                 // Admin endpoints
                 .requestMatchers(HttpMethod.GET, "/users").hasRole("ADMIN")

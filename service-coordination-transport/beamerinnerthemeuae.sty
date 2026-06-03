@@ -1,0 +1,17 @@
+\ProvidesPackage{beamerinnerthemeuae}[2026/05/27 UAE ENSA Beamer inner]
+
+\setbeamertemplate{blocks}[rounded][shadow=true]
+\setbeamertemplate{items}[circle]
+\setbeamertemplate{sections/subsections in toc}[sections numbered]
+\setbeamertemplate{section in toc}{%
+  \leavevmode\leftskip=1.5ex%
+  \llap{\color{UAELightBlue}\raise1.5pt\hbox{\scalebox{0.7}{$\blacktriangleright$}}}%
+  \inserttocsection\par%
+}
+\setbeamertemplate{subsection in toc}{%
+  \leavevmode\leftskip=3.5ex%
+  \llap{\color{UAESkyBlue}\raise1.5pt\hbox{\scalebox{0.6}{$\triangleright$}}}%
+  \inserttocsubsection\par%
+}
+
+\endinput

@@ -14,8 +14,11 @@ import java.util.concurrent.Executors;
 public class RestTemplateConfig {
 
     @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+    public RestTemplate restTemplate(org.springframework.boot.web.client.RestTemplateBuilder builder) {
+        return builder
+                .setConnectTimeout(java.time.Duration.ofSeconds(3))
+                .setReadTimeout(java.time.Duration.ofSeconds(3))
+                .build();
     }
 
     @Bean(name = "validationExecutor")

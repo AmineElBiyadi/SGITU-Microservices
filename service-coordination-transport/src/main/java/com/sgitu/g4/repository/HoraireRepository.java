@@ -10,4 +10,6 @@ public interface HoraireRepository extends JpaRepository<Horaire, Long> {
 	List<Horaire> findByTrajetIdOrderByHeurePassageAsc(Long trajetId);
 
 	List<Horaire> findByTrajetLigneIdOrderByHeurePassageAsc(Long ligneId);
+
+	List<Horaire> findByTrajetIdAndArretId(Long trajetId, Long arretId);
 }

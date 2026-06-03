@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    actor Client as DISPATCHER
+    participant NC as NotificationController
+    participant G5 as G5NotificationClient
+    participant G5API as G5 Service
+    participant PN as PendingNotificationService
+    participant DB as PostgreSQL
+    Client->>NC: POST /api/notifications/send
+    NC->>G5: HTTP call CircuitBreaker
+    G5->>G5API: POST
+    G5API--xG5: timeout
+    G5->>PN: save PENDING
+    PN->>DB: pending_notifications
+    NC-->>Client: 202 DEGRADED

@@ -178,18 +178,23 @@ public class SubscriptionEventPublisher {
 
     // --- CORE SEND METHOD ---
     private void send(NotificationEventType type, UserDTO user, Map<String, Object> metadata, NotificationPriority priority) {
+        if (user == null || user.getId() == null) {
+            log.warn("Cannot publish {} event: user or userId is null", type);
+            return;
+        }
+
         RecipientDTO recipient = RecipientDTO.builder()
                 .userId(user.getId().toString())
                 .email(user.getEmail())
                 .phone(user.getProfile() != null ? user.getProfile().getPhone() : null)
-                .deviceToken(null) // Non présent dans UserDTO actuellement
+                .deviceToken(null)
                 .build();
 
         NotificationEventDTO event = NotificationEventDTO.builder()
                 .notificationId(UUID.randomUUID().toString())
                 .sourceService(SOURCE_SERVICE)
                 .eventType(type)
-                .channel(NotificationChannel.EMAIL) // Par défaut EMAIL, à adapter si besoin
+                .channel(NotificationChannel.EMAIL)
                 .priority(priority)
                 .recipient(recipient)
                 .metadata(metadata)
@@ -205,6 +210,11 @@ public class SubscriptionEventPublisher {
 
     // --- CORE SEND METHOD (Direct userId/email version) ---
     private void sendDirect(NotificationEventType type, Long userId, String email, String phone, Map<String, Object> metadata, NotificationPriority priority) {
+        if (userId == null) {
+            log.warn("Cannot publish {} event: userId is null", type);
+            return;
+        }
+
         RecipientDTO recipient = RecipientDTO.builder()
                 .userId(userId.toString())
                 .email(email)
@@ -228,28 +238,5 @@ public class SubscriptionEventPublisher {
         } catch (Exception e) {
             log.error("Échec de l'envoi direct de la notification Kafka (type: {}): {}", type, e.getMessage());
         }
-    }
-
-    // --- CORE SEND METHOD (Direct userId/email version) ---
-    private void sendDirect(NotificationEventType type, Long userId, String email, String phone, Map<String, Object> metadata, NotificationPriority priority) {
-        RecipientDTO recipient = RecipientDTO.builder()
-                .userId(userId.toString())
-                .email(email)
-                .phone(phone)
-                .deviceToken(null)
-                .build();
-
-        NotificationEventDTO event = NotificationEventDTO.builder()
-                .notificationId(UUID.randomUUID().toString())
-                .sourceService(SOURCE_SERVICE)
-                .eventType(type)
-                .channel(NotificationChannel.EMAIL)
-                .priority(priority)
-                .recipient(recipient)
-                .metadata(metadata)
-                .build();
-
-        log.info("Publishing {} event for user {}", type, userId);
-        kafkaTemplate.send(topic, event);
     }
 }

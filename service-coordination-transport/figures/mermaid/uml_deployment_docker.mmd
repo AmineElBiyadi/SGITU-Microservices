@@ -1,0 +1,13 @@
+flowchart TB
+    subgraph Docker sgitu-network
+        APP[g4-coordination :8084]
+        PG[g4-postgres :5434]
+        K[sgitu-kafka :9092]
+        PROM[prometheus :9090]
+        GRAF[grafana :3000]
+    end
+    DEV[Postman localhost] --> APP
+    APP --> PG
+    APP --> K
+    PROM --> APP
+    GRAF --> PROM

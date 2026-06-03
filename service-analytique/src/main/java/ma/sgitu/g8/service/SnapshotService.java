@@ -6,6 +6,7 @@ import ma.sgitu.g8.repository.SnapshotRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class SnapshotService {
@@ -17,7 +18,12 @@ public class SnapshotService {
     }
 
     public StatSnapshot upsert(String statId, SnapshotType type, Object value) {
-        StatSnapshot existing = snapshotRepository.findByStatId(statId).orElse(null);
+        List<StatSnapshot> existingSnapshots = snapshotRepository.findTop30ByStatIdOrderByComputedAtDesc(statId);
+        StatSnapshot existing = existingSnapshots.isEmpty() ? null : existingSnapshots.get(0);
+        if (existingSnapshots.size() > 1) {
+            snapshotRepository.deleteAll(existingSnapshots.subList(1, existingSnapshots.size()));
+        }
+
         StatSnapshot incoming = null;
 
         if (value instanceof StatSnapshot) {
@@ -25,6 +31,7 @@ public class SnapshotService {
         }
 
         if (existing != null) {
+            existing.setSnapshotType(type);
             if (incoming != null) {
                 existing.setValue(incoming.getValue());
                 existing.setPeriod(incoming.getPeriod());

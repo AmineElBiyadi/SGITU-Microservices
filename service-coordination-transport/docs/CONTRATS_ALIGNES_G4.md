@@ -22,6 +22,7 @@ Réseau Docker commun : **`sgitu-network`**.
 
 | Topic | Producteur | Consommateur G4 | Fichier exemple JSON |
 |-------|------------|-----------------|----------------------|
+| `vehicle.registered` | **G7** | `G7VehicleRegisteredKafkaConsumer` | `postman/examples/kafka-g7-vehicle-registered.json` |
 | `vehicule-positions` | **G7** | `G7VehiclePositionKafkaConsumer` | `postman/examples/kafka-g7-position.json` |
 | `incident.transport.topic` | **G9** | `G9IncidentKafkaConsumer` | `postman/examples/kafka-g9-incident.json` |
 | `missions-lifecycle` | **G4** | **G1** (billetterie) | `postman/examples/g1-mission-lifecycle.json` |
@@ -29,13 +30,37 @@ Réseau Docker commun : **`sgitu-network`**.
 
 Variables d'environnement : voir `.env.example`.
 
-## JSON entrant G7 → G4
+## Flow véhicule G7 ↔ G4 (affectation + mission)
+
+1. G7 `POST /api/suivi-vehicules/vehicules` → statut `DISPONIBLE`, sans ligne.
+2. G7 publie Kafka **`vehicle.registered`** → G4 table `vehicules_referentiel`.
+3. G4 `POST /api/g4/affectations` (véhicule + ligne, statut `ACTIF`) → G4 `PUT` G7 `.../vehicules/{id}/statut?statut=EN_SERVICE`.
+4. G4 `POST /api/g4/missions` avec le même `vehiculeId` (UUID) et une affectation `ACTIF` sur la ligne.
+5. G7 publie **`vehicule-positions`** pendant la mission.
+
+Secours sans Kafka : `POST /api/g4/vehicules/sync-from-g7/{vehiculeId}`.
+
+## JSON entrant G7 → G4 (`vehicle.registered`)
+
+Champs **obligatoires** : `vehiculeId`.
+
+```json
+{
+  "vehiculeId": "53c31262-591a-44d4-8872-51e84611ac5e",
+  "immatriculation": "BUS-G4-001",
+  "type": "BUS",
+  "statut": "DISPONIBLE",
+  "timestamp": "2026-05-20T10:00:00Z"
+}
+```
+
+## JSON entrant G7 → G4 (`vehicule-positions`)
 
 Champs **obligatoires** : `vehiculeId`, `lat`, `long` (ou `longitude`).
 
 ```json
 {
-  "vehiculeId": "VH-001",
+  "vehiculeId": "00000000-0000-4000-8000-000000000001",
   "ligneId": "L12",
   "lat": 35.578,
   "long": -5.368,
@@ -55,7 +80,7 @@ Champs **obligatoires** : `referenceIncident`.
   "referenceIncident": "INC-2026-042",
   "type": "PANNE_VEHICULE",
   "statut": "NOUVEAU",
-  "vehiculeId": "VH-001",
+  "vehiculeId": "00000000-0000-4000-8000-000000000001",
   "ligneId": "L12",
   "description": "Panne moteur",
   "latitude": 35.57,
@@ -80,9 +105,15 @@ Stockage G4 : table **`mission_incident_impacts`** (pas `coordination_events`).
       "horaire": { "depart": "2026-05-20T08:00:00Z" },
       "trajet": { "ligneId": "1" }
     },
-    "variables": { "vehiculeId": "VH-001" }
+    "variables": { "vehiculeId": "00000000-0000-4000-8000-000000000001" }
   }
 }
+```
+
+## HTTP G4 → G7 (après affectation)
+
+```http
+PUT {G7}/api/suivi-vehicules/vehicules/{vehiculeId}/statut?statut=EN_SERVICE
 ```
 
 ## HTTP G3 (validation conducteur)

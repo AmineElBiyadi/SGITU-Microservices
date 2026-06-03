@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sgitu-config
+  namespace: sgitu
+data:
+  JWT_EXPIRATION: "86400"
+  JWT_REFRESH_EXPIRATION: "604800000"
+  TOKEN_BLACKLIST_ENABLED: "true"
+  GATEWAY_CONNECT_TIMEOUT_MS: "3000"
+  GATEWAY_RESPONSE_TIMEOUT: "5s"
+
+  G1_BASE_URL: "http://service-billetterie:8081"
+  G2_BASE_URL: "http://abonnement-service:8082"
+  G3_BASE_URL: "http://user-service:8083"
+  G4_BASE_URL: "http://g4-coordination:8084"
+  G5_BASE_URL: "http://notification-service:8085"
+  G6_BASE_URL: "http://payment-service:8086"
+  G7_BASE_URL: "http://g7-service:8087"
+  G8_BASE_URL: "http://g8-analytics-service:8088"
+  G9_BASE_URL: "http://service-gestion-incidents:8089"
+  G10_BASE_URL: "http://api-gateway:8080"
+
+  G8_ANALYTICS_URI: "http://g8-analytics-service:8088"
+  G8_ML_URI: "http://g8-ml-service:5000"
+
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  abonnement_DB_NAME: "abonnement_db"
+  users_DB_NAME: "users_db"
+  g4_DB_NAME: "sgitu_g4"
+  suivi_vehicule_DB_NAME: "g7_vehicules"
+  billetterie_MONGO_DATABASE: "billetterie_db"
+
+  SGITU_KAFKA_TOPIC: "sgitu.g4.coordination.events"
+  SGITU_G9_INCIDENT_TOPIC: "incident.transport.topic"
+  SGITU_G1_MISSION_TOPIC: "missions-lifecycle"
+  SGITU_G7_POSITIONS_TOPIC: "vehicule-positions"
+  SGITU_G7_VEHICLE_REGISTERED_TOPIC: "vehicle.registered"
+  SGITU_G9_CONSUMER_GROUP: "g4-coordination-g9"
+  SGITU_G7_CONSUMER_GROUP: "g4-coordination-g7"
+  SGITU_G7_REGISTERED_CONSUMER_GROUP: "g4-coordination-g7-registered"
+  SGITU_G7_FLOW_ENABLED: "true"
+  SGITU_G7_FLOW_STRICT: "false"
+  SGITU_G7_SYNC_ON_DEMAND: "true"
+  SGITU_G3_VALIDATION_ENABLED: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sgitu-secrets
+  namespace: sgitu
+type: Opaque
+stringData:
+  JWT_SECRET: "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!"
+  G4_JWT_SECRET_B64: "U0dJVFVfRzNfSldUX1NFQ1JFVF9LRVlfQ0hBTkdFX01FX0lOX1BST0RVQ1RJT05fMjU2QklUUyEh"
+  GRAFANA_ADMIN_PASSWORD: "admin123"
+
+  billetterie_MONGO_ROOT_USERNAME: "admin"
+  billetterie_MONGO_ROOT_PASSWORD: "admin"
+
+  abonnement_DB_USER: "abonnement"
+  abonnement_DB_PASSWORD: "abonnement"
+  abonnement_DB_ROOT_PASSWORD: "abonnement"
+
+  users_DB_USER: "user"
+  users_DB_PASSWORD: "user"
+
+  g4_DB_USER: "g4"
+  g4_DB_PASSWORD: "g4"
+
+  MYSQL_ROOT_PASSWORD: "root_sgitu_2026"
+  MYSQL_PASSWORD: "sgitu_pass_2026"
+
+  suivi_vehicule_DB_USER: "postgres"
+  suivi_vehicule_DB_PASSWORD: "password"
+
+  MAIL_HOST: "smtp.gmail.com"
+  MAIL_PORT: "587"
+  MAIL_USERNAME: "your_email@gmail.com"
+  MAIL_PASSWORD: "TON_APP_PASSWORD_GMAIL"
+  MAIL_FROM: "your_email@gmail.com"
+  TWILIO_ACCOUNT_SID: "your_twilio_account_sid"
+  TWILIO_AUTH_TOKEN: "your_twilio_auth_token"
+  TWILIO_FROM_PHONE: "+212600000000"
+

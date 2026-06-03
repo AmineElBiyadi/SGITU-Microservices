@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
@@ -11,6 +15,9 @@ spring:
   cloud:
     gateway:
       enabled: true
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:3000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:5s}
       handler-mapping:
         order: -1
       globalcors:
@@ -49,12 +56,14 @@ spring:
         - id: g4-coordination
           uri: http://coordination-service:8084
           predicates:
-            - Path=/api/g4,/api/g4/**,/api/v1/operator/status
+            - Path=/api/g4,/api/g4/**,/api/v1/operator/status,/api/v1/lignes,/api/v1/lignes/**,/api/v1/arrets,/api/v1/arrets/**
 
         - id: g5-notifications
           uri: http://notification-service:8085
           predicates:
             - Path=/api/notifications,/api/notifications/**
+          filters:
+            - RemoveRequestHeader=Authorization
 
         - id: g6-paiement
           uri: http://payment-service:8086
@@ -81,14 +90,21 @@ spring:
         - id: g9-incidents
           uri: http://service-gestion-incidents:8089
           predicates:
-            - Path=/api/incidents/**,/api/rapports/**
+            - Path=/api/incidents/**
+        - id: g9-rapports-legacy
+          uri: http://service-gestion-incidents:8089
+          predicates:
+            - Path=/api/rapports/**
           filters:
-            - RewritePath=/api/(?<segment>.*), /$\{segment}
+            - RewritePath=/api/rapports(?<segment>/?.*), /api/incidents/rapports${segment}
 
 jwt:
   secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
   expiration: ${JWT_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+token-blacklist:
+  enabled: ${TOKEN_BLACKLIST_ENABLED:false}
 
 springdoc:
   api-docs:
@@ -108,7 +124,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      group: G10
 
 logging:
   file:
@@ -118,7 +143,7 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
   level:
     root: INFO
-    com.agileflow.api_gateway: DEBUG
+    com.sgitu.apigateway: DEBUG
     org.springframework.cloud.gateway: INFO
   logback:
     rollingpolicy:

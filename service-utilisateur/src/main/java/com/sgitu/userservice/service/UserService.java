@@ -29,4 +29,11 @@ public interface UserService {
     void deleteUser(Long id);
 
     boolean userExists(Long id);
+
+    NotificationRecipientsResponseDTO getNotificationRecipients(int page, int size);
+
+    // Email verification methods
+    void verifyEmail(String email, String code);
+
+    void resendVerificationCode(String email);
 }

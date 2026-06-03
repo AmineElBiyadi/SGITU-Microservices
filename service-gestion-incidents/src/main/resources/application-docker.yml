@@ -1,15 +1,55 @@
+jwt:
+  secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+  
 spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://mysql-db:3306/sgitu_incidents?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
-  
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  cloud:
+    openfeign:
+      client:
+        config:
+          utilisateur-service:
+            connect-timeout: 2000
+            read-timeout: 3000
 
 microservices:
   utilisateur:
     url: ${UTILISATEUR_SERVICE_URL:http://service-utilisateur:8083}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      utilisateurService:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+  retry:
+    instances:
+      utilisateurService:
+        max-attempts: 2
+        wait-duration: 500ms
+        retry-exceptions:
+          - feign.RetryableException
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+  timelimiter:
+    instances:
+      utilisateurService:
+        timeout-duration: 3s
+
+resilience:
+  fallback:
+    email: fallback@sgitu.ma
+    phone: "+212000000000"
 
 # On peut aussi ajuster d'autres paramètres pour la production/docker si nécessaire
 logging:

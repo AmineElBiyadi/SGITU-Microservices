@@ -1,4 +1,5 @@
-target/
+target/*
+!target/service-paiement.jar
 .git/
 .idea/
 *.iml

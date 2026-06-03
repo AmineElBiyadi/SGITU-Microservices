@@ -2,7 +2,7 @@ package com.sgitu.g4.controller;
 
 import com.sgitu.g4.dto.NotificationSendRequest;
 import com.sgitu.g4.dto.NotificationSendResponse;
-import com.sgitu.g4.service.NotificationDispatchService;
+import com.sgitu.g4.service.G5RecipientBroadcastService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class NotificationController {
 
-	private final NotificationDispatchService notificationDispatchService;
+	private final G5RecipientBroadcastService g5RecipientBroadcastService;
 
 	@PostMapping("/send")
 	@Operation(summary = "Envoyer une notification vers G5 (via gateway)")
@@ -35,13 +35,19 @@ public class NotificationController {
 	})
 	@io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = @ExampleObject(value = """
 			{
-			  "canal": "MOBILE_PUSH",
-			  "sujet": "Retard confirmé — L12",
-			  "corps": "Le véhicule VH-001 accuse 12 minutes de retard.",
-			  "metadata": {"missionId": "1", "ligneCode": "L12", "source": "G4"}
+			  "notificationId": "11111111-1111-4111-8111-111111111111",
+			  "sourceService": "COORDINATION",
+			  "eventType": "DELAY_ALERT",
+			  "channel": "EMAIL",
+			  "recipient": { "userId": "42", "email": "dispatcher@campus.fr" },
+			  "metadata": {
+			    "lineId": "L12",
+			    "reason": "RETARD_SIGNIFICATIF",
+			    "variables": {"vehiculeId": "00000000-0000-4000-8000-000000000001", "valeur": "12", "arret": "Gare Sud"}
+			  }
 			}
 			""")))
 	public ResponseEntity<NotificationSendResponse> send(@Valid @RequestBody NotificationSendRequest request) {
-		return ResponseEntity.status(HttpStatus.ACCEPTED).body(notificationDispatchService.send(request));
+		return ResponseEntity.status(HttpStatus.ACCEPTED).body(g5RecipientBroadcastService.dispatch(request));
 	}
 }

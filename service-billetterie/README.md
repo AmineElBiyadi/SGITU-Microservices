@@ -1,11 +1,203 @@
-# Paperless Ticket Management Service — System Architecture
+# Service Billetterie - Paperless Ticket Management
 
-## Overview
+## Table des matières
 
-The Paperless Ticket Management Service is a Spring Boot application that manages the full lifecycle of digital tickets — from issuance through validation and expiry. It is structured into four core packages, each with a distinct responsibility.
+- [Prérequis](#prérequis)
+- [Lancement local avec Docker Compose](#lancement-local-avec-docker-compose)
+- [Lancement local sans Docker](#lancement-local-sans-docker)
+- [Configuration](#configuration)
+- [Accès aux services](#accès-aux-services)
+- [Architecture du projet](#architecture-du-projet)
+
+---
+
+## Prérequis
+
+- **Docker** et **Docker Compose** installés
+- **Java 21** (pour lancement sans Docker)
+- **Maven 3.9+** (pour lancement sans Docker)
+
+---
+
+## Lancement local avec Docker Compose
+
+Cette méthode est recommandée car elle lance automatiquement toutes les dépendances (MongoDB, Kafka, Prometheus, Grafana).
+
+### 1. Configurer les variables d'environnement
+
+Copiez le fichier d'exemple et modifiez les valeurs si nécessaire :
+
+```bash
+cp .env.example .env
+```
+
+Le fichier `.env` contient :
+```bash
+MONGO_ROOT_USERNAME=admin
+MONGO_ROOT_PASSWORD=change_me
+MONGO_DATABASE=billetterie
+KAFKA_CLUSTER_ID=sgitu-kafka-cluster-001
+```
+
+### 2. Lancer les services
+
+Depuis le répertoire `service-billetterie` :
+
+```bash
+docker compose up -d
+```
+
+Cette commande démarre :
+- **service-billetterie** (port 8081)
+- **mongodb** (port 27017)
+- **kafka** (port 9092)
+- **prometheus** (port 9090)
+- **grafana** (port 3000)
+
+### 3. Vérifier les logs
+
+```bash
+docker compose logs -f service-billetterie
+```
+
+### 4. Arrêter les services
+
+```bash
+docker compose down
+```
+
+Pour supprimer également les volumes (données) :
+
+```bash
+docker compose down -v
+```
+
+---
+
+## Lancement local sans Docker
+
+Si vous préférez lancer les services manuellement (utile pour le développement).
+
+### 1. Démarrer MongoDB
+
+```bash
+docker run -d --name billetterie-mongo \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=admin \
+  -e MONGO_INITDB_ROOT_PASSWORD=admin \
+  -e MONGO_INITDB_DATABASE=billetterie \
+  mongo:7
+```
+
+### 2. Démarrer Kafka
+
+```bash
+docker run -d --name billetterie-kafka \
+  -p 9092:9092 \
+  -e KAFKA_CLUSTER_ID=sgitu-kafka-cluster-001 \
+  -e KAFKA_NODE_ID=1 \
+  -e KAFKA_PROCESS_ROLES="broker,controller" \
+  -e KAFKA_CONTROLLER_QUORUM_VOTERS="1@kafka:9093" \
+  -e KAFKA_LISTENERS="PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093" \
+  -e KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092" \
+  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP="PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT" \
+  -e KAFKA_CONTROLLER_LISTENER_NAMES="CONTROLLER" \
+  -e KAFKA_INTER_BROKER_LISTENER_NAME="PLAINTEXT" \
+  confluentinc/cp-kafka:7.8.7
+```
+
+### 3. Configurer l'application
+
+Créez ou modifiez `src/main/resources/application-local.yml` :
+
+```yaml
+server:
+  port: 8081
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@localhost:27017/billetterie?authSource=admin
+
+  kafka:
+    bootstrap-servers: localhost:9092
+```
+
+### 4. Lancer l'application Spring Boot
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Ou avec Maven installé :
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+---
+
+## Lancement dans l'architecture SGITU complète
+
+Pour lancer le service dans le contexte de tous les microservices SGITU :
+
+### 1. Configurer les variables à la racine
+
+```bash
+cd ..
+cp .env.example .env
+```
+
+### 2. Lancer tous les services
+
+```bash
+docker compose up -d service-billetterie billetterie-mongo kafka
+```
+
+Le service sera accessible sur le port **8081** et MongoDB sur **27018** (port hôte différent pour éviter les conflits).
+
+---
+
+## Configuration
+
+### Variables d'environnement principales
+
+| Variable | Description | Défaut |
+|----------|-------------|--------|
+| `MONGO_ROOT_USERNAME` | Utilisateur MongoDB admin | admin |
+| `MONGO_ROOT_PASSWORD` | Mot de passe MongoDB admin | change_me |
+| `MONGO_DATABASE` | Nom de la base de données | billetterie |
+| `KAFKA_CLUSTER_ID` | ID du cluster Kafka | sgitu-kafka-cluster-001 |
+| `SERVER_PORT` | Port du service | 8081 |
+| `PAYMENT_SERVICE_URL` | URL du service paiement | http://localhost:8086 |
+| `COORDINATION_SERVICE_URL` | URL du service coordination | http://localhost:8084 |
+
+### Profiles Spring
+
+- **default** : Configuration Docker (variables d'environnement)
+- **local** : Configuration pour développement local
+
+---
+
+## Accès aux services
+
+Une fois démarré, vous pouvez accéder à :
+
+- **API REST** : http://localhost:8081
+- **Swagger UI** : http://localhost:8081/swagger-ui.html
+- **OpenAPI JSON** : http://localhost:8081/v3/api-docs
+- **Actuator Health** : http://localhost:8081/actuator/health
+- **Prometheus Metrics** : http://localhost:8081/actuator/prometheus
+- **Prometheus UI** : http://localhost:9090 (si Docker Compose)
+- **Grafana** : http://localhost:3000 (si Docker Compose, login: admin/admin)
+- **MongoDB** : mongodb://localhost:27017 (ou localhost:27018 en mode SGITU)
+
+---
+
+## Architecture du projet
 
 ```
-com.example.billetterie
+com.ensate.billetterie
 ├── ticket        ← Spring Boot entry point, REST API, lifecycle orchestration
 ├── identity      ← Token generation and verification (QR, Fingerprint, Face ID)
 ├── validation    ← Pipeline-based ticket validation using Chain of Responsibility

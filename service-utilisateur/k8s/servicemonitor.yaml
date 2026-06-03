@@ -1,0 +1,37 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service-monitor
+  namespace: sgitu
+  labels:
+    app: user-service
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  endpoints:
+  - port: http
+    path: /api/actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - sgitu
+---
+# PodMonitor alternative (if ServiceMonitor is not available)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: user-service-pod-monitor
+  namespace: sgitu
+  labels:
+    app: user-service
+spec:
+  selector:
+    matchLabels:
+      app: user-service
+  podMetricsEndpoints:
+  - port: http
+    path: /api/actuator/prometheus
+    interval: 30s

@@ -17,13 +17,13 @@ import com.sgitu.g4.entity.StatutMission;
 import com.sgitu.g4.exception.BadRequestException;
 import com.sgitu.g4.exception.ResourceNotFoundException;
 import com.sgitu.g4.integration.G7VehicleClient;
-import com.sgitu.g4.integration.G9IncidentClient;
 import com.sgitu.g4.mapper.EntityMapper;
 import com.sgitu.g4.repository.CoordinationEventRepository;
 import com.sgitu.g4.repository.MissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -41,6 +41,8 @@ public class CoordinationEventService {
 	private final CoordinationKafkaPublisher kafkaPublisher;
 	private final ObjectMapper objectMapper;
 	private final G7VehicleClient g7VehicleClient;
+	private final G1MissionLifecyclePublisher g1MissionLifecyclePublisher;
+	private final G5ContractNotificationService g5ContractNotificationService;
 	private final SupervisionLogService supervisionLogService;
 
 	@Transactional
@@ -78,7 +80,11 @@ public class CoordinationEventService {
 		payload.put("retardMinutes", request.getRetardMinutes());
 		payload.put("cause", request.getCause());
 		payload.put("vehiculeStatut", g7VehicleClient.fetchStatus(mission.getVehiculeId()));
-		return persistDetection(CoordinationEventType.RETARD, mission, request.getCause(), payload);
+		CoordinationEventResponse response = persistDetection(CoordinationEventType.RETARD, mission, request.getCause(), payload);
+		String arret = StringUtils.hasText(request.getArret()) ? request.getArret() : request.getCause();
+		g1MissionLifecyclePublisher.publishDelayAlert(mission, request.getRetardMinutes(), arret);
+		g5ContractNotificationService.postDelayAlert(mission, request.getRetardMinutes(), arret);
+		return response;
 	}
 
 	@Transactional
@@ -89,7 +95,10 @@ public class CoordinationEventService {
 		payload.put("details", request.getDetails());
 		payload.put("ecartMetres", request.getEcartMetres());
 		payload.put("vehiculeStatut", g7VehicleClient.fetchStatus(mission.getVehiculeId()));
-		return persistDetection(CoordinationEventType.DEVIATION, mission, request.getDetails(), payload);
+		CoordinationEventResponse response = persistDetection(CoordinationEventType.DEVIATION, mission, request.getDetails(), payload);
+		g1MissionLifecyclePublisher.publishRouteDeviation(mission, request.getDetails());
+		g5ContractNotificationService.postRouteDeviation(mission, request.getDetails());
+		return response;
 	}
 
 	@Transactional
@@ -109,7 +118,9 @@ public class CoordinationEventService {
 				.payloadJson(writeJson(new LinkedHashMap<>(payload)))
 				.occurredAt(Instant.now())
 				.build();
-		return finalize(EntityMapper.toDto(eventRepository.save(entity)));
+		CoordinationEventResponse response = finalize(EntityMapper.toDto(eventRepository.save(entity)));
+		g5ContractNotificationService.postVehicleBreakdown(request.getVehiculeId(), mission);
+		return response;
 	}
 
 	@Transactional

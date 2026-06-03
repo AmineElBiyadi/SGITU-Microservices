@@ -43,6 +43,8 @@ G10 --> G7 : route REST
 G10 --> G8 : route REST
 G10 --> G9 : route REST
 
+G5 --> G8 : evenements notifications\npour analyse / statistiques
+
 note bottom of G10
 G10 ne stocke pas les utilisateurs.
 Il valide le JWT emis par G3, controle les roles,

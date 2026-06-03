@@ -10,6 +10,23 @@ networks:
     external: true
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: sgitu-g10-redis
+    expose:
+      - "6379"
+    networks:
+      sgitu-network:
+        aliases:
+          - redis
+          - g10-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api-gateway:
     build:
       context: .
@@ -24,10 +41,21 @@ services:
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      TOKEN_BLACKLIST_ENABLED: ${TOKEN_BLACKLIST_ENABLED:-true}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      GATEWAY_CONNECT_TIMEOUT_MS: ${GATEWAY_CONNECT_TIMEOUT_MS:-3000}
+      GATEWAY_RESPONSE_TIMEOUT: ${GATEWAY_RESPONSE_TIMEOUT:-5s}
       G8_ANALYTICS_URI: ${G8_ANALYTICS_URI:-http://g8-analytics:8088}
       G8_ML_URI: ${G8_ML_URI:-http://ml-service:5000}
     networks:
-      - sgitu-network
+      sgitu-network:
+        aliases:
+          - api-gateway
+          - g10-api-gateway
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
@@ -39,3 +67,42 @@ services:
       resources:
         limits:
           memory: 512m
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sgitu-g10-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=6h"
+    networks:
+      - sgitu-network
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sgitu-g10-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - g10_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - sgitu-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  g10_grafana_data:

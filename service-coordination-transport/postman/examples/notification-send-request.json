@@ -1,10 +1,15 @@
 {
-	"canal": "MOBILE_PUSH",
-	"sujet": "Retard confirmé — L12",
-	"corps": "Le véhicule VH-001 accuse environ 12 minutes de retard sur le trajet T12-A.",
-	"metadata": {
-		"missionId": "42",
-		"ligneCode": "L12",
-		"source": "G4"
-	}
+  "notificationId": "11111111-1111-4111-8111-111111111111",
+  "sourceService": "COORDINATION",
+  "eventType": "DELAY_ALERT",
+  "channel": "EMAIL",
+  "metadata": {
+    "lineId": "L12",
+    "reason": "RETARD_SIGNIFICATIF",
+    "variables": {
+      "vehiculeId": "00000000-0000-4000-8000-000000000002",
+      "valeur": "12",
+      "arret": "Gare Sud"
+    }
+  }
 }

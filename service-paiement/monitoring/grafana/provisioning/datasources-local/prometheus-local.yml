@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # On pointe vers le nom du service défini dans le docker-compose.yml local
+    url: http://g6-local-prometheus:9090
+    isDefault: true
+    editable: false

@@ -7,6 +7,7 @@ import ma.sgitu.g5.dto.response.NotificationResponseDTO;
 import ma.sgitu.g5.dto.response.SendResultDTO;
 import ma.sgitu.g5.entity.Notification;
 import ma.sgitu.g5.entity.NotificationStatus;
+import ma.sgitu.g5.entity.NotificationType;
 import ma.sgitu.g5.mapper.NotificationMapper;
 import ma.sgitu.g5.repository.NotificationRepository;
 import ma.sgitu.g5.repository.specification.NotificationSpecification;
@@ -69,6 +70,7 @@ public class NotificationServiceImpl implements INotificationService {
         entity.setNotificationId(notificationId);
         entity.setSubject(subject);
         entity.setContent(message);
+        normalizeBeforeSave(entity, dto);
         notificationRepository.save(entity);
 
         dispatchAsync(entity, dto, subject, message);
@@ -173,6 +175,41 @@ public class NotificationServiceImpl implements INotificationService {
             log.error("[G5] Notification FAILED définitivement : {} | Raison : {}",
                     entity.getNotificationId(), errorReason);
         }
+    }
+
+    private void normalizeBeforeSave(Notification entity, NotificationRequestDTO dto) {
+        String channel = dto.getChannel() != null ? dto.getChannel().trim().toUpperCase() : "EMAIL";
+        entity.setChannel(channel);
+        entity.setType(NotificationType.valueOf(channel));
+
+        if (entity.getStatus() == null) {
+            entity.setStatus(NotificationStatus.PENDING);
+        }
+        if (entity.getPriority() == null || entity.getPriority().isBlank()) {
+            entity.setPriority(dto.getPriority() != null ? dto.getPriority().trim().toUpperCase() : "NORMAL");
+        }
+        if (entity.getCreatedAt() == null) {
+            entity.setCreatedAt(LocalDateTime.now());
+        }
+        if (entity.getUserId() == null || entity.getUserId().isBlank()) {
+            entity.setUserId(dto.getRecipient() != null ? dto.getRecipient().getUserId() : "system");
+        }
+        if (entity.getRecipient() == null || entity.getRecipient().isBlank()) {
+            entity.setRecipient(resolveRecipient(dto));
+        }
+    }
+
+    private String resolveRecipient(NotificationRequestDTO dto) {
+        if (dto.getRecipient() == null) {
+            return "system";
+        }
+        return switch (dto.getChannel()) {
+            case "EMAIL" -> dto.getRecipient().getEmail();
+            case "SMS" -> dto.getRecipient().getPhone();
+            case "PUSH" -> dto.getRecipient().getDeviceToken();
+            case "LOG" -> dto.getRecipient().getUserId();
+            default -> "system";
+        };
     }
 
     private NotificationRequestDTO rebuildDtoFromEntity(Notification entity) {

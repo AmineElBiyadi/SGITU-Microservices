@@ -3,6 +3,7 @@ package ma.sgitu.payment.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ma.sgitu.payment.dto.request.PaymentRequest;
+import ma.sgitu.payment.dto.response.InvoiceResponse;
 import ma.sgitu.payment.dto.response.PaymentDetailsResponse;
 import ma.sgitu.payment.dto.response.PaymentResponse;
 import ma.sgitu.payment.entity.Payment;
@@ -100,7 +101,7 @@ public class PaymentService {
 
         log.info("Paiement SUCCESS ID={}, montant débité", payment.getId());
 
-        invoiceService.generateInvoice(payment, request.getEmail());
+        InvoiceResponse invoiceResponse = invoiceService.generateInvoice(payment, request.getEmail());
         notificationService.sendPaymentSuccessNotification(payment, request.getEmail());
         subscriptionCallbackService.sendPaymentConfirmation(payment);
 
@@ -109,8 +110,8 @@ public class PaymentService {
                 .transactionToken(payment.getTransactionToken())
                 .status(payment.getStatus().name())
                 .message("Paiement validé avec succès")
-                .invoiceId(null)
-                .invoiceNumber(null)
+                .invoiceId(invoiceResponse.getId())
+                .invoiceNumber(invoiceResponse.getInvoiceNumber())
                 .failureReason(null)
                 .build();
     }

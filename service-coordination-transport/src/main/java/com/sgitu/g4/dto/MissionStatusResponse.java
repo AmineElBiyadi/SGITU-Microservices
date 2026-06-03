@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Map;
 
 @Data
 @Builder
@@ -19,4 +20,5 @@ public class MissionStatusResponse {
 	private Instant lastUpdate;
 	private String vehiculeId;
 	private Long ligneId;
+	private Map<String, Object> vehiculeStatutG7;
 }

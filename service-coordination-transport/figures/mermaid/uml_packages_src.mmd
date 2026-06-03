@@ -1,0 +1,12 @@
+flowchart TB
+    subgraph com.sgitu.g4
+        controller --> service
+        service --> repository
+        repository --> entity
+        controller --> dto
+        service --> mapper
+        service --> integration
+        controller --> config
+        config --> security
+        controller --> exception
+    end

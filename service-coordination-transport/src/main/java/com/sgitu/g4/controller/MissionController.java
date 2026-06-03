@@ -44,12 +44,12 @@ public class MissionController {
 			@ApiResponse(responseCode = "404", description = "Ligne, trajet ou affectation introuvable"),
 			@ApiResponse(responseCode = "409", description = "Véhicule déjà sur une mission EN_COURS",
 					content = @Content(schema = @Schema(example = """
-							{"status":409,"error":"CONFLICT","message":"Le véhicule VH-001 est déjà affecté à une mission EN_COURS"}
+							{"status":409,"error":"CONFLICT","message":"Le véhicule 00000000-0000-4000-8000-000000000001 est déjà affecté à une mission EN_COURS"}
 							""")))
 	})
 	@io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = @ExampleObject(value = """
 			{
-			  "vehiculeId": "VH-001",
+			  "vehiculeId": "00000000-0000-4000-8000-000000000001",
 			  "chauffeurId": "42",
 			  "ligneId": 1,
 			  "trajetId": 1,

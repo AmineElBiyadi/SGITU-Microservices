@@ -1,5 +1,6 @@
 package ma.sgitu.g5.config;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
@@ -25,6 +26,11 @@ public class FirebaseConfig {
         if (FirebaseApp.getApps().isEmpty()) {
             if (credentialsPath == null || credentialsPath.isBlank()) {
                 log.warn("[FCM] FIREBASE_CREDENTIALS_PATH non defini. FCM desactive.");
+                return;
+            }
+            File credentialsFile = new File(credentialsPath);
+            if (!credentialsFile.isFile()) {
+                log.warn("[FCM] Credentials Firebase introuvables ou invalides: {}. FCM desactive.", credentialsPath);
                 return;
             }
             try (FileInputStream serviceAccount = new FileInputStream(credentialsPath)) {

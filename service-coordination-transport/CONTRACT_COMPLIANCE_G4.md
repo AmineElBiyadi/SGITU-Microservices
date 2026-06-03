@@ -42,12 +42,16 @@ Le code utilise **G1** pour la billetterie côté Kafka (`G1BilletterieClient`, 
 | Arrêts | `PUT /api/g4/arrets/{arretId}` | `ArretController` | Conforme |
 | Arrêts | `DELETE /api/g4/arrets/{arretId}` | `ArretController` | Conforme |
 | Arrêts | `GET /api/g4/arrets/ligne/{ligneId}` | `ArretController` | Conforme |
-| Affectations | `POST /api/g4/affectations` | `AffectationController` | Conforme |
+| Véhicules G7 | `GET /api/g4/vehicules` | `VehiculeReferentielController` | Conforme |
+| Véhicules G7 | `GET /api/g4/vehicules/disponibles` | `VehiculeReferentielController` | Conforme |
+| Véhicules G7 | `GET /api/g4/vehicules/{vehiculeId}` | `VehiculeReferentielController` | Conforme |
+| Véhicules G7 | `POST /api/g4/vehicules/sync-from-g7/{vehiculeId}` | `VehiculeReferentielController` | Conforme |
+| Affectations | `POST /api/g4/affectations` | `AffectationController` | Conforme (flow G7 + PUT EN_SERVICE) |
 | Affectations | `GET /api/g4/affectations` | `AffectationController` | Conforme |
 | Affectations | `GET /api/g4/affectations/{affectationId}` | `AffectationController` | Conforme |
 | Affectations | `GET /api/g4/affectations/vehicule/{vehiculeId}` | `AffectationController` | Conforme |
-| Affectations | `PUT /api/g4/affectations/{affectationId}` | `AffectationController` | Conforme |
-| Affectations | `DELETE /api/g4/affectations/{affectationId}` | `AffectationController` | Conforme |
+| Affectations | `PUT /api/g4/affectations/{affectationId}` | `AffectationController` | Conforme (si `TERMINE` : PUT G7 `DISPONIBLE` si plus ACTIF ni mission `EN_COURS`) |
+| Affectations | `DELETE /api/g4/affectations/{affectationId}` | `AffectationController` | Conforme (idem libération véhicule) |
 | Missions | `POST /api/g4/missions` | `MissionController` | Conforme (409 si véhicule déjà EN_COURS) |
 | Missions | `GET /api/g4/missions` | `MissionController` | Conforme |
 | Missions | `GET /api/g4/missions/actives` | `MissionController` | Conforme |
@@ -67,6 +71,7 @@ Le code utilise **G1** pour la billetterie côté Kafka (`G1BilletterieClient`, 
 | Incidents G9 | `POST /api/g4/incident-impacts` | `IncidentImpactController` | Conforme (séparé des événements coordination) |
 | Events | `POST /api/g4/events/cancel-mission` | `CoordinationEventController` | Conforme |
 | Notifications | `POST /api/notifications/send` | `NotificationController` | Conforme (`202 Accepted`) |
+| Notifications G5 | `POST /api/notifications/send` (REST via G10, `recipient` par utilisateur via G3) | `G5RecipientBroadcastService` + `G5NotificationClient` | Conforme — voir `docs/CONTRAT_G4_G5_REST_UNIQUEMENT.md` |
 | Supervision | `GET /api/g4/health` | `G4SupervisionController` | Conforme |
 | Supervision | `GET /api/v1/operator/status` | `OperatorStatusController` | Conforme |
 | Supervision | `GET /api/g4/logs` | `G4SupervisionController` | Conforme (public, sans JWT) |
@@ -108,6 +113,8 @@ Tout document d’interface doit désigner **G1** pour les actions commerciales 
 | `missionDetails` : `missionId`, `status`, `horaire`, `trajet` | `MissionService.publishG1BilletterieLifecycle` | Conforme |
 | `metadata.variables` : uniquement `vehiculeId` (pas `chauffeurId`) | `Map.of("vehiculeId", mission.getVehiculeId())` | Conforme |
 | Publication sur transitions mission | `MissionService` (create/update/cloturer/annuler) | Conforme |
+| Retard / déviation → Kafka G1 | `G1MissionLifecyclePublisher` + `CoordinationEventService` | Conforme — `DELAY_ALERT`, `ROUTE_DEVIATION` |
+| Clé partition `missionId` (`M-{id}`) | `G1MissionLifecyclePublisher.formatMissionId` | Conforme |
 
 ## 4) Contrat G4 ↔ G7 (Suivi)
 

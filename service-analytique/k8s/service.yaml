@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-analytique
+  namespace: service-analytique
+  labels:
+    app: service-analytique
+    component: backend
+  annotations:
+    # Annotations pour le monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8088"
+    prometheus.io/path: "/actuator/prometheus"
+    
+    # Annotations pour le load balancing (si utilisé avec Ingress)
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8088
+    targetPort: http
+    protocol: TCP
+    nodePort: 30002
+  selector:
+    app: service-analytique
+    component: backend
+  
+---
+# Service supplémentaire pour le monitoring interne (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-analytique-monitoring
+  namespace: service-analytique
+  labels:
+    app: service-analytique
+    component: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8088"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/scheme: "http"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 8088
+    targetPort: http
+    protocol: TCP
+  - name: actuator
+    port: 8090
+    targetPort: 8088
+    protocol: TCP
+  selector:
+    app: service-analytique
+    component: backend

@@ -1,0 +1,85 @@
+\ProvidesPackage{beamerouterthemeuae}[2026/05/27 UAE ENSA Beamer outer]
+
+\RequirePackage{graphicx}
+\RequirePackage{tikz}
+\usetikzlibrary{calc}
+
+\newif\if@uaeprogressbar
+\@uaeprogressbarfalse
+\DeclareOptionBeamer{progressbar}{\@uaeprogressbartrue}
+\ProcessOptionsBeamer
+
+\newcommand{\insertvenue}{}
+\newcommand{\venue}[1]{\renewcommand{\insertvenue}{#1}}
+
+\setbeamertemplate{navigation symbols}{}
+
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,ht=3.2ex,dp=1.2ex,leftskip=0.3cm,rightskip=0.3cm]{frametitle}
+    \usebeamerfont{frametitle}\insertframetitle\par
+    \ifx\insertframesubtitle\@empty\else
+      {\usebeamerfont{framesubtitle}\insertframesubtitle\par}
+    \fi
+  \end{beamercolorbox}%
+  \if@uaeprogressbar
+    \begin{beamercolorbox}[wd=\paperwidth,ht=0.8ex,dp=0ex]{progress bar}
+      \begin{tikzpicture}
+        \fill[progress bar.bg] (0,0) rectangle (\paperwidth,0.8ex);
+        \fill[progress bar.fg] (0,0) rectangle (\insertframenumber/\inserttotalframenumber*\paperwidth,0.8ex);
+      \end{tikzpicture}
+    \end{beamercolorbox}%
+  \fi
+}
+
+\setbeamertemplate{footline}{%
+  \leavevmode
+  \hbox{%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1ex,leftskip=0.3cm]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.5\paperwidth,ht=2.5ex,dp=1ex,rightskip=0.3cm plus1fil]{date in head/foot}%
+      \usebeamerfont{date in head/foot}\insertshortdate\hspace{1em}\insertframenumber{} / \inserttotalframenumber
+    \end{beamercolorbox}%
+  }%
+  \vskip0pt%
+}
+
+\newcommand{\titleframe}{%
+  \begin{frame}[plain,noframenumbering]
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[UAEDarkBlue] (current page.north west) rectangle ([yshift=-2.6cm]current page.north east);
+      \fill[UAELightBlue] ([yshift=-2.6cm]current page.north west) rectangle ([yshift=-2.72cm]current page.north east);
+      \fill[UAEAccentGold] ([yshift=-2.72cm]current page.north west) rectangle ([yshift=-2.82cm]current page.north east);
+      \node[anchor=west] at ([xshift=0.7cm,yshift=-1.35cm]current page.north west) {%
+        \IfFileExists{logo_uae_ensa.png}{%
+          \includegraphics[height=1.55cm]{logo_uae_ensa.png}}{%
+          \IfFileExists{image.png}{%
+            \includegraphics[height=1.55cm]{image.png}}{%
+            \textcolor{white}{\small ENSA}%
+        }}}};
+      \node[anchor=center,text=white,align=center] at ([yshift=-1.35cm]current page.north) {%
+        \normalsize\textbf{Université Abdelmalek Essaâdi}\\[0.15cm]
+        {\small École Nationale des Sciences Appliquées — Tétouan}%
+      };
+    \end{tikzpicture}
+    \vspace{3.4cm}
+    \begin{center}
+      {\LARGE\bfseries\color{UAEDarkBlue}\inserttitle}\\[0.75cm]
+      \ifx\insertsubtitle\@empty\else
+        {\large\color{UAELightBlue}\insertsubtitle}\\[0.95cm]
+      \fi
+      {\normalsize\color{black!75}\insertauthor}\\[0.65cm]
+      {\small\color{black!65}\insertinstitute}\\[0.45cm]
+      {\small\color{black!65}\insertdate}\\[0.35cm]
+      {\footnotesize\url{https://github.com/anadouae/SGITU-Microservices}}
+    \end{center}
+    \vfill
+    \begin{center}
+      {\footnotesize\color{UAELightBlue}\insertvenue}
+    \end{center}
+    \vspace{0.35cm}
+  \end{frame}
+}
+
+\endinput

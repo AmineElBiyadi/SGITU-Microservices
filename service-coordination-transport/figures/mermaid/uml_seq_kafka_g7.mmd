@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant G7 as G7 Suivi
+    participant K as Kafka vehicule-positions
+    participant C as G7VehiclePositionKafkaConsumer
+    participant V as KafkaContractValidator
+    participant L as SupervisionLogService
+    participant ES as CoordinationEventService
+    G7->>K: publish position JSON
+    K->>C: message
+    C->>V: validateG7Position
+    alt invalide
+        C->>L: WARN payload rejete
+    else valide
+        C->>L: INFO KAFKA-G7
+        opt deviation
+            C->>ES: create DEVIATION
+        end
+    end

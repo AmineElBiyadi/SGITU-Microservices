@@ -1,0 +1,12 @@
+apiVersion: 1
+
+datasources:
+  - uid: prometheus
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    # Pointe vers g6-local-prometheus pour la config locale (service-paiement)
+    # ou vers prometheus pour la config globale (racine)
+    url: http://g6-local-prometheus:9090
+    isDefault: true
+    editable: false

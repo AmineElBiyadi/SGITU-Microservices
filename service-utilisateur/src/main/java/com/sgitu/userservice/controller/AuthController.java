@@ -2,11 +2,14 @@ package com.sgitu.userservice.controller;
 import com.sgitu.userservice.dto.LoginRequestDTO;
 import com.sgitu.userservice.dto.LoginResponseDTO;
 import com.sgitu.userservice.dto.RefreshRequestDTO;
+import com.sgitu.userservice.dto.VerifyEmailRequestDTO;
+import com.sgitu.userservice.dto.ResendCodeRequestDTO;
 import com.sgitu.userservice.entity.Role;
 import com.sgitu.userservice.entity.User;
 import com.sgitu.userservice.repository.UserRepository;
 import com.sgitu.userservice.security.JwtService;
 import com.sgitu.userservice.security.RedisTokenBlacklistService;
+import com.sgitu.userservice.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -22,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -33,6 +37,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RedisTokenBlacklistService blacklistService;
+    private final UserService userService;
 
     @Operation(summary = "Connexion utilisateur",
         description = "Valide les identifiants et retourne un JWT d acces + un refresh token. G10 doit forwarder les requetes de login vers cet endpoint.")
@@ -128,5 +133,35 @@ public class AuthController {
         }
 
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Vérifier l'email avec le code de vérification",
+        description = "Permet à l'utilisateur d'activer son compte en entrant le code de vérification à 6 chiffres reçu par email.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Email vérifié avec succès, compte activé"),
+        @ApiResponse(responseCode = "400", description = "Code invalide ou expiré"),
+        @ApiResponse(responseCode = "404", description = "Utilisateur introuvable")
+    })
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@Valid @RequestBody VerifyEmailRequestDTO request) {
+        userService.verifyEmail(request.getEmail(), request.getCode());
+        return ResponseEntity.ok(Map.of(
+            "message", "Email vérifié avec succès. Vous pouvez maintenant vous connecter."
+        ));
+    }
+
+    @Operation(summary = "Renvoyer le code de vérification",
+        description = "Renvoie un nouveau code de vérification à l'email de l'utilisateur si le précédent a expiré ou a été perdu.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Nouveau code envoyé"),
+        @ApiResponse(responseCode = "404", description = "Utilisateur introuvable"),
+        @ApiResponse(responseCode = "400", description = "Compte déjà vérifié")
+    })
+    @PostMapping("/resend-code")
+    public ResponseEntity<Map<String, String>> resendCode(@Valid @RequestBody ResendCodeRequestDTO request) {
+        userService.resendVerificationCode(request.getEmail());
+        return ResponseEntity.ok(Map.of(
+            "message", "Nouveau code de vérification envoyé à votre email."
+        ));
     }
 }

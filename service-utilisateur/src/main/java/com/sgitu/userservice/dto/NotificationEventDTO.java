@@ -37,6 +37,11 @@ public class NotificationEventDTO {
     private String username;
 
     /**
+     * Verification code (for EMAIL_VERIFICATION events).
+     */
+    private String verificationCode;
+
+    /**
      * ISO-8601 timestamp of the event.
      */
     private String timestamp;

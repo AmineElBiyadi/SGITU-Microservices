@@ -39,6 +39,10 @@ public interface TicketMapper {
     @Mapping(target = "cancelledAt",     ignore = true)
     @Mapping(target = "deletedAt",       ignore = true)
     @Mapping(target = "transferredAt",   ignore = true)
+    @Mapping(target = "parentTicketId",  ignore = true)
+    @Mapping(target = "transferredFromUserId", ignore = true)
+    @Mapping(target = "transferReason",  ignore = true)
+    @Mapping(target = "createdAt",       ignore = true)
     Ticket toEntity(CreateTicketRequest request);
 
     // ─── Patch / update helper ────────────────────────────────────────────
@@ -60,5 +64,9 @@ public interface TicketMapper {
     @Mapping(target = "cancelledAt",     ignore = true)
     @Mapping(target = "deletedAt",       ignore = true)
     @Mapping(target = "transferredAt",   ignore = true)
+    @Mapping(target = "parentTicketId",  ignore = true)
+    @Mapping(target = "transferredFromUserId", ignore = true)
+    @Mapping(target = "transferReason",  ignore = true)
+    @Mapping(target = "createdAt",       ignore = true)
     void updateEntityFromRequest(CreateTicketRequest request, @MappingTarget Ticket ticket);
 }

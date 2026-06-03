@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "g4-coord-2026-ordered",
 		"name": "SGITU G4 — Tests ordonnés",
-		"description": "ORDRE IMPORTANT\n\n1) Démarrer G4 : cd service-coordination-transport puis docker compose up -d\n2) Attendre health UP : GET 00 — Démarrage\n3) Parcours rapide : dossier GUIDE (requêtes 1→13 dans l'ordre)\n4) Login : gestionnaire.reseau = réseau | gestionnaire.flotte = missions | admin.technique = admin\n\nLes POST « créer » enregistrent automatiquement ligneId, arretId, missionId…",
+		"description": "ORDRE IMPORTANT\n\n1) Démarrer G4 : cd service-coordination-transport puis docker compose up -d\n2) Attendre health UP : GET 00 — Démarrage\n3) Parcours rapide : dossier GUIDE (requêtes 1→13 dans l'ordre)\n4) Login : gestionnaire.reseau = réseau | gestionnaire.flotte = missions | admin.technique = admin\n\nFlow G7 : créer véhicule chez G7 → variable vehiculeId (UUID) → sync ou Kafka → affectation ACTIF → mission.\n\nLes POST « créer » enregistrent automatiquement ligneId, arretId, missionId…",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -52,7 +52,19 @@
 		},
 		{
 			"key": "vehiculeId",
-			"value": "VH-001"
+			"value": "00000000-0000-4000-8000-000000000001"
+		},
+		{
+			"key": "recipientUserId",
+			"value": "1"
+		},
+		{
+			"key": "recipientEmail",
+			"value": "test@sgitu.local"
+		},
+		{
+			"key": "g7BaseUrl",
+			"value": "http://localhost:8087"
 		},
 		{
 			"key": "g3BaseUrl",
@@ -210,7 +222,7 @@
 			"description": "Exécuter dans l'ordre, une requête à la fois. Ne pas sauter d'étapes.",
 			"item": [
 				{
-					"name": "1. Login flotte (DISPATCHER)",
+					"name": "1. Login réseau (G4_OPERATOR)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -225,8 +237,9 @@
 						},
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"username\": \"gestionnaire.flotte\",\n  \"password\": \"password\"\n}"
-						}
+							"raw": "{\n  \"username\": \"gestionnaire.reseau\",\n  \"password\": \"password\"\n}"
+						},
+						"description": "Étapes 2→6 : lignes, arrêts, trajets, horaires"
 					},
 					"event": [
 						{
@@ -237,6 +250,17 @@
 									"if (pm.response.code === 200) {",
 									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
 									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([200]);",
+									"});"
 								]
 							}
 						}
@@ -255,7 +279,7 @@
 						"url": "{{baseUrl}}/api/g4/lignes",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"code\": \"L12\",\n  \"nom\": \"Ligne test Postman\",\n  \"description\": \"Parcours guidé\",\n  \"active\": true\n}"
+							"raw": "{\n  \"code\": \"L12-{{$timestamp}}\",\n  \"nom\": \"Ligne test Postman\",\n  \"description\": \"Parcours guidé\",\n  \"active\": true\n}"
 						}
 					},
 					"event": [
@@ -268,6 +292,17 @@
 									"  const j = pm.response.json();",
 									"  if (j && j.id != null) pm.collectionVariables.set('ligneId', String(j.id));",
 									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 201', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([201]);",
+									"});"
 								]
 							}
 						}
@@ -301,6 +336,17 @@
 									"}"
 								]
 							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 201', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([201]);",
+									"});"
+								]
+							}
 						}
 					]
 				},
@@ -330,6 +376,17 @@
 									"  const j = pm.response.json();",
 									"  if (j && j.id != null) pm.collectionVariables.set('arretId2', String(j.id));",
 									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 201', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([201]);",
+									"});"
 								]
 							}
 						}
@@ -363,6 +420,17 @@
 									"}"
 								]
 							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 201', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([201]);",
+									"});"
+								]
+							}
 						}
 					]
 				},
@@ -392,6 +460,115 @@
 									"  const j = pm.response.json();",
 									"  if (j && j.id != null) pm.collectionVariables.set('horaireId', String(j.id));",
 									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 201', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([201]);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6b. Login flotte (DISPATCHER)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/auth/login",
+						"auth": {
+							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"gestionnaire.flotte\",\n  \"password\": \"password\"\n}"
+						},
+						"description": "Étapes 7→11 : affectation, mission, events, G9, notification"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"  pm.collectionVariables.set('accessToken', pm.response.json().token);",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([200]);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6c. POST sync véhicule G7 → G4 (optionnel)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules/sync-from-g7/{{vehiculeId}}",
+						"description": "Si G7 UP : sync REST. Sinon exécuter run-postman-ordered.ps1 (seed référentiel)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200|400|502', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([200,400,502]);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6d. GET véhicules disponibles G4",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules/disponibles"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([200]);",
+									"});"
 								]
 							}
 						}
@@ -534,7 +711,7 @@
 						"url": "{{baseUrl}}/api/notifications/send",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"canal\": \"MOBILE_PUSH\",\n  \"sujet\": \"Retard L12\",\n  \"corps\": \"Retard 10 min\",\n  \"metadata\": { \"missionId\": \"{{missionId}}\" }\n}"
+							"raw": "{\n  \"notificationId\": \"G4-POSTMAN-001\",\n  \"sourceService\": \"COORDINATION\",\n  \"eventType\": \"DELAY_ALERT\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": { \"userId\": \"{{recipientUserId}}\", \"email\": \"{{recipientEmail}}\" },\n  \"metadata\": { \"lineId\": \"L12\", \"reason\": \"RETARD_SIGNIFICATIF\", \"variables\": { \"vehiculeId\": \"{{vehiculeId}}\", \"valeur\": \"12\", \"arret\": \"Gare Sud\" } }\n}"
 						}
 					}
 				},
@@ -936,8 +1113,68 @@
 			]
 		},
 		{
+			"name": "05b — Référentiel véhicules G7",
+			"description": "UUID G7 obligatoire — avant affectation",
+			"item": [
+				{
+					"name": "GET véhicules disponibles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules/disponibles",
+						"description": "Véhicules DISPONIBLE (Kafka vehicle.registered ou sync)"
+					}
+				},
+				{
+					"name": "GET tous véhicules référentiel",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules"
+					}
+				},
+				{
+					"name": "GET véhicule par id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules/{{vehiculeId}}"
+					}
+				},
+				{
+					"name": "POST sync depuis G7",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/vehicules/sync-from-g7/{{vehiculeId}}",
+						"description": "Secours si Kafka indisponible — G7 doit être UP sur g7BaseUrl"
+					}
+				}
+			]
+		},
+		{
 			"name": "06 — Affectations",
-			"description": "Login gestionnaire.flotte",
+			"description": "Login gestionnaire.flotte — après véhicule DISPONIBLE",
 			"item": [
 				{
 					"name": "POST créer affectation",
@@ -1301,10 +1538,23 @@
 						"url": "{{baseUrl}}/api/notifications/send",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"canal\": \"MOBILE_PUSH\",\n  \"sujet\": \"Info voyageurs\",\n  \"corps\": \"Message test\",\n  \"metadata\": { \"missionId\": \"{{missionId}}\" }\n}"
+							"raw": "{\n  \"notificationId\": \"G4-POSTMAN-001\",\n  \"sourceService\": \"COORDINATION\",\n  \"eventType\": \"DELAY_ALERT\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": { \"userId\": \"{{recipientUserId}}\", \"email\": \"{{recipientEmail}}\" },\n  \"metadata\": { \"lineId\": \"L12\", \"reason\": \"RETARD_SIGNIFICATIF\", \"variables\": { \"vehiculeId\": \"{{vehiculeId}}\", \"valeur\": \"12\", \"arret\": \"Gare Sud\" } }\n}"
 						},
-						"description": "202 OK ou 202 DEGRADED si G5 arrêté"
-					}
+						"description": "202 ACCEPTED ou 202 DEGRADED si G5 arrêté"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 202', function () {",
+									"  pm.expect(pm.response.code).to.be.oneOf([202]);",
+									"});"
+								]
+							}
+						}
+					]
 				}
 			]
 		},
@@ -1573,7 +1823,7 @@
 						"url": "{{baseUrl}}/api/notifications/send",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"notificationId\": \"CHAOS-001\",\n  \"sourceService\": \"G4\",\n  \"eventType\": \"RETARD\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": { \"email\": \"test@sgitu.local\" }\n}"
+							"raw": "{\n  \"notificationId\": \"CHAOS-001\",\n  \"sourceService\": \"COORDINATION\",\n  \"eventType\": \"DELAY_ALERT\",\n  \"channel\": \"EMAIL\",\n  \"recipient\": { \"userId\": \"{{recipientUserId}}\", \"email\": \"{{recipientEmail}}\" },\n  \"metadata\": { \"lineId\": \"L12\", \"reason\": \"RETARD_SIGNIFICATIF\", \"variables\": { \"vehiculeId\": \"{{vehiculeId}}\", \"valeur\": \"12\", \"arret\": \"Gare Sud\" } }\n}"
 						}
 					}
 				}

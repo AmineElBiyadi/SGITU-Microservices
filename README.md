@@ -45,6 +45,38 @@ Chaque service est contenu dans son propre répertoire. Pour développer un serv
 2. Suivre le README spécifique au service (si disponible)
 3. Exécuter le service en mode développement
 
+## CI/CD GitHub Actions
+
+Le projet contient un workflow global :
+
+```text
+.github/workflows/sgitu-global-ci-cd.yml
+```
+
+Ce pipeline couvre l'ensemble de l'application SGITU :
+
+- compilation Maven de tous les microservices Java ;
+- execution automatique des tests G10 ;
+- execution optionnelle des tests de tous les groupes via `workflow_dispatch` ;
+- validation des fichiers `docker-compose.yml` ;
+- validation des configurations Prometheus ;
+- rendu des manifests Kubernetes globaux ;
+- build Docker de toutes les images applicatives ;
+- publication optionnelle des images sur GitHub Container Registry sur `main` ou `master`.
+
+Pour lancer manuellement les tests complets de tous les services :
+
+```text
+GitHub -> Actions -> SGITU Global CI/CD -> Run workflow -> run_all_tests=true
+```
+
+Les images publiees sur GHCR utilisent le format :
+
+```text
+ghcr.io/<owner>/<repo>/<image>:latest
+ghcr.io/<owner>/<repo>/<image>:<commit-sha>
+```
+
 ## Contribution
 
 1. Forker le dépôt
@@ -52,27 +84,3 @@ Chaque service est contenu dans son propre répertoire. Pour développer un serv
 3. Commiter vos changements (`git commit -m 'Ajouter une fonctionnalité incroyable'`)
 4. Pousser vers la branche (`git push origin feature/AmazingFeature`)
 5. Ouvrir une Pull Request
-
-## Demarrage G10 uniquement
-
-Pour travailler seulement sur le groupe 10, lancer l'API Gateway :
-
-```bash
-cd api-gateway
-docker compose up -d --build
-```
-
-URLs utiles :
-
-- API Gateway : http://localhost:8080
-- Health check : http://localhost:8080/actuator/health
-- Swagger : http://localhost:8080/swagger-ui.html
-
-G10 ne lance plus de base MySQL locale. Les comptes, roles, permissions, mots de passe et JWT appartiennent au service G3 Gestion des utilisateurs.
-
-Pour arreter seulement G10 :
-
-```bash
-cd api-gateway
-docker compose down
-```

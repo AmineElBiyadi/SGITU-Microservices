@@ -1,0 +1,27 @@
+@startuml use-case-g4
+title G4 — Cas d'utilisation (coordination des transports)
+left to right direction
+
+actor "Gestionnaire réseau\n(ROLE_G4_OPERATOR)" as Op
+actor "Gestionnaire flotte\n(ROLE_DISPATCHER)" as Disp
+actor "Admin technique\n(ROLE_G4_ADMIN)" as Adm
+
+rectangle "Microservice G4" {
+  usecase "Gérer lignes / trajets / arrêts / horaires" as UC1
+  usecase "Gérer affectations véhicule-ligne" as UC2
+  usecase "Créer et suivre missions" as UC3
+  usecase "Déclarer événements coordination" as UC4
+  usecase "Lier impact incident G9" as UC5
+  usecase "Envoyer notification" as UC6
+  usecase "Superviser (health, logs)" as UC7
+}
+
+Op --> UC1
+Disp --> UC2
+Disp --> UC3
+Disp --> UC4
+Disp --> UC5
+Disp --> UC6
+Adm --> UC7
+Adm --> UC3
+@enduml

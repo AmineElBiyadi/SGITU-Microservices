@@ -84,7 +84,8 @@ Exemples JSON : `postman/examples/`
 
 | Groupe | Mode | Topic / API |
 |--------|------|-------------|
-| G7 | Kafka consumer | `vehicule-positions` → événements coordination (ex. DEVIATION) |
+| G7 | Kafka consumer | `vehicle.registered` → référentiel G4 ; `vehicule-positions` → déviation |
+| G7 | HTTP sortant | `PUT .../vehicules/{id}/statut?statut=EN_SERVICE` après affectation ligne |
 | G9 | Kafka consumer | `incident.transport.topic` → table `mission_incident_impacts` |
 | G4 | REST | `POST /api/g4/incident-impacts` — lien mission ↔ référence incident G9 |
 | G1 | Kafka producer | `missions-lifecycle` |
@@ -112,8 +113,18 @@ sgitu.integration.g3-validation-enabled: true   # quand G3 est démarré
 **Important :** même `jwt.secret` entre G3 et G4 (ou token G10) pour que le Bearer soit accepté par G3.
 Si G3 retourne `[]`, aucun conducteur n’est enregistré avec `ROLE_DRIVER` — créer des comptes chauffeur côté G3 d’abord.
 
+## Flow véhicules G7 (réel)
+
+1. G7 crée un véhicule (`DISPONIBLE`) → Kafka `vehicle.registered`.
+2. G4 enregistre le véhicule (`GET /api/g4/vehicules/disponibles`).
+3. G4 crée une **affectation** `ACTIF` véhicule ↔ ligne → notifie G7 `EN_SERVICE`.
+4. G4 crée une **mission** avec le même UUID véhicule.
+
+`vehiculeId` = **UUID G7** (pas `00000000-0000-4000-8000-000000000001`). Secours : `POST /api/g4/vehicules/sync-from-g7/{id}`.
+
 ## Règles métier importantes
 
+- **400** : mission sans affectation `ACTIF` ou véhicule non `EN_SERVICE` (flow G7 activé).
 - **409 Conflict** : deux missions `EN_COURS` pour le même `vehiculeId`.
 - **Retard / déviation** : crée un événement ; la mission reste `EN_COURS`.
 - Rôles alignés sur **G3** / JWT **G10** — voir `docs/ROLES_G3_G4_ALIGNMENT.md`.

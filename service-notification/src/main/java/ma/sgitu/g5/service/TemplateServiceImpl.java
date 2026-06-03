@@ -66,7 +66,7 @@ public class TemplateServiceImpl implements ITemplateService {
     private static final String TPL_MODIFICATION_ECHOUE = "Échec de la modification du plan. Motif : {motif}.";
 
     // ============================================================
-    // TEMPLATES G3 - UTILISATEURS (Kafka + REST fallback - 4 eventTypes)
+    // TEMPLATES G3 - UTILISATEURS (Kafka + REST fallback - 5 eventTypes)
     // ============================================================
     private static final String TPL_WELCOME = "Bienvenue sur SGITU, {username} ! Votre compte est maintenant activé.";
 
@@ -76,6 +76,8 @@ public class TemplateServiceImpl implements ITemplateService {
 
     // G3 utilise SECURITY_ALERT sans ipAddress (détecté par G10)
     private static final String TPL_G3_SECURITY_ALERT = "Connexion suspecte détectée sur votre compte. Vérifiez votre sécurité et changez votre mot de passe si nécessaire.";
+
+    private static final String TPL_EMAIL_VERIFICATION = "Bienvenue sur SGITU, {username} ! Votre code de vérification : {verificationCode}. Ce code expire dans 15 minutes.";
 
     // ============================================================
     // TEMPLATES G4 - COORDINATION (REST - 6 eventTypes)
@@ -211,11 +213,12 @@ public class TemplateServiceImpl implements ITemplateService {
             Map.entry("MODIFICATION_EFFECTUEE", TPL_MODIFICATION_EFFECTUEE),
             Map.entry("MODIFICATION_ECHOUE", TPL_MODIFICATION_ECHOUE),
 
-            // G3 - Utilisateurs (4) - SECURITY_ALERT sans ipAddress
+            // G3 - Utilisateurs (5) - SECURITY_ALERT sans ipAddress
             Map.entry("WELCOME", TPL_WELCOME),
             Map.entry("PASSWORD_CHANGED", TPL_PASSWORD_CHANGED),
             Map.entry("ACCOUNT_DEACTIVATED", TPL_ACCOUNT_DEACTIVATED),
             Map.entry("SECURITY_ALERT", TPL_G3_SECURITY_ALERT),
+            Map.entry("EMAIL_VERIFICATION", TPL_EMAIL_VERIFICATION),
 
             // G4 - Coordination (6)
             Map.entry("MISSION_CREATED", TPL_MISSION_CREATED),
@@ -287,6 +290,7 @@ public class TemplateServiceImpl implements ITemplateService {
             // G3
             Map.entry("WELCOME", "Bienvenue sur SGITU"),
             Map.entry("SECURITY_ALERT", "SGITU - Alerte de sécurité"),
+            Map.entry("EMAIL_VERIFICATION", "SGITU - Code de vérification"),
 
             // G7
             Map.entry("LOG_ALERT_ADMIN", "SGITU - Alerte logs admin"),

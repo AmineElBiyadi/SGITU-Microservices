@@ -7,7 +7,7 @@ Le microservice G6 a été entièrement dockerisé et intégré au fichier `dock
 Pour tester G6 indépendamment des autres groupes lourds, exécutez la commande suivante à la racine du projet :
 
 ```bash
-docker compose up --build -d payment-service g6-payment-db kafka
+docker compose up -d payment-service g6-payment-db kafka prometheus grafana
 ```
 
 - **payment-service** : Le backend Spring Boot du G6 (Port 8086).
@@ -24,7 +24,7 @@ Nous avons implémenté les exigences strictes de sécurité du professeur :
 
 ### B. Authentification JWT
 - Chaque requête (sauf Swagger et `/health`) exige un token JWT valide dans le Header.
-- Secret utilisé pour tester : `SGITU_G6_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!`
+- Secret utilisé pour tester : `SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!`
 - G6 ne génère pas les JWT, il valide ceux générés par G10 ou l'API Gateway.
 
 ## 🧪 3. Comment tester avec Swagger ?

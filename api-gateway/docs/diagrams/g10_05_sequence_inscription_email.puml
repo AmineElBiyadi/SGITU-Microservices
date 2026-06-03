@@ -1,5 +1,5 @@
 @startuml
-title Sequence - Inscription et email avec G3 source de verite
+title Sequence - Inscription et login avec G3 source de verite
 
 autonumber
 actor "Visiteur" as Visitor
@@ -12,25 +12,24 @@ Visitor -> G10 : POST /api/users
 activate G10
 G10 -> G3 : route /api/users
 activate G3
-G3 -> Db : creer utilisateur\nemailVerified=false
+G3 -> Db : creer utilisateur
 Db --> G3 : userId
-G3 -> Db : creer token verification
-G3 -> G5 : POST /api/notifications/send\nVERIFY_EMAIL
+G3 -> G5 : publier notification\nUSER_REGISTERED
 G5 --> G3 : notification acceptee
 G3 --> G10 : 200/201 inscription creee
 deactivate G3
 G10 --> Visitor : reponse G3
 deactivate G10
 
-Visitor -> G10 : GET /auth/verify-email?token=abc
+Visitor -> G10 : POST /auth/login\nemail, password
 activate G10
-G10 -> G3 : route verification
+G10 -> G3 : route /auth/login
 activate G3
-G3 -> Db : verifier token\nactiver compte
-Db --> G3 : compte active
-G3 --> G10 : 200 email verifie
+G3 -> Db : verifier identifiants
+Db --> G3 : utilisateur + roles
+G3 --> G10 : 200 JWT + refreshToken
 deactivate G3
-G10 --> Visitor : 200 email verifie
+G10 --> Visitor : 200 JWT + refreshToken
 deactivate G10
 
 @enduml

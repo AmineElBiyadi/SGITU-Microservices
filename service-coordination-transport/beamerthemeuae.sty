@@ -1,0 +1,37 @@
+% UAE / ENSA Tétouan Beamer theme
+\ProvidesPackage{beamerthemeuae}[2026/05/27 UAE ENSA Beamer theme]
+
+\RequirePackage{etoolbox}
+\RequirePackage[T1]{fontenc}
+
+\mode<presentation>{
+  \RequirePackage[scaled]{helvet}
+  \renewcommand{\familydefault}{\sfdefault}
+}
+
+\newif\if@uaesectiontoc
+\@uaesectiontocfalse
+\DeclareOptionBeamer{sectiontoc}{\@uaesectiontoctrue}
+\DeclareOptionBeamer{language}{}
+\DeclareOptionBeamer{progressbar}{\PassOptionsToPackage{progressbar}{beamerouterthemeuae}}
+\ProcessOptionsBeamer
+
+\usecolortheme{uae}
+\useinnertheme{uae}
+\useoutertheme[progressbar]{uae}
+
+\setbeamerfont{title}{size=\Large,series=\bfseries}
+\setbeamerfont{subtitle}{size=\normalsize}
+\setbeamerfont{frametitle}{size=\large,series=\bfseries}
+\setbeamerfont{framesubtitle}{size=\small}
+\setbeamerfont{block title}{series=\bfseries}
+
+\AtBeginSection[]{
+  \if@uaesectiontoc
+    \begin{frame}{Plan}
+      \tableofcontents[currentsection,hideothersubsections]
+    \end{frame}
+  \fi
+}
+
+\endinput

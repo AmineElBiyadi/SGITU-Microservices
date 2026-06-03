@@ -1,12 +1,11 @@
 package ma.sgitu.g8.alert;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import ma.sgitu.g8.model.StatSnapshot;
 import ma.sgitu.g8.repository.SnapshotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -22,10 +21,10 @@ public class ThresholdAlertService {
     private SnapshotRepository snapshotRepository;
 
     @Autowired
-    private RestTemplate restTemplate;
+    private AlertSender alertSender;
 
-    @Value("${g5.notification.url}")
-    private String g5Url;
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     public void detect() {
         checkPunctuality();
@@ -169,12 +168,12 @@ public class ThresholdAlertService {
     }
 
     private void sendAlert(Map<String, Object> payload) {
-        try {
-            restTemplate.postForObject(g5Url, payload, Void.class);
-            log.info("Alert sent to G5: {}", payload.get("eventType"));
-        } catch (Exception ex) {
-            log.error("Failed to send alert to G5", ex);
+        Object eventType = payload.get("eventType");
+        if (eventType != null) {
+            meterRegistry.counter("sgitu_alerts_triggered_total", "alert_type", String.valueOf(eventType))
+                    .increment();
         }
+        alertSender.send(payload);
     }
 
     private double value(StatSnapshot snapshot) {
