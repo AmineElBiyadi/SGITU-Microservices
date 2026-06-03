@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: service-billetterie
-          image: service-billetterie:latest
+          image: sgitu-microservices-service-billetterie:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
@@ -212,7 +212,7 @@ spec:
     spec:
       containers:
         - name: g4-coordination
-          image: g4-coordination:latest
+          image: sgitu-microservices-g4-coordination:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8084
@@ -301,7 +301,7 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: notification-service:latest
+          image: sgitu-microservices-notification-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8085
@@ -530,7 +530,7 @@ spec:
     spec:
       containers:
         - name: g8-ml-service
-          image: g8-ml-service:latest
+          image: sgitu-microservices-g8-ml-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
@@ -576,7 +576,7 @@ spec:
     spec:
       containers:
         - name: g8-analytics-service
-          image: g8-analytics-service:latest
+          image: sgitu-microservices-g8-analytics-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8088
@@ -638,7 +638,7 @@ spec:
     spec:
       containers:
         - name: service-gestion-incidents
-          image: service-gestion-incidents:latest
+          image: sgitu-microservices-g9-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8089
@@ -700,7 +700,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: sgitu-g10-api-gateway:latest
+          image: sgitu-microservices-api-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -749,14 +749,25 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 30
+            initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 45
+            initialDelaySeconds: 120
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 24
 ---
 apiVersion: v1
 kind: Service
