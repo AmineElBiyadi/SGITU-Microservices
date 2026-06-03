@@ -14,5 +14,8 @@ public class PreuveDTO {
     private TypePreuve type;
 
     private String fichierBase64;
+    private String nomFichier;
+    private String stockageKey;
+    private Long tailleFichier;
     private String description;
 }

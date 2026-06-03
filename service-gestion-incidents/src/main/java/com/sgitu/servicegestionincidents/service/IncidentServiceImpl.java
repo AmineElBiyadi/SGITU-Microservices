@@ -576,7 +576,9 @@ public class IncidentServiceImpl implements IncidentService {
             request.getPreuves().forEach(preuveDTO -> {
                 Preuve preuve = Preuve.builder()
                         .type(preuveDTO.getType())
-                        .fichier(preuveDTO.getFichierBase64())
+                        .fichier(preuveDTO.getNomFichier() != null ? preuveDTO.getNomFichier() : (preuveDTO.getFichierBase64() != null ? "base64_file" : null))
+                        .stockageKey(preuveDTO.getStockageKey())
+                        .tailleFichier(preuveDTO.getTailleFichier())
                         .description(preuveDTO.getDescription())
                         .dateAjout(LocalDateTime.now())
                         .build();
