@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Slf4j
 @Service
 public class PaymentServiceClient {
@@ -41,14 +44,18 @@ public class PaymentServiceClient {
     @CircuitBreaker(name = "paymentService", fallbackMethod = "refundFallback")
     @Retry(name = "paymentService")
     @RateLimiter(name = "paymentService", fallbackMethod = "refundRateLimitFallback")
-    public PaymentResponse refund(String ticketId) {
-        // Appel réel de l'annulation/remboursement de paiement
+    public PaymentResponse refund(Long paymentId, java.math.BigDecimal amount, String reason) {
+        // Appel réel de remboursement via l'endpoint correct de G6
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("amount", amount);
+        requestBody.put("reason", reason);
+
         PaymentResponse response = restTemplate.postForObject(
-                paymentServiceUrl + "/payments/" + ticketId + "/cancel",
-                null,
+                paymentServiceUrl + "/payments/" + paymentId + "/refund",
+                requestBody,
                 PaymentResponse.class
         );
-        log.info("Received refund response from billing service via REST: {}", response);
+        log.info("Received refund response from payment service via REST: {}", response);
         return response;
     }
 
@@ -76,7 +83,7 @@ public class PaymentServiceClient {
     }
 
     // Fallbacks pour Refund (Remboursement)
-    public PaymentResponse refundFallback(String ticketId, Throwable t) {
+    public PaymentResponse refundFallback(Long paymentId, java.math.BigDecimal amount, String reason, Throwable t) {
         log.error("Refund fallback triggered due to error: {}", t.getMessage());
         PaymentResponse fallback = new PaymentResponse();
         fallback.setPaymentStatus("FAILED");
@@ -85,7 +92,7 @@ public class PaymentServiceClient {
         return fallback;
     }
 
-    public PaymentResponse refundRateLimitFallback(String ticketId, Throwable t) {
+    public PaymentResponse refundRateLimitFallback(Long paymentId, java.math.BigDecimal amount, String reason, Throwable t) {
         log.error("Refund Rate Limit exceeded: {}", t.getMessage());
         PaymentResponse fallback = new PaymentResponse();
         fallback.setPaymentStatus("FAILED");

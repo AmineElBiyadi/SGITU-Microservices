@@ -136,6 +136,11 @@ public class TicketService {
             throw new TicketOperationException("Ticket " + ticketId + " has expired");
         }
 
+        // Enrichir la requête avec les données du ticket pour G6
+        paymentRequest.setSourceType("TICKET");
+        paymentRequest.setSourceId(ticket.getId());
+        paymentRequest.setAmount(java.math.BigDecimal.valueOf(ticket.getPrice()));
+
         // Appel réel au service de paiement sécurisé par Resilience4j
         PaymentResponse paymentResponse = paymentServiceClient.pay(paymentRequest);
 
@@ -144,6 +149,13 @@ public class TicketService {
             throw new TicketOperationException("Le paiement a échoué : " +
                     (paymentResponse != null ? paymentResponse.getMessage() : "Pas de réponse du service de paiement"));
         }
+
+        // Stocker paymentId et transactionToken dans les métadonnées du ticket
+        if (ticket.getMetadata() == null) {
+            ticket.setMetadata(new HashMap<>());
+        }
+        ticket.getMetadata().put("paymentId", paymentResponse.getPaymentId());
+        ticket.getMetadata().put("transactionToken", paymentResponse.getTransactionToken());
 
         ticket.setStatus(TicketStatus.ISSUED);
         ticket.setIssuedAt(Instant.now());
@@ -180,8 +192,28 @@ public class TicketService {
 
         assertStatus(ticket, TicketStatus.ISSUED);
 
-        // Appel réel de remboursement sécurisé par Resilience4j
-        PaymentResponse paymentResponse = paymentServiceClient.refund(ticket.getId());
+        // Récupérer le paymentId stocké lors du paiement
+        Object paymentIdObj = Optional.ofNullable(ticket.getMetadata())
+                .map(m -> m.get("paymentId"))
+                .orElseThrow(() -> new TicketOperationException("Payment ID not found in ticket metadata"));
+
+        Long paymentId;
+        if (paymentIdObj instanceof Long) {
+            paymentId = (Long) paymentIdObj;
+        } else if (paymentIdObj instanceof Integer) {
+            paymentId = ((Integer) paymentIdObj).longValue();
+        } else if (paymentIdObj instanceof String) {
+            paymentId = Long.valueOf((String) paymentIdObj);
+        } else {
+            throw new TicketOperationException("Invalid payment ID type in metadata");
+        }
+
+        // Appel réel de remboursement sécurisé par Resilience4j avec le bon endpoint G6
+        PaymentResponse paymentResponse = paymentServiceClient.refund(
+                paymentId,
+                java.math.BigDecimal.valueOf(ticket.getPrice()),
+                "Remboursement ticket"
+        );
 
         if (paymentResponse == null || "FAILED".equals(paymentResponse.getPaymentStatus())) {
             eventPublisher.publish(KafkaTopics.TICKET_REFUND_CANCELLED, ticket);
