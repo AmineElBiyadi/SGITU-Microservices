@@ -2,17 +2,7 @@ name: SGITU Global CI/CD
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
-    paths:
-      - "api-gateway/**"
-      - "service-*/**"
-      - "docker-compose.yml"
-      - "prometheus.yml"
-      - "monitoring/**"
-      - "k8s/**"
-      - ".github/workflows/sgitu-global-ci-cd.yml"
   pull_request:
-    branches: [ "main", "master", "develop" ]
   workflow_dispatch:
     inputs:
       run_all_tests:
