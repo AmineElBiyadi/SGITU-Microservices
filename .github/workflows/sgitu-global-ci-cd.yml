@@ -2,7 +2,9 @@ name: SGITU Global CI/CD
 
 on:
   push:
+    branches: [ "main", "master", "develop" ]
   pull_request:
+    branches: [ "main", "master", "develop" ]
   workflow_dispatch:
     inputs:
       run_all_tests:
