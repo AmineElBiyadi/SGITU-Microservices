@@ -9,6 +9,9 @@ scrape_configs:
   - job_name: 'service-billetterie'
     static_configs:
       - targets: ['service-billetterie:8081']
+        labels:
+          group: G1
+          service: billetterie
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -17,6 +20,9 @@ scrape_configs:
   - job_name: 'service-abonnement'
     static_configs:
       - targets: ['service-abonnement:8082']
+        labels:
+          group: G2
+          service: abonnement
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -25,6 +31,9 @@ scrape_configs:
   - job_name: 'g3-user-service'
     static_configs:
       - targets: ['g3-user-service:8083']
+        labels:
+          group: G3
+          service: utilisateurs
     metrics_path: '/api/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -46,6 +55,9 @@ scrape_configs:
   - job_name: 'g5-notification'
     static_configs:
       - targets: ['notification-service:8085']
+        labels:
+          group: G5
+          service: notifications
     metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
   #  G6 — Service Paiement (SGITU)
@@ -53,6 +65,9 @@ scrape_configs:
   - job_name: 'payment-service'
     static_configs:
       - targets: ['g6-payment-service:8086']
+        labels:
+          group: G6
+          service: paiement
     metrics_path: '/actuator/prometheus'
   # ---------------------------------------------------------------
   #  G7 — Service Suivi des Véhicules (SGITU)
@@ -60,6 +75,9 @@ scrape_configs:
   - job_name: 'service-suivi-vehicule'
     static_configs:
       - targets: ['g7-service:8087']
+        labels:
+          group: G7
+          service: suivi-vehicules
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -68,6 +86,9 @@ scrape_configs:
   - job_name: 'g8-analytics'
     static_configs:
       - targets: ['g8-analytics-service:8088']
+        labels:
+          group: G8
+          service: analytique
     metrics_path: '/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -76,6 +97,9 @@ scrape_configs:
   - job_name: 'g9-gestion-incidents'
     static_configs:
       - targets: ['service-gestion-incidents:8089']
+        labels:
+          group: G9
+          service: gestion-incidents
     metrics_path: '/api/incidents/actuator/prometheus'
 
   # ---------------------------------------------------------------
@@ -84,4 +108,7 @@ scrape_configs:
   - job_name: 'g10-api-gateway'
     static_configs:
       - targets: ['api-gateway:8080']
+        labels:
+          group: G10
+          service: api-gateway
     metrics_path: '/actuator/prometheus'

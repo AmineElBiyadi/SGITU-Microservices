@@ -1389,6 +1389,89 @@
                               ]
                  },
                  {
+                     "name":  "04bis - Verification email G3 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "04bis.1 - 400 verify email code invalide",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test('Status 400 ou 404 selon etat utilisateur', function () { pm.expect([400, 404]).to.include(pm.response.code); });",
+                                                                                    "pm.test('Reponse erreur JSON', function () { const json = pm.response.json(); pm.expect(json.status || pm.response.code).to.exist; });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-verify-email-invalid"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/verify-email",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"code\": \"000000\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "description":  "Couvre le nouvel endpoint G3 /auth/verify-email via G10 avec un code volontairement invalide."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04bis.2 - resend verification code G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test('Endpoint resend-code route via G10', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });",
+                                                                                    "pm.test('Reponse JSON', function () { const json = pm.response.json(); pm.expect(json).to.be.an('object'); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-resend-code"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/resend-code",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "description":  "Couvre le nouvel endpoint G3 /auth/resend-code via G10. Le statut exact depend de l'etat du compte cree pendant la collection."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
                      "name":  "05 - Refresh logout et blacklist G3 via G10",
                      "item":  [
                                   {

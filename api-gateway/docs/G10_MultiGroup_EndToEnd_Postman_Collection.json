@@ -1,0 +1,522 @@
+{
+  "info": {
+    "name": "SGITU - G10 Multi-Group End-to-End Tests",
+    "description": "Collection Postman de demonstration integree : Client -> G10 -> G3/G5/G8/G1/G6. Elle valide JWT/RBAC, propagation des headers, routage inter-groupes, ingestion analytics, notification et resilience 503.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const secret = pm.collectionVariables.get('jwtSecret') || 'SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!';",
+          "const nowDate = new Date();",
+          "pm.collectionVariables.set('isoNow', nowDate.toISOString());",
+          "pm.collectionVariables.set('today', nowDate.toISOString().slice(0, 10));",
+          "if (!pm.collectionVariables.get('runId')) { pm.collectionVariables.set('runId', 'e2e-' + Date.now()); }",
+          "pm.collectionVariables.set('testEmail', 'e2e.' + pm.collectionVariables.get('runId') + '@sgitu.ma');",
+          "pm.collectionVariables.set('g5NotificationId', 'notif-' + pm.collectionVariables.get('runId'));",
+          "function b64url(input) { return CryptoJS.enc.Base64.stringify(input).replace(/=+$/,'').replace(/\\+/g,'-').replace(/\\//g,'_'); }",
+          "function makeJwt(email, userId, roles, ttlSeconds) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: 'postman-' + Math.random().toString(36).slice(2) };",
+          "  const h = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "  const p = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const s = b64url(CryptoJS.HmacSHA256(h + '.' + p, secret));",
+          "  return h + '.' + p + '.' + s;",
+          "}",
+          "if (pm.collectionVariables.get('autoGenerateTokens') !== 'false') {",
+          "  pm.collectionVariables.set('adminToken', makeJwt('admin.g10@sgitu.ma', '1', ['ROLE_ADMIN'], 3600));",
+          "  pm.collectionVariables.set('operatorToken', makeJwt('operator.g10@sgitu.ma', '2', ['ROLE_OPERATOR'], 3600));",
+          "  pm.collectionVariables.set('staffToken', makeJwt('staff.g10@sgitu.ma', '3', ['ROLE_STAFF'], 3600));",
+          "  pm.collectionVariables.set('passengerToken', makeJwt('passenger.g10@sgitu.ma', '4', ['ROLE_PASSENGER'], 3600));",
+          "  pm.collectionVariables.set('expiredToken', makeJwt('expired.g10@sgitu.ma', '5', ['ROLE_ADMIN'], -60));",
+          "  pm.collectionVariables.set('invalidToken', pm.collectionVariables.get('adminToken') + 'invalid');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!", "type": "string" },
+    { "key": "autoGenerateTokens", "value": "true", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "operatorToken", "value": "", "type": "string" },
+    { "key": "staffToken", "value": "", "type": "string" },
+    { "key": "passengerToken", "value": "", "type": "string" },
+    { "key": "expiredToken", "value": "", "type": "string" },
+    { "key": "invalidToken", "value": "", "type": "string" },
+    { "key": "runId", "value": "", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "isoNow", "value": "", "type": "string" },
+    { "key": "today", "value": "", "type": "string" },
+    { "key": "g5NotificationId", "value": "", "type": "string" },
+    { "key": "paymentId", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preconditions globales G10 + groupes",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G10 UP', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body contains UP', function () { pm.expect(pm.response.text()).to.include('UP'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "e2e-health-g10" }],
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "00.2 - 200 Swagger G10 contient routes multi-groupes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OpenAPI accessible', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Routes G3/G5/G8/G6 documentees', function () { const t = pm.response.text(); pm.expect(t).to.include('/auth/login'); pm.expect(t).to.include('/api/notifications'); pm.expect(t).to.include('/api/v1/analytics'); pm.expect(t).to.include('/api/payments'); });"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/v3/api-docs" }
+        },
+        {
+          "name": "00.3 - 200 health G5 via G10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G5 health route par G10', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Correlation id retourne', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('e2e-health-g5'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "e2e-health-g5" }],
+            "url": "{{baseUrl}}/api/notifications/health"
+          }
+        },
+        {
+          "name": "00.4 - G6 health via G10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('G6 health route par G10', function () { pm.expect([200, 204, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "e2e-health-g6" }],
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Securite transverse JWT/RBAC",
+      "item": [
+        {
+          "name": "01.1 - 401 analytics sans JWT",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('JWT absent refuse', function () { pm.response.to.have.status(401); });",
+            "pm.test('Erreur Gateway JSON', function () { pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "e2e-no-jwt-g8" }],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        },
+        {
+          "name": "01.2 - 401 JWT invalide",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('JWT invalide refuse', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-invalid-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        },
+        {
+          "name": "01.3 - 403 ROLE_PASSENGER refuse sur analytics",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('RBAC applique', function () { pm.response.to.have.status(403); });",
+            "pm.test('Code FORBIDDEN', function () { pm.expect(pm.response.json().code).to.eql('FORBIDDEN'); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-passenger-g8-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        },
+        {
+          "name": "01.4 - 200 ROLE_OPERATOR accepte sur analytics",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Operator autorise ou service indisponible gere', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+            "pm.test('Correlation id retourne', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('e2e-operator-g8-ok'); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-operator-g8-ok" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - G3 Utilisateurs via G10",
+      "item": [
+        {
+          "name": "02.1 - Create user public G3 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Inscription routee vers G3', function () { pm.expect([201, 400, 409]).to.include(pm.response.code); });",
+            "if (pm.response.code === 201) { const json = pm.response.json(); if (json.id) pm.collectionVariables.set('createdUserId', String(json.id)); }"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g3-create-user" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"E2E\",\n    \"lastName\": \"Gateway\",\n    \"phone\": \"+212600000000\",\n    \"address\": \"Casablanca\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "02.2 - Login G3 via G10 mot de passe incorrect",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login route vers G3 et refuse credentials invalides', function () { pm.response.to.have.status(401); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g3-login-wrong" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"WrongPassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "02.3 - Resend verification code G3 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Endpoint G3 resend-code route', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g3-resend-code" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/resend-code"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - G5 Notifications via G10",
+      "item": [
+        {
+          "name": "03.1 - 202 send notification LOG via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Notification acceptee par G5', function () { pm.response.to.have.status(202); });",
+            "pm.test('Status QUEUED ou ALREADY_QUEUED', function () { const json = pm.response.json(); pm.expect(['QUEUED', 'ALREADY_QUEUED']).to.include(json.status); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g5-send-log" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{g5NotificationId}}\",\n  \"sourceService\": \"G10_E2E\",\n  \"eventType\": \"AUTH_LOGIN_SUCCESS\",\n  \"channel\": \"LOG\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"4\",\n    \"email\": \"passenger.g10@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"source\": \"Postman multi-group\",\n    \"correlationId\": \"e2e-g5-send-log\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "03.2 - 403 admin G5 avec ROLE_PASSENGER",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Admin G5 refuse passenger', function () { pm.response.to.have.status(403); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g5-admin-forbidden" }
+            ],
+            "url": "{{baseUrl}}/api/notifications/admin/stats"
+          }
+        },
+        {
+          "name": "03.3 - 200 admin stats G5 avec ROLE_ADMIN",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Admin G5 autorise', function () { pm.expect([200, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g5-admin-stats" }
+            ],
+            "url": "{{baseUrl}}/api/notifications/admin/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - G8 Analytics via G10",
+      "item": [
+        {
+          "name": "04.1 - Ingestion tickets G8 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Ingestion G8 routee', function () { pm.expect([200, 201, 207, 503]).to.include(pm.response.code); });",
+            "pm.test('Correlation id retourne', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('e2e-g8-ingest-tickets'); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g8-ingest-tickets" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-001\",\n    \"userId\": \"USR-{{runId}}-001\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"ticketId\": \"TCK-{{runId}}-002\",\n    \"userId\": \"USR-{{runId}}-002\",\n    \"status\": \"validated\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"scanType\": \"QR\"\n  }\n]",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/ingestion/tickets"
+          }
+        },
+        {
+          "name": "04.2 - Dashboard analytics G8 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Dashboard G8 accessible ou 503 propre', function () { pm.expect([200, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g8-dashboard" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        },
+        {
+          "name": "04.3 - ML peak hours G8 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('ML G8 route via G10', function () { pm.expect([200, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g8-ml-peak" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"line\": \"L1\",\n  \"date\": \"{{today}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/predict/peak-hours"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - G1 Billetterie et G6 Paiement via G10",
+      "item": [
+        {
+          "name": "05.1 - G1 ticket types via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G1 route via G10', function () { pm.expect([200, 401, 403, 404, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g1-ticket-types" }
+            ],
+            "url": "{{baseUrl}}/api/v1/ticket-types"
+          }
+        },
+        {
+          "name": "05.2 - G6 test cards via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G6 test cards route via G10', function () { pm.expect([200, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g6-test-cards" }
+            ],
+            "url": "{{baseUrl}}/api/test-cards"
+          }
+        },
+        {
+          "name": "05.3 - Process payment G6 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Paiement G6 route via G10', function () { pm.expect([200, 201, 400, 503]).to.include(pm.response.code); });",
+            "if ([200, 201].includes(pm.response.code)) { const json = pm.response.json(); if (json.paymentId) pm.collectionVariables.set('paymentId', String(json.paymentId)); }"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g6-process-payment" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 4,\n  \"sourceType\": \"TICKET\",\n  \"sourceId\": 1001,\n  \"amount\": 10.00,\n  \"paymentMethod\": \"CARD\",\n  \"savedPaymentToken\": \"CARD-TOKEN-006\",\n  \"email\": \"passenger.g10@sgitu.ma\",\n  \"description\": \"Paiement multi-groupe via G10\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/payments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Scenario inter-groupes G8 vers G5 via G10",
+      "item": [
+        {
+          "name": "06.1 - Notification source G8_ANALYTICS vers G5 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Notification G8->G10->G5 acceptee', function () { pm.expect([202, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "e2e-g8-to-g5-notification" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"{{g5NotificationId}}-g8\",\n  \"sourceService\": \"G8_ANALYTICS\",\n  \"eventType\": \"ANALYTICS_REPORT_READY\",\n  \"channel\": \"LOG\",\n  \"priority\": \"HIGH\",\n  \"recipient\": {\n    \"userId\": \"2\",\n    \"email\": \"operator.g10@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"report\": \"dashboard\",\n    \"date\": \"{{today}}\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/notifications/send"
+          }
+        },
+        {
+          "name": "06.2 - Admin consulte notifications G8 dans G5 via G10",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Consultation admin routee', function () { pm.expect([200, 503]).to.include(pm.response.code); });"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g5-by-source-g8" }
+            ],
+            "url": "{{baseUrl}}/api/notifications/admin/notifications/by-source/G8_ANALYTICS?page=0&size=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Resilience manuelle multi-groupes",
+      "item": [
+        {
+          "name": "07.1 - G8 down -> 503 via G10",
+          "description": "Avant execution : docker compose stop g8-analytics-service. Si G8 tourne encore, la reponse peut etre 200.",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G8 up ou 503 propre', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+            "if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{operatorToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g8-down" }
+            ],
+            "url": "{{baseUrl}}/api/v1/analytics/dashboard"
+          }
+        },
+        {
+          "name": "07.2 - G5 down -> 503 via G10",
+          "description": "Avant execution : docker compose stop notification-service. Si G5 tourne encore, la reponse peut etre 200.",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G5 up ou 503 propre', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+            "if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-Id", "value": "e2e-g5-down" }],
+            "url": "{{baseUrl}}/api/notifications/health"
+          }
+        },
+        {
+          "name": "07.3 - G6 down -> 503 via G10",
+          "description": "Avant execution : docker compose stop payment-service. Si G6 tourne encore, la reponse peut etre 200.",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('G6 up ou 503 propre', function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+            "if (pm.response.code === 503) { pm.expect(pm.response.json().code).to.eql('SERVICE_UNAVAILABLE'); }"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "e2e-g6-down" }
+            ],
+            "url": "{{baseUrl}}/api/test-cards"
+          }
+        }
+      ]
+    }
+  ]
+}

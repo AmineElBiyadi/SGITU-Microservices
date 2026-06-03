@@ -30,6 +30,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public : health check + Swagger/OpenAPI
                 .requestMatchers(
+                    "/actuator/**",
                     "/api/notifications/health",
                     "/swagger-ui/**",
                     "/swagger-ui.html",

@@ -631,8 +631,10 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./service-paiement/monitoring/grafana/dashboards/g6-paiement.json:/etc/grafana/provisioning/dashboards/g6-paiement.json:ro
+      - ./monitoring/grafana/dashboards/dashboard-provider.yml:/etc/grafana/provisioning/dashboards/dashboard-provider.yml:ro
+      - ./monitoring/grafana/dashboards/g10-api-gateway-dashboard.json:/etc/grafana/dashboards/g10-api-gateway-dashboard.json:ro
+      - ./monitoring/grafana/dashboards/sgitu-global-services-dashboard.json:/etc/grafana/dashboards/sgitu-global-services-dashboard.json:ro
+      - ./service-paiement/monitoring/grafana/dashboards/g6-paiement.json:/etc/grafana/dashboards/g6-paiement.json:ro
     networks:
       - sgitu-network
     depends_on:
