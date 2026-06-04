@@ -169,6 +169,55 @@ data:
         }
       ]
     }
+  sgitu-global-services-dashboard.json: |
+    {
+      "title": "SGITU - Vue Globale Tous les Groupes",
+      "uid": "sgitu-global-all-groups-k8s",
+      "schemaVersion": 36,
+      "version": 1,
+      "refresh": "10s",
+      "tags": ["SGITU", "Global", "Kubernetes"],
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Services UP",
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum(up)", "refId": "A"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+        },
+        {
+          "type": "stat",
+          "title": "Services DOWN",
+          "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "count(up) - sum(up)", "refId": "A"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+        },
+        {
+          "type": "table",
+          "title": "Etat Prometheus de tous les services",
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "up", "format": "table", "instant": true, "refId": "A"}],
+          "fieldConfig": {"defaults": {"custom": {"align": "auto"}}}
+        },
+        {
+          "type": "timeseries",
+          "title": "Requetes HTTP par seconde par service",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 9},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum by (job) (rate(http_server_requests_seconds_count[1m]))", "refId": "A"}]
+        },
+        {
+          "type": "timeseries",
+          "title": "Erreurs HTTP 5xx par service",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum by (job) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))", "refId": "A"}]
+        }
+      ]
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -208,6 +257,9 @@ spec:
             - name: provisioning
               mountPath: /etc/grafana/provisioning/dashboards/g10-api-gateway-dashboard.json
               subPath: g10-api-gateway-dashboard.json
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/sgitu-global-services-dashboard.json
+              subPath: sgitu-global-services-dashboard.json
             - name: data
               mountPath: /var/lib/grafana
       volumes:

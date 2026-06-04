@@ -488,6 +488,12 @@ spec:
               value: http://notification-service:8085
             - name: G8_BASE_URL
               value: http://g8-analytics-service:8088
+            - name: G4_INTEGRATION_URL
+              value: http://api-gateway:8080/api/g4
+            - name: G5_NOTIFICATION_URL
+              value: http://api-gateway:8080/api/notifications/send
+            - name: G9_INTEGRATION_URL
+              value: http://service-gestion-incidents:8089/api/incidents
 ---
 apiVersion: v1
 kind: Service
@@ -749,25 +755,26 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 12
+            timeoutSeconds: 15
+            failureThreshold: 18
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 120
+            initialDelaySeconds: 240
             periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 6
+            timeoutSeconds: 15
+            failureThreshold: 10
           startupProbe:
             httpGet:
               path: /actuator/health
               port: 8080
+            initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 24
+            timeoutSeconds: 15
+            failureThreshold: 45
 ---
 apiVersion: v1
 kind: Service
