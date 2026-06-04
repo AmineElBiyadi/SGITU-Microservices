@@ -17,8 +17,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class VerifyOtpRequest {
 
-    @NotNull(message = "paymentAccountId obligatoire")
-    @Positive(message = "paymentAccountId doit être positif")
     private Long paymentAccountId;
 
     @NotBlank(message = "Code OTP obligatoire")

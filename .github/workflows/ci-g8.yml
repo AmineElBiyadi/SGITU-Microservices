@@ -100,7 +100,7 @@ jobs:
 
       - name: Check for compilation warnings
         working-directory: service-analytique
-        run: mvn compile -Xlint:all 2>&1 | tail -20
+        run: mvn -B compile -Dmaven.compiler.showWarnings=true -Dmaven.compiler.compilerArgs=-Xlint:all 2>&1 | tail -20
 
       - name: Verify project structure
         working-directory: service-analytique

@@ -6,7 +6,7 @@
 POST /api/notifications/send
 ```
 
-Passage par **G10**, JWT, réponse **202**.
+Appel **direct** G4→G5 (`SGITU_G5_URL`), JWT service + réponse **202** (G10 uniquement pour le front).
 
 ## Règle `recipient` (obligatoire)
 
@@ -28,7 +28,7 @@ G5 n’enrichit pas ce champ. G4 le remplit via **G3** :
 
 Après retard, déviation, panne, incident G9 confirmé, mission annulée ou clôturée :
 
-`G5ContractNotificationService` → `G5RecipientBroadcastService` → G3 → N × POST G5 (via G10).
+`G5ContractNotificationService` → `G5RecipientBroadcastService` → G3 → N × POST G5 (direct + JWT service G4).
 
 Configuration (`application.yml`, défaut **true**) :
 

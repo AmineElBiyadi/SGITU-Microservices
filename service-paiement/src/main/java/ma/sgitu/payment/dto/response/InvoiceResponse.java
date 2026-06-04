@@ -24,7 +24,7 @@ public class InvoiceResponse {
     private String transactionToken;
     private Long userId;
     private String sourceType;        // TICKET ou SUBSCRIPTION
-    private Long sourceId;
+    private String sourceId;
     private BigDecimal totalAmount;
     private String paymentMethod;     // CARD ou MOBILE_MONEY
     private LocalDateTime issuedAt;

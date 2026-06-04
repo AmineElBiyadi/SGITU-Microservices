@@ -147,6 +147,9 @@ services:
       SPRING_REDIS_HOST: g3-redis
       SPRING_REDIS_PORT: 6379
       SERVER_PORT: 8083
+      SPRING_PROFILES_ACTIVE: docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET:-SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
       G8_BASE_URL: ${G8_BASE_URL:-}
@@ -228,8 +231,9 @@ services:
       SGITU_G5_URL: http://notification-service:8085
       SGITU_G10_URL: ${G10_BASE_URL:-http://api-gateway:8080}
       SGITU_G7_URL: http://g7-service:8087
-      SGITU_G1_URL: ${G1_BASE_URL:-http://g1-billetterie:8081}
-      SGITU_G9_URL: ${G9_BASE_URL:-http://g9-incidents:8089}
+      SGITU_G3_INTER_SERVICE_ROLES: ${SGITU_G3_INTER_SERVICE_ROLES:-G4_OPERATOR,DISPATCHER}
+      SGITU_G1_URL: ${G1_BASE_URL:-http://service-billetterie:8081}
+      SGITU_G9_URL: ${G9_BASE_URL:-http://service-gestion-incidents:8089}
       SGITU_G3_VALIDATION_ENABLED: ${SGITU_G3_VALIDATION_ENABLED:-true}
       SGITU_INTEGRATION_G5_NOTIFICATION_PATH: ${SGITU_INTEGRATION_G5_NOTIFICATION_PATH:-/api/notifications/send}
       SGITU_G1_MISSION_LIFECYCLE_PATH: ${SGITU_G1_MISSION_LIFECYCLE_PATH:-/api/internal/missions/events}
@@ -361,7 +365,7 @@ services:
       JWT_EXPIRATION: 86400000
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8086
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: sgitu-kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SUBSCRIPTION_SERVICE_URL: ${G2_BASE_URL:-http://service-abonnement:8082}
       TICKET_SERVICE_URL: ${G1_BASE_URL:-http://service-billetterie:8081}
       NOTIFICATION_SERVICE_URL: ${G5_BASE_URL:-http://notification-service:8085}
@@ -412,6 +416,9 @@ services:
       G4_BASE_URL: ${G4_BASE_URL:-}
       G5_BASE_URL: ${G5_BASE_URL:-}
       G8_BASE_URL: ${G8_BASE_URL:-}
+      G4_INTEGRATION_URL: ${G4_INTEGRATION_URL:-http://api-gateway:8080/api/g4}
+      G5_NOTIFICATION_URL: ${G5_NOTIFICATION_URL:-http://api-gateway:8080/api/notifications/send}
+      G9_INTEGRATION_URL: ${G9_INTEGRATION_URL:-http://service-gestion-incidents:8089/api/incidents}
     depends_on:
       db-g7:
         condition: service_healthy

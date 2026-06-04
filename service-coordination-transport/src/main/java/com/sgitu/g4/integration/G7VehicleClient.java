@@ -19,6 +19,7 @@ import java.util.Optional;
 public class G7VehicleClient {
 
 	private final IntegrationProperties integrationProperties;
+	private final InterServiceHttpAuth interServiceHttpAuth;
 
 	public Map<String, Object> fetchVehiculeOrThrow(String vehiculeId) {
 		return fetchVehicule(vehiculeId)
@@ -28,9 +29,11 @@ public class G7VehicleClient {
 	@SuppressWarnings("unchecked")
 	public Optional<Map<String, Object>> fetchVehicule(String vehiculeId) {
 		try {
-			Map<String, Object> body = RestClient.create(integrationProperties.getG7BaseUrl())
+			RestClient.RequestHeadersSpec<?> get = RestClient.create(integrationProperties.getG7BaseUrl())
 					.get()
-					.uri(integrationProperties.getG7VehiculesPath() + "/{id}", vehiculeId)
+					.uri(integrationProperties.getG7VehiculesPath() + "/{id}", vehiculeId);
+			@SuppressWarnings("unchecked")
+			Map<String, Object> body = interServiceHttpAuth.apply(get, InterServiceHttpAuth.Peer.G7)
 					.retrieve()
 					.body(Map.class);
 			return Optional.ofNullable(body);
@@ -70,12 +73,13 @@ public class G7VehicleClient {
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> updateStatut(String vehiculeId, String statutG7) {
 		try {
-			Map<String, Object> body = RestClient.create(integrationProperties.getG7BaseUrl())
+			RestClient.RequestHeadersSpec<?> put = RestClient.create(integrationProperties.getG7BaseUrl())
 					.put()
 					.uri(uriBuilder -> uriBuilder
 							.path(integrationProperties.getG7VehiculesPath() + "/{id}/statut")
 							.queryParam("statut", statutG7)
-							.build(vehiculeId))
+							.build(vehiculeId));
+			Map<String, Object> body = interServiceHttpAuth.apply(put, InterServiceHttpAuth.Peer.G7)
 					.retrieve()
 					.body(Map.class);
 			log.info("G7 statut mis à jour vehiculeId={} statut={}", vehiculeId, statutG7);
@@ -92,6 +96,10 @@ public class G7VehicleClient {
 
 	public void notifyEnService(String vehiculeId) {
 		updateStatut(vehiculeId, "EN_SERVICE");
+	}
+
+	public void notifyIncident(String vehiculeId) {
+		updateStatut(vehiculeId, "INCIDENT");
 	}
 
 	public void notifyDisponible(String vehiculeId) {

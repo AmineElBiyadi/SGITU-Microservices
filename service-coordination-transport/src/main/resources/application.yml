@@ -48,7 +48,7 @@ springdoc:
 
 sgitu:
   jwt:
-    secret: ${SGITU_JWT_SECRET:SGlUVS1HNC1KV1QtU0VDUkVOLURFVl8xMjhCaXRzX19VU0VfRU5WX1ZBUiMjIw==}
+    secret: ${SGITU_JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
     expiration-ms: ${SGITU_JWT_EXPIRATION_MS:86400000}
   integration:
     g3-base-url: ${SGITU_G3_URL:http://localhost:8083}
@@ -61,6 +61,10 @@ sgitu:
     g3-notification-recipients-page-size: ${SGITU_G3_NOTIFICATION_RECIPIENTS_PAGE_SIZE:100}
     g3-notification-recipient-roles: ${SGITU_G3_NOTIFICATION_RECIPIENT_ROLES:}
     g3-service-bearer-token: ${SGITU_G3_SERVICE_BEARER_TOKEN:}
+    g3-inter-service-roles: ${SGITU_G3_INTER_SERVICE_ROLES:G4_OPERATOR,DISPATCHER}
+    inter-service-source-group: ${SGITU_INTER_SERVICE_SOURCE_GROUP:G4}
+    inter-service-principal: ${SGITU_INTER_SERVICE_PRINCIPAL:g4-coordination-service}
+    inter-service-roles: ${SGITU_INTER_SERVICE_ROLES:G4_OPERATOR,SERVICE}
     # Billetterie = G1. Les variables SGITU_G3_* mission restent acceptées (rétrocompat).
     g1-base-url: ${SGITU_G1_URL:http://localhost:8081}
     g5-base-url: ${SGITU_G5_URL:http://localhost:8085}
@@ -86,7 +90,7 @@ sgitu:
     g7-consumer-group-id: ${SGITU_G7_CONSUMER_GROUP:g4-coordination-g7}
     g7-registered-consumer-group-id: ${SGITU_G7_REGISTERED_CONSUMER_GROUP:g4-coordination-g7-registered}
   g5-notification:
-    # Événement coordination → POST G5 via G10, un payload par utilisateur (recipient depuis G3)
+    # Événement coordination → POST G5 direct (SGITU_G5_URL) + JWT service, un POST par user (recipient G3)
     post-on-event-enabled: ${SGITU_G5_POST_ON_EVENT_ENABLED:true}
     source-service: ${SGITU_G5_SOURCE_SERVICE:COORDINATION}
     channel: EMAIL

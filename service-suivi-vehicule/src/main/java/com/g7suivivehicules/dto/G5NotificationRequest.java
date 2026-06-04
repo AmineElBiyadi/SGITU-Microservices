@@ -48,6 +48,9 @@ public class G5NotificationRequest {
         @Schema(description = "Identifiant de l'utilisateur (conducteur)", example = "conducteur-V-1042")
         private String userId;
 
+        @Schema(description = "Email de l'utilisateur", example = "admin@sgitu.ma")
+        private String email;
+
         @Schema(description = "Token du device pour le PUSH", example = "token-device-conducteur")
         private String deviceToken;
     }

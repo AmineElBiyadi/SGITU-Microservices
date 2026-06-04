@@ -1,10 +1,10 @@
 {
   "referenceIncident": "INC-2026-042",
   "type": "PANNE_VEHICULE",
-  "statut": "NOUVEAU",
+  "statut": "CONFIRME",
   "vehiculeId": "00000000-0000-4000-8000-000000000001",
   "ligneId": "L12",
-  "description": "Panne moteur signalée par G9",
+  "description": "Panne moteur confirmée par G9",
   "latitude": 35.57,
   "longitude": -5.36,
   "timestamp": "2026-05-20T14:35:00"

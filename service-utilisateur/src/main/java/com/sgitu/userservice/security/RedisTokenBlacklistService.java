@@ -1,6 +1,5 @@
 package com.sgitu.userservice.security;
 
-import com.sgitu.userservice.service.ChaosMonkeyService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Service for token revocation and blacklist checking.
  *
- * Resilience4j Circuit Breaker handles Redis outages (or simulated DOWN).
+ * Resilience4j Circuit Breaker handles Redis outages (real or Chaos Monkey injected).
  * If Redis is unavailable, falls back to a ConcurrentHashMap in-memory local cache.
  */
 @Slf4j
@@ -23,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RedisTokenBlacklistService {
 
     private final StringRedisTemplate redisTemplate;
-    private final ChaosMonkeyService chaosMonkeyService;
 
     // Local in-memory fallback cache
     private final ConcurrentHashMap<String, Instant> localBlacklist = new ConcurrentHashMap<>();
@@ -34,7 +32,6 @@ public class RedisTokenBlacklistService {
 
     @CircuitBreaker(name = "redisBlacklist", fallbackMethod = "revokeTokenFallback")
     public void revokeToken(String token, Duration ttl) {
-        chaosMonkeyService.checkRedis();
         if (token == null || token.isBlank() || ttl == null || ttl.isNegative() || ttl.isZero()) {
             return;
         }
@@ -51,7 +48,6 @@ public class RedisTokenBlacklistService {
 
     @CircuitBreaker(name = "redisBlacklist", fallbackMethod = "isTokenRevokedFallback")
     public boolean isTokenRevoked(String token) {
-        chaosMonkeyService.checkRedis();
         if (token == null || token.isBlank()) {
             return false;
         }

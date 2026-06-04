@@ -970,6 +970,34 @@
 						],
 						"url": "{{baseUrl}}/api/g4/arrets/ligne/{{ligneId}}"
 					}
+				},
+				{
+					"name": "DELETE arrêt 2 (cleanup optionnel)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets/{{arretId2}}",
+						"description": "Optionnel: nettoyer données de test"
+					}
+				},
+				{
+					"name": "DELETE arrêt 1 (cleanup optionnel)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/arrets/{{arretId}}",
+						"description": "Optionnel: nettoyer données de test"
+					}
 				}
 			]
 		},
@@ -1046,6 +1074,20 @@
 						],
 						"url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}/arrets"
 					}
+				},
+				{
+					"name": "DELETE trajet (cleanup optionnel)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/trajets/{{trajetId}}",
+						"description": "Optionnel: nettoyer données de test"
+					}
 				}
 			]
 		},
@@ -1108,6 +1150,20 @@
 							}
 						],
 						"url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}"
+					}
+				},
+				{
+					"name": "DELETE horaire (cleanup optionnel)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/horaires/{{horaireId}}",
+						"description": "Optionnel: nettoyer données de test"
 					}
 				}
 			]
@@ -1231,6 +1287,20 @@
 							}
 						],
 						"url": "{{baseUrl}}/api/g4/affectations/vehicule/{{vehiculeId}}"
+					}
+				},
+				{
+					"name": "DELETE affectation (cleanup optionnel)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": "{{baseUrl}}/api/g4/affectations/{{affectationId}}",
+						"description": "Optionnel: nettoyer données de test"
 					}
 				}
 			]
@@ -1460,7 +1530,7 @@
 		},
 		{
 			"name": "09 — Impacts incident G9",
-			"description": "Distinct de /api/g4/events",
+			"description": "Kafka prod: postman/examples/kafka-g9-incident-*.json (CONFIRME→G5+G7 INCIDENT, RESOLU→G7 normal, REJETE→log)",
 			"item": [
 				{
 					"name": "POST impact",

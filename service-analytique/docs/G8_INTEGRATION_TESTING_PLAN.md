@@ -88,7 +88,7 @@ The script uses `POST /api/users` because it is the simplest real action and doe
 
 **Status: ✅ PASSING** - All 10 tests pass. End-to-end flow works correctly.
 
-## Stage 3: Start G5 Manually (THIS DOSEN'T WORK BECAUSE G5 DOCKERFILE HAS A PROBLEM)
+## Stage 3: Start G5 Manually
 
 After Stage 2 passes, start G5:
 
@@ -122,4 +122,200 @@ HIGH_INCIDENT_VOLUME
 INCIDENT_ZONE_RISK
 ```
 
+Current G5 behavior:
+
+```text
+G5 Docker container crash-loops instantly on startup due to missing env properties and firebase-adminsdk.json being a directory instead of a file in the compose mount.
+```
+
+**Status: FAIL (Sender Side)** - Run this stage after G5 resolves their Docker startup issues.
+
+## Stage 4: Start One Sender At A Time
+
+Stage 4 follows the same sequence used for G3:
+
+```text
+1. Start G8 and shared infrastructure.
+2. Start exactly one sender service and its private database.
+3. Run that sender's PowerShell script.
+4. Read the script diagnosis before starting the next sender.
+```
+
+Keep Stage 4 one-sender-at-a-time on purpose. It makes topic drift, schema drift, and missing producer wiring much easier to isolate.
+
+### Stage 4.1 Ticketing
+
+Start the sender:
+
+```powershell
+docker compose up -d --build service-billetterie billetterie-mongo
+```
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\service-analytique\test-g1-ticketing-events.ps1
+```
+
+What this script checks:
+
+| Area | Result |
+|---|---|
+| Sender readiness | Checks `service-billetterie` and `billetterie-mongo`. |
+| Real action | Creates a ticket, then calls the validation endpoint. |
+| Kafka proof | Searches `ticket.validated` for the created ticket ID. |
+| G8 proof | Checks `incoming_events` for `sourceType: TICKETING`. |
+| Analytics proof | Runs G8 analytics and checks `FREQ_TOTAL_VALIDATIONS`. |
+
+**Status: FAIL (Sender Side)** - The `service-billetterie` fails to build in Docker (`error: release version 21.0.11 not supported`).
+
+### Stage 4.2 Subscriptions
+
+Start the sender:
+
+```powershell
+docker compose up -d abonnement-service db-abonnement
+```
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\service-analytique\test-g2-subscription-events.ps1
+```
+
+What this script checks:
+
+| Area | Result |
+|---|---|
+| Sender readiness | Checks `service-abonnement` and `db-abonnement`. |
+| Real action | Creates a plan, then calls `/abonnements/souscrire`. |
+| Kafka proof | Searches `abonnement.souscription` for the test user/subscription. |
+| G8 proof | Checks `incoming_events` for `sourceType: SUBSCRIPTION`. |
+| Analytics proof | Runs G8 analytics and checks `SUB_NEW`. |
+
+Known risk to watch:
+
+```text
+service-abonnement also stores AnalytiqueTrace and has a scheduler/REST path to /api/events/batch.
+If the script sees a notification-shaped event but no G8 persistence, the issue is sender-side contract/topic drift, not a G8 crash.
+```
+
+**Status: FAIL (Sender Side)** - The `service-abonnement` successfully reaches `g3-user-service` but receives a `401 Unauthorized` because its `UtilisateurServiceClient` (Feign) does not propagate the JWT authentication header.
+
+### Stage 4.3 Payments
+
+Start the sender:
+
+```powershell
+docker compose up -d --build payment-service g6-payment-db
+```
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\service-analytique\test-g6-payment-events.ps1
+```
+
+What this script checks:
+
+| Area | Result |
+|---|---|
+| Sender readiness | Checks `g6-payment-service` and `g6-payment-db`. |
+| Real action | Calls `POST /payments` with a test payment request. |
+| Kafka proof | Searches `payment.transaction.completed`, the G8 analytics topic. |
+| Extra sender proof | Also searches `payment.notification`, because current G6 code publishes notification events there. |
+| G8 proof | Checks `incoming_events` for `sourceType: PAYMENT`. |
+| Analytics proof | Runs G8 analytics and checks `REV_TOTAL`. |
+
+Known risk to watch:
+
+```text
+Current G6 code publishes payment notifications to payment.notification.
+G8 listens for analytics events on payment.transaction.completed.
+If only payment.notification has data, the diagnosis is topic drift on the sender side.
+```
+
+**Status: FAIL (Sender Side)** - The `payment-service` fails to build in Docker (`mvn dependency:go-offline` exits with code 1).
+
+### Stage 4.4 Vehicle Tracking
+
+Start the sender:
+
+```powershell
+docker compose up -d --build g7-service db-g7
+```
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\service-analytique\test-g7-vehicle-events.ps1
+```
+
+What this script checks:
+
+| Area | Result |
+|---|---|
+| Sender readiness | Checks `g7-service` and `db-g7`. |
+| Real action | Creates a vehicle, sets it `EN_SERVICE`, then posts a GPS position. |
+| Kafka proof | Searches `g8.vehicule.status`, the G8 analytics topic. |
+| Extra sender proof | Also searches `vehicule-positions`, because current G7 position flow publishes telemetry there. |
+| G8 proof | Checks `incoming_events` for `sourceType: VEHICLE`. |
+| Analytics proof | Runs G8 analytics and checks `VEH_PUNCTUALITY`. |
+| Alert observation | Reads the Prometheus alert counter for `PUNCTUALITY_ALERT` as non-blocking context. |
+
+Known risk to watch:
+
+```text
+Current G7 code has an envoyerStatusG8 method, but normal vehicle/status/position endpoints may not call it.
+If vehicule-positions has data but g8.vehicule.status does not, the issue is missing sender wiring.
+```
+
+**Status: FAIL (Sender Side)** - The `g7-service` successfully starts and creates the vehicle (test script race condition fixed), but it never publishes the event to `g8.vehicule.status`. The G7 team implemented the method `KafkaProducerService.envoyerStatusG8` but completely forgot to invoke it in their business logic (e.g., `VehiculeService`).
+
+### Stage 4.5 Incidents
+
+The incident service is not wired into the root compose file yet. Start it separately and make sure its Kafka bootstrap points at the shared broker:
+
+```text
+From host machine: localhost:29093
+From inside root compose network: kafka:9092
+```
+
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\service-analytique\test-g7-incident-events.ps1
+```
+
+What this script checks:
+
+| Area | Result |
+|---|---|
+| G8 readiness | Checks Kafka, G8 Mongo, and G8 Analytics. |
+| Real action | Calls `POST /api/incidents/signaler` with a passenger JWT and user headers. |
+| Kafka proof | Searches `incident.analytique.topic`. |
+| G8 proof | Checks `incoming_events` for `sourceType: INCIDENT`. |
+| Analytics proof | Runs G8 analytics and checks `INC_TOTAL`. |
+| Alert observation | Reads the Prometheus alert counter for `INCIDENT_ZONE_RISK` as non-blocking context. |
+
+### Stage 4 Interpretation Rules
+
+Use the same diagnosis model for every sender:
+
+| Result | Likely owner |
+|---|---|
+| Real action fails | Sender service or its own dependency/precondition. |
+| Real action succeeds, expected Kafka topic is empty | Sender-side producer wiring or topic name drift. |
+| Expected Kafka topic has the test event, but G8 Mongo is empty | G8 consumer config, G8 validation, or payload contract drift. |
+| G8 Mongo has the event, but snapshot does not change | G8 aggregation logic, event timestamp/window, or event status semantics. |
+| Snapshot changes, alert missing | Threshold not crossed, alert rule window mismatch, or G5 unavailable. |
+
+Current G8 compatibility behavior:
+
+```text
+Kafka listeners auto-add schemaVersion=1 before validation.
+Kafka listeners accept both a single JSON object and a batch/list.
+G8 normalizes known legacy sender fields for ticketing, vehicles, payments, subscriptions, and incidents.
+REST ingestion still expects callers to respect the documented contract.
+```
 
