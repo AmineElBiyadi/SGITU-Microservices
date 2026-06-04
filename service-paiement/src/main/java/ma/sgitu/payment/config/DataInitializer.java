@@ -97,22 +97,22 @@ public class DataInitializer {
     private void initPayments() {
         log.info("--- Création des paiements de test ---");
         
-        createPayment(1L, SourceType.TICKET, 101L, new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
-        createPayment(1L, SourceType.TICKET, 102L, new BigDecimal("30.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-001", PaymentStatus.SUCCESS, null);
-        createPayment(1L, SourceType.SUBSCRIPTION, 201L, new BigDecimal("150.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
+        createPayment(1L, SourceType.TICKET, "101", new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
+        createPayment(1L, SourceType.TICKET, "102", new BigDecimal("30.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-001", PaymentStatus.SUCCESS, null);
+        createPayment(1L, SourceType.SUBSCRIPTION, "201", new BigDecimal("150.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.SUCCESS, null);
         
-        createPayment(2L, SourceType.TICKET, 103L, new BigDecimal("20.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.SUCCESS, null);
-        createPayment(2L, SourceType.SUBSCRIPTION, 202L, new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-002", PaymentStatus.SUCCESS, null);
+        createPayment(2L, SourceType.TICKET, "103", new BigDecimal("20.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.SUCCESS, null);
+        createPayment(2L, SourceType.SUBSCRIPTION, "202", new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-002", PaymentStatus.SUCCESS, null);
         
-        createPayment(3L, SourceType.TICKET, 104L, new BigDecimal("15.00"), PaymentMethod.CARD, "CARD-TOKEN-003", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
-        createPayment(3L, SourceType.SUBSCRIPTION, 203L, new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-003", PaymentStatus.SUCCESS, null);
+        createPayment(3L, SourceType.TICKET, "104", new BigDecimal("15.00"), PaymentMethod.CARD, "CARD-TOKEN-003", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
+        createPayment(3L, SourceType.SUBSCRIPTION, "203", new BigDecimal("150.00"), PaymentMethod.MOBILE_MONEY, "MM-TOKEN-003", PaymentStatus.SUCCESS, null);
         
-        createPayment(4L, SourceType.TICKET, 105L, new BigDecimal("40.00"), PaymentMethod.CARD, "CARD-TOKEN-004", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
+        createPayment(4L, SourceType.TICKET, "105", new BigDecimal("40.00"), PaymentMethod.CARD, "CARD-TOKEN-004", PaymentStatus.FAILED, FailureReason.INSUFFICIENT_BALANCE);
         
-        createPayment(5L, SourceType.TICKET, 106L, new BigDecimal("50.00"), PaymentMethod.CARD, "CARD-TOKEN-005", PaymentStatus.FAILED, FailureReason.ACCOUNT_BLOCKED);
+        createPayment(5L, SourceType.TICKET, "106", new BigDecimal("50.00"), PaymentMethod.CARD, "CARD-TOKEN-005", PaymentStatus.FAILED, FailureReason.ACCOUNT_BLOCKED);
         
-        createPayment(1L, SourceType.TICKET, 107L, new BigDecimal("35.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.PENDING, null);
-        createPayment(2L, SourceType.TICKET, 108L, new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.CANCELLED, null);
+        createPayment(1L, SourceType.TICKET, "107", new BigDecimal("35.00"), PaymentMethod.CARD, "CARD-TOKEN-001", PaymentStatus.PENDING, null);
+        createPayment(2L, SourceType.TICKET, "108", new BigDecimal("25.00"), PaymentMethod.CARD, "CARD-TOKEN-002", PaymentStatus.CANCELLED, null);
         
         log.info("✅ {} paiements créés", paymentRepository.count());
     }
@@ -196,7 +196,7 @@ public class DataInitializer {
         }
     }
 
-    private void createPayment(Long userId, SourceType sourceType, Long sourceId, BigDecimal amount, 
+    private void createPayment(Long userId, SourceType sourceType, String sourceId, BigDecimal amount,
                               PaymentMethod paymentMethod, String savedPaymentToken, 
                               PaymentStatus status, FailureReason failureReason) {
         try {

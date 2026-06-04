@@ -16,8 +16,8 @@ public class PaymentRequest {
     @NotNull(message = "sourceType est obligatoire")
     private SourceType sourceType;
 
-    @NotNull(message = "sourceId est obligatoire")
-    private Long sourceId;
+    @NotBlank(message = "sourceId est obligatoire")
+    private String sourceId;
 
     @NotNull(message = "amount est obligatoire")
     @Positive(message = "Le montant doit être positif")

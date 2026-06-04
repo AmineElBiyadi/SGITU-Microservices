@@ -13,7 +13,7 @@ public class PaymentDetailsResponse {
     private String transactionToken;
     private Long userId;
     private String sourceType;
-    private Long sourceId;
+    private String sourceId;
     private BigDecimal amount;
     private String paymentMethod;
     private String savedPaymentToken;

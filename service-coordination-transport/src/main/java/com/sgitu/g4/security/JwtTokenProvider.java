@@ -28,19 +28,32 @@ public class JwtTokenProvider {
 	private final JwtProperties jwtProperties;
 
 	public String createToken(String username, Collection<? extends GrantedAuthority> authorities) {
-		Date now = new Date();
-		Date exp = new Date(now.getTime() + jwtProperties.getExpirationMs());
 		List<String> roles = authorities.stream()
 				.map(GrantedAuthority::getAuthority)
 				.map(a -> a.startsWith("ROLE_") ? a.substring("ROLE_".length()) : a)
 				.collect(Collectors.toList());
-		return Jwts.builder()
-				.subject(username)
+		return buildSignedToken(username, roles, null);
+	}
+
+	/**
+	 * JWT inter-services (promo §3) : {@code Authorization: Bearer} signé avec le secret global.
+	 */
+	public String createServiceToken(String subject, List<String> roles, String sourceService) {
+		return buildSignedToken(subject, roles, sourceService);
+	}
+
+	private String buildSignedToken(String subject, List<String> roles, String sourceService) {
+		Date now = new Date();
+		Date exp = new Date(now.getTime() + jwtProperties.getExpirationMs());
+		var builder = Jwts.builder()
+				.subject(subject)
 				.claim("roles", roles)
 				.issuedAt(now)
-				.expiration(exp)
-				.signWith(signingKey())
-				.compact();
+				.expiration(exp);
+		if (sourceService != null && !sourceService.isBlank()) {
+			builder.claim("sourceService", sourceService);
+		}
+		return builder.signWith(signingKey()).compact();
 	}
 
 	public Authentication parseToken(String token) {

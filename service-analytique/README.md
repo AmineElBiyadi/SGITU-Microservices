@@ -142,3 +142,8 @@ docker exec -it g8-mongo mongosh g8_analytics --eval "db.stat_snapshots.find({st
 ```
 
 You should see two documents with `snapshotType: 'PREDICTION'` containing the responses from the Python ML service in their `metadata` fields.
+
+### 5. Postman Collections
+We provide two Postman collections in the `docs` folder to test the API:
+1. `G8_Analytics_Postman_Collection.json`: Full API suite for the G8 Analytics service.
+2. `G8_G3_Showcase_Postman_Collection.json`: A showcase sequence demonstrating the end-to-end integration of creating a user in G3 and seeing the aggregated stats update in G8 using JWT authentication.

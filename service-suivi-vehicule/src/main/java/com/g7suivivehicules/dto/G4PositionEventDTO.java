@@ -30,6 +30,16 @@ public class G4PositionEventDTO {
     @Schema(description = "Longitude GPS", example = "-5.803")
     private Double longitude;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("long")
+    public Double getLongitude() {
+        return this.longitude;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("long")
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
     @Schema(description = "Vitesse instantanée en km/h", example = "42.5")
     private Double vitesse;
 

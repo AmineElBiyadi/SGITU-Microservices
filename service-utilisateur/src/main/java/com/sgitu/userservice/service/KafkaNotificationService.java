@@ -20,7 +20,8 @@ import java.time.format.DateTimeFormatter;
  * Service for sending user-related notifications to Kafka (Group 5).
  *
  * Resilience4j Circuit Breaker intercepts Kafka notification sending.
- * If Kafka is down (or simulated DOWN), the fallback method persists the event to PostgreSQL.
+ * If Kafka is down (real outage or Chaos Monkey injected fault), the fallback
+ * method persists the event to PostgreSQL for later retry.
  */
 @Slf4j
 @Service
@@ -30,7 +31,6 @@ public class KafkaNotificationService {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final FailedEventRepository failedEventRepository;
-    private final ChaosMonkeyService chaosMonkeyService;
     
     private static final String TOPIC = "user-events";
 
@@ -43,8 +43,6 @@ public class KafkaNotificationService {
     @Async
     @CircuitBreaker(name = "kafkaNotification", fallbackMethod = "sendNotificationFallback")
     public void sendNotification(String eventType, User user) {
-        chaosMonkeyService.checkKafka();
-
         try {
             String username = "User";
             if (user.getProfile() != null) {

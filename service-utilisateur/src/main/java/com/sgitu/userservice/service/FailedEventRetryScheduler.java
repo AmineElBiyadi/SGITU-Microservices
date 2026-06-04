@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Background scheduler that periodically retries sending failed events stored in the database.
- * Part of the Chaos Monkey Outbox Pattern.
+ * Part of the Outbox Pattern for Kafka resilience.
  */
 @Slf4j
 @Service
@@ -23,21 +23,16 @@ public class FailedEventRetryScheduler {
 
     private final FailedEventRepository failedEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ChaosMonkeyService chaosMonkeyService;
 
     private static final int MAX_RETRIES = 10;
 
     /**
-     * Runs every 30 seconds to retry sending PENDING events.
+     * Runs periodically to retry sending PENDING events.
+     * The scheduler always attempts to resend — if Kafka is still down,
+     * the send will fail naturally and the event stays in PENDING state.
      */
-    @Scheduled(fixedDelayString = "${chaos.scheduler.kafka-retry-delay-ms:30000}")
+    @Scheduled(fixedDelayString = "${resilience.scheduler.kafka-retry-delay-ms:30000}")
     public void retryFailedEvents() {
-        // If Kafka is currently simulated as DOWN, skip retry to avoid unnecessary attempts
-        if (chaosMonkeyService.isKafkaDown()) {
-            log.debug("[RETRY SCHEDULER] Kafka is currently simulated as DOWN — skipping retry cycle");
-            return;
-        }
-
         List<FailedEvent> pendingEvents = failedEventRepository.findByStatusOrderByCreatedAtAsc(EventStatus.PENDING);
         if (pendingEvents.isEmpty()) {
             return;

@@ -41,6 +41,7 @@ public class KafkaConsumerConfig {
     public ConsumerFactory<String, Map> consumerFactory() {
         JsonDeserializer<Map> deserializer = new JsonDeserializer<>(Map.class);
         deserializer.addTrustedPackages("*");
+        deserializer.setUseTypeHeaders(false);   // ignore __TypeId__ header; always deserialize as Map
         deserializer.setUseTypeMapperForKey(false);
 
         Map<String, Object> props = new HashMap<>();

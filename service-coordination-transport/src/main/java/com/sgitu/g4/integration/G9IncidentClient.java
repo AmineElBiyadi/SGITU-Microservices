@@ -15,6 +15,7 @@ import java.util.Map;
 public class G9IncidentClient {
 
 	private final IntegrationProperties integrationProperties;
+	private final InterServiceHttpAuth interServiceHttpAuth;
 
 	public void acknowledgeCorrelation(String incidentReference, Long incidentImpactId) {
 		var body = Map.of(
@@ -22,13 +23,12 @@ public class G9IncidentClient {
 				"incidentImpactId", incidentImpactId,
 				"coordinationEventId", incidentImpactId);
 		try {
-			RestClient.create(integrationProperties.getG9BaseUrl())
+			RestClient.RequestBodySpec post = RestClient.create(integrationProperties.getG9BaseUrl())
 					.post()
 					.uri("/api/internal/incidents/correlation")
-					.contentType(MediaType.APPLICATION_JSON)
-					.body(body)
-					.retrieve()
-					.toBodilessEntity();
+					.contentType(MediaType.APPLICATION_JSON);
+			post = (RestClient.RequestBodySpec) interServiceHttpAuth.apply(post, InterServiceHttpAuth.Peer.G9);
+			post.body(body).retrieve().toBodilessEntity();
 		} catch (Exception ex) {
 			log.debug("G9 ack: {}", ex.getMessage());
 		}

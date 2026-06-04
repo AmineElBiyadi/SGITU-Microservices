@@ -44,7 +44,7 @@ logging:
 
 g5:
   notification:
-    url: ${G5_NOTIFICATION_URL:http://api-gateway:8080/api/notifications/send}
+    url: ${G5_NOTIFICATION_URL:http://localhost:8085/api/notifications/send}
 
 ml:
   service:

@@ -17,10 +17,6 @@ public final class CoordinationDetectionUtils {
 	}
 
 	public static boolean isG9IncidentConfirmed(String rawStatut) {
-		if (!StringUtils.hasText(rawStatut)) {
-			return false;
-		}
-		String s = rawStatut.trim().toUpperCase();
-		return s.contains("CONFIRM") || s.contains("VALID") || "CONFIRME".equals(s) || "VALIDE".equals(s);
+		return G9IncidentStatut.fromRaw(rawStatut) == G9IncidentStatut.CONFIRME;
 	}
 }

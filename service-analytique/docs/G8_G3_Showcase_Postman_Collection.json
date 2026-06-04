@@ -1,0 +1,150 @@
+{
+  "info": {
+    "_postman_id": "g8-g3-showcase-collection",
+    "name": "SGITU G3 -> G8 Integration Showcase",
+    "description": "Showcase collection demonstrating the integration between G3 (User Service) and G8 (Analytics).\n\nSequence:\n1. Generate JWT for G8\n2. View User Stats in G8 Analytics (Before)\n3. Create a user in G3\n4. View User Stats in G8 Analytics (After) to see the count increment",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "g3BaseUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "g8BaseUrl",
+      "value": "http://localhost:8088",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jwtSecret",
+      "value": "your_jwt_secret_here_min_256_bits",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Generate G8 JWT Token",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var secret = pm.collectionVariables.get('jwtSecret');",
+              "var header = { alg: 'HS256', typ: 'JWT' };",
+              "var now = Math.floor(Date.now() / 1000);",
+              "var payload = {",
+              "    sub: 'admin',",
+              "    roles: ['ROLE_ADMIN', 'ROLE_ANALYTICS'],",
+              "    iat: now,",
+              "    exp: now + 86400",
+              "};",
+              "function base64url(str) { return btoa(str).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, ''); }",
+              "var encodedHeader  = base64url(JSON.stringify(header));",
+              "var encodedPayload = base64url(JSON.stringify(payload));",
+              "var signingInput   = encodedHeader + '.' + encodedPayload;",
+              "var signature = CryptoJS.HmacSHA256(signingInput, secret);",
+              "var encodedSig = CryptoJS.enc.Base64.stringify(signature).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');",
+              "var token = signingInput + '.' + encodedSig;",
+              "pm.collectionVariables.set('authToken', token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{g8BaseUrl}}/api/v1/analytics/dashboard",
+          "host": ["{{g8BaseUrl}}"],
+          "path": ["api", "v1", "analytics", "dashboard"]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{authToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Generates a JWT token for G8 and calls the dashboard to verify it."
+      }
+    },
+    {
+      "name": "02 - Check G8 User Stats (Before)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{g8BaseUrl}}/api/v1/analytics/users/stats",
+          "host": ["{{g8BaseUrl}}"],
+          "path": ["api", "v1", "analytics", "users", "stats"]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{authToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Fetches the latest User Stats from G8 before creating a new user."
+      }
+    },
+    {
+      "name": "03 - Create G3 User (Public)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{g3BaseUrl}}/api/users",
+          "host": ["{{g3BaseUrl}}"],
+          "path": ["api", "users"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"showcase-user-{{$timestamp}}@example.com\",\n  \"password\": \"Secret123!\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"Showcase\",\n    \"lastName\": \"User\",\n    \"phone\": \"0600000000\",\n    \"address\": \"SGITU Showcase\",\n    \"birthDate\": \"1998-01-01\"\n  }\n}"
+        },
+        "description": "Creates a real user in G3. G3 will then publish a Kafka event to g8-user-events."
+      }
+    },
+    {
+      "name": "04 - Check G8 User Stats (After)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{g8BaseUrl}}/api/v1/analytics/users/stats",
+          "host": ["{{g8BaseUrl}}"],
+          "path": ["api", "v1", "analytics", "users", "stats"]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{authToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Fetches the latest User Stats from G8 after creating the new user.\\n\\n**NOTE:** Because G8 uses a scheduler to aggregate incoming Kafka events into the database stats, you might need to wait up to 60 seconds after creating the user before the new count appears here!"
+      }
+    }
+  ]
+}

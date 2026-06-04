@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Adaptateur fil HTTP G10→G5 : JSON métier G4 + champs techniques G5 ({@code priority}, {@code wireSourceService}).
+ * Adaptateur fil HTTP G4→G5 (direct) : JSON métier G4 + champs techniques G5 ({@code priority}, {@code wireSourceService}).
  * {@code recipient} inclus lorsque G4 remplit le champ (broadcast G3→G5).
  */
 @Component

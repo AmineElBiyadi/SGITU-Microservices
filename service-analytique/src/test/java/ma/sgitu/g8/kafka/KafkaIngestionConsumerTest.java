@@ -7,14 +7,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.support.Acknowledgment;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,30 +35,16 @@ class KafkaIngestionConsumerTest {
     @InjectMocks
     private KafkaIngestionConsumer consumer;
 
-    private BatchIngestionResponse successResponse;
+    private BatchIngestionResponse successResponse = BatchIngestionResponse.builder()
+            .totalReceived(1).totalAccepted(1).totalRejected(0)
+            .status("SUCCESS").build();
 
-    @BeforeEach
-    void setup() {
-        successResponse = BatchIngestionResponse.builder()
-                .totalReceived(1).totalAccepted(1).totalRejected(0)
-                .status("SUCCESS").rejectedReasons(List.of())
-                .build();
+    private Map<String, Object> singleEvent() {
+        return new LinkedHashMap<>(Map.of("id", "123", "schemaVersion", 1));
     }
-
-    private List<Map<String, Object>> singleEvent() {
-        return List.of(Map.of(
-                "schemaVersion", 1,
-                "timestamp", "2024-01-15T10:00:00Z",
-                "userId", "u-01"
-        ));
-    }
-
-    // -------------------------------------------------------------------------
-    // A – each listener delegates to IngestionService with the correct SourceType
-    // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("A1 – consumeTicketingEvents → ingest called with TICKETING, ack acknowledged")
+    @DisplayName("A1 – consumeTicketingEvents → ingest called with TICKETING")
     void ticketing_delegatesWithCorrectSourceType() {
         when(ingestionService.ingest(any(), eq(SourceType.TICKETING))).thenReturn(successResponse);
         consumer.consumeTicketingEvents(singleEvent(), ack);
@@ -103,7 +92,7 @@ class KafkaIngestionConsumerTest {
     @DisplayName("A6 – consumeUserEvents → ingest called with USER")
     void user_delegatesWithCorrectSourceType() {
         when(ingestionService.ingest(any(), eq(SourceType.USER))).thenReturn(successResponse);
-        consumer.consumeUserEvents(singleEvent().get(0), ack);
+        consumer.consumeUserEvents(singleEvent(), ack);
         verify(ingestionService).ingest(any(), eq(SourceType.USER));
         verify(ack).acknowledge();
     }
@@ -139,6 +128,25 @@ class KafkaIngestionConsumerTest {
 
         consumer.consumeTicketingEvents(singleEvent(), ack);
 
+        verify(ack).acknowledge();
+    }
+
+    @Test
+    @DisplayName("D - missing schemaVersion is added before Kafka batch ingestion")
+    void missingSchemaVersion_isAddedBeforeIngestion() {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("timestamp", "2024-01-15T10:00:00Z");
+        event.put("vehicleId", "veh-01");
+        event.put("status", "in_service");
+        event.put("line", "L1");
+
+        when(ingestionService.ingest(any(), eq(SourceType.VEHICLE))).thenReturn(successResponse);
+
+        consumer.consumeVehicleEvents(event, ack);
+
+        ArgumentCaptor<List<Map<String, Object>>> eventsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(ingestionService).ingest(eventsCaptor.capture(), eq(SourceType.VEHICLE));
+        assertThat(eventsCaptor.getValue().get(0).get("schemaVersion")).isEqualTo(1);
         verify(ack).acknowledge();
     }
 }

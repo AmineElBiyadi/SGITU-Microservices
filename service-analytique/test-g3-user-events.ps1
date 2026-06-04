@@ -214,7 +214,7 @@ if ($createdUserId) {
 
         Add-Result "G3 published user event to g8-user-events" $g3Published $matchedPayload
         if ($g3Published) {
-            Write-Host "[DIAGNOSIS] G3 is publishing, but G8 did not persist the event. Current G3 sends one JSON object; G8's g8-user-events listener expects a JSON array/batch. This is a producer/consumer contract mismatch, not a Docker network issue." -ForegroundColor Yellow
+            Write-Host "[DIAGNOSIS] G3 is publishing, but G8 did not persist the event. Check G8 consumer logs, topic config, schema validation, and Mongo persistence." -ForegroundColor Yellow
         } else {
             Write-Host "[DIAGNOSIS] G3 user creation worked, but no matching Kafka event was found. Check G3 Kafka bootstrap config, events.user-status.topic, and g3-user-service logs." -ForegroundColor Yellow
         }

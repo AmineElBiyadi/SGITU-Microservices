@@ -1,5 +1,6 @@
 package com.sgitu.g4.config;
 
+import com.sgitu.g4.security.GatewayHeaderAuthenticationFilter;
 import com.sgitu.g4.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -25,6 +26,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+	private final GatewayHeaderAuthenticationFilter gatewayHeaderAuthenticationFilter;
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
 	/**
@@ -89,7 +91,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/api/notifications/send").hasAnyRole(G4_FLEET_WRITE)
 						.anyRequest().authenticated()
 				)
-				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+				.addFilterBefore(gatewayHeaderAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterAfter(jwtAuthenticationFilter, GatewayHeaderAuthenticationFilter.class);
 		return http.build();
 	}
 

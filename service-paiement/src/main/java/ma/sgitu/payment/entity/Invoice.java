@@ -40,8 +40,8 @@ public class Invoice {
     @Column(name = "source_type", nullable = false, length = 30)
     private SourceType sourceType;
 
-    @Column(name = "source_id", nullable = false)
-    private Long sourceId;
+    @Column(name = "source_id", nullable = false, length = 100)
+    private String sourceId;
 
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
