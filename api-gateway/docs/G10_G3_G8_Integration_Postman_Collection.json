@@ -287,6 +287,35 @@
                                                   }
                                   },
                                   {
+                                      "name":  "01.3b - 200 activate user before login",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027User active before login\u0027, function () { pm.expect(pm.response.json().active).to.eql(true); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "int-g3-activate-before-login"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/users/{{createdUserId}}/activate"
+                                                  }
+                                  },
+                                  {
                                       "name":  "01.4 - 200 login G3 via G10",
                                       "event":  [
                                                     {
