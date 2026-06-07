@@ -12,7 +12,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Appel G5 via G10 — circuit breaker Resilience4j + fallback DEGRADED (Chaos Monkey / prof).
+ * Appel G5 en direct (promo §3) — {@code SGITU_G5_URL} + JWT service G4.
+ * Circuit breaker Resilience4j + fallback DEGRADED.
  */
 @Slf4j
 @Component
@@ -21,15 +22,17 @@ public class G5NotificationClient {
 
 	private final IntegrationProperties integrationProperties;
 	private final G5NotificationWireAdapter wireAdapter;
+	private final InterServiceHttpAuth interServiceHttpAuth;
 
 	@CircuitBreaker(name = "g5Notification", fallbackMethod = "dispatchFallback")
 	public NotificationSendResponse dispatch(NotificationSendRequest request) {
 		try {
-			RestClient.create(integrationProperties.getG10GatewayUrl())
+			RestClient.RequestBodySpec post = RestClient.create(integrationProperties.getG5BaseUrl())
 					.post()
 					.uri(integrationProperties.getG5NotificationPath())
-					.contentType(MediaType.APPLICATION_JSON)
-					.body(wireAdapter.toWirePayload(request))
+					.contentType(MediaType.APPLICATION_JSON);
+			post = (RestClient.RequestBodySpec) interServiceHttpAuth.apply(post, InterServiceHttpAuth.Peer.G5);
+			post.body(wireAdapter.toWirePayload(request))
 					.retrieve()
 					.toBodilessEntity();
 			return NotificationSendResponse.builder()
@@ -52,7 +55,6 @@ public class G5NotificationClient {
 				.build();
 	}
 
-	/** Erreurs HTTP métier G5 (4xx/5xx) — pas de crash applicatif. */
 	public NotificationSendResponse mapHttpError(RestClientResponseException ex) {
 		return NotificationSendResponse.builder()
 				.status("ERROR")

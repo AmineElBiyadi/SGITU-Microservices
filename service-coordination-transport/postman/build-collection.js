@@ -287,6 +287,12 @@ collection.item.push(
 		req('GET tous', 'GET', '{{baseUrl}}/api/g4/arrets'),
 		req('GET par id', 'GET', '{{baseUrl}}/api/g4/arrets/{{arretId}}'),
 		req('GET par ligne', 'GET', '{{baseUrl}}/api/g4/arrets/ligne/{{ligneId}}'),
+		req('DELETE arrêt 2 (cleanup optionnel)', 'DELETE', '{{baseUrl}}/api/g4/arrets/{{arretId2}}', {
+			desc: 'Optionnel: nettoyer données de test',
+		}),
+		req('DELETE arrêt 1 (cleanup optionnel)', 'DELETE', '{{baseUrl}}/api/g4/arrets/{{arretId}}', {
+			desc: 'Optionnel: nettoyer données de test',
+		}),
 	])
 );
 
@@ -302,6 +308,9 @@ collection.item.push(
 		req('GET tous', 'GET', '{{baseUrl}}/api/g4/trajets'),
 		req('GET par id', 'GET', '{{baseUrl}}/api/g4/trajets/{{trajetId}}'),
 		req('GET arrêts du trajet', 'GET', '{{baseUrl}}/api/g4/trajets/{{trajetId}}/arrets'),
+		req('DELETE trajet (cleanup optionnel)', 'DELETE', '{{baseUrl}}/api/g4/trajets/{{trajetId}}', {
+			desc: 'Optionnel: nettoyer données de test',
+		}),
 	])
 );
 
@@ -316,6 +325,9 @@ collection.item.push(
 		},
 		req('GET tous', 'GET', '{{baseUrl}}/api/g4/horaires'),
 		req('GET par id', 'GET', '{{baseUrl}}/api/g4/horaires/{{horaireId}}'),
+		req('DELETE horaire (cleanup optionnel)', 'DELETE', '{{baseUrl}}/api/g4/horaires/{{horaireId}}', {
+			desc: 'Optionnel: nettoyer données de test',
+		}),
 	])
 );
 
@@ -343,6 +355,9 @@ collection.item.push(
 		},
 		req('GET toutes', 'GET', '{{baseUrl}}/api/g4/affectations'),
 		req('GET par véhicule', 'GET', '{{baseUrl}}/api/g4/affectations/vehicule/{{vehiculeId}}'),
+		req('DELETE affectation (cleanup optionnel)', 'DELETE', '{{baseUrl}}/api/g4/affectations/{{affectationId}}', {
+			desc: 'Optionnel: nettoyer données de test',
+		}),
 	])
 );
 
@@ -391,7 +406,7 @@ collection.item.push(
 );
 
 collection.item.push(
-	folder('09 — Impacts incident G9', 'Distinct de /api/g4/events', [
+	folder('09 — Impacts incident G9', 'Kafka prod: postman/examples/kafka-g9-incident-*.json (CONFIRME→G5+G7 INCIDENT, RESOLU→G7 normal, REJETE→log)', [
 		{
 			...req('POST impact', 'POST', '{{baseUrl}}/api/g4/incident-impacts', {
 				body:

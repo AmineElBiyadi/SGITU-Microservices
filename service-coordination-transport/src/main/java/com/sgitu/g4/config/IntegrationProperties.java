@@ -30,6 +30,13 @@ public class IntegrationProperties {
 	 * Obtenir via POST G3 {@code /api/auth/login} ; ne pas committer en clair en prod.
 	 */
 	private String g3ServiceBearerToken = "";
+	/** Rôles du JWT machine G4 vers G3 (séparés par virgule). */
+	private String g3InterServiceRoles = "G4_OPERATOR,DISPATCHER";
+
+	/** Promo §3 — identité machine G4 pour JWT sortants ({@code sourceService} claim). */
+	private String interServiceSourceGroup = "G4";
+	private String interServicePrincipal = "g4-coordination-service";
+	private String interServiceRoles = "G4_OPERATOR,SERVICE";
 
 	/** URL billetterie (G1). */
 	private String g1BaseUrl = "http://localhost:8081";

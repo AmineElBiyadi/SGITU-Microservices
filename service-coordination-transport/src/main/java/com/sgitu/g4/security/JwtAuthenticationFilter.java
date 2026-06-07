@@ -24,6 +24,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			@NonNull HttpServletRequest request,
 			@NonNull HttpServletResponse response,
 			@NonNull FilterChain filterChain) throws ServletException, IOException {
+		var existing = SecurityContextHolder.getContext().getAuthentication();
+		if (existing != null && existing.isAuthenticated()) {
+			filterChain.doFilter(request, response);
+			return;
+		}
 		String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 		if (header != null && header.startsWith("Bearer ")) {
 			String token = header.substring(7).trim();

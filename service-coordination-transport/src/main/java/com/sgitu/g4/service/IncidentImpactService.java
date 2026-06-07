@@ -13,7 +13,7 @@ import com.sgitu.g4.exception.ResourceNotFoundException;
 import com.sgitu.g4.integration.G7VehicleClient;
 import com.sgitu.g4.integration.G9IncidentClient;
 import com.sgitu.g4.mapper.EntityMapper;
-import com.sgitu.g4.util.CoordinationDetectionUtils;
+import com.sgitu.g4.util.G9IncidentStatut;
 import com.sgitu.g4.repository.MissionIncidentImpactRepository;
 import com.sgitu.g4.repository.MissionRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +38,7 @@ public class IncidentImpactService {
 	private final G7VehicleClient g7VehicleClient;
 	private final G9IncidentClient g9IncidentClient;
 	private final G5ContractNotificationService g5ContractNotificationService;
+	private final VehiculeReferentielService vehiculeReferentielService;
 	private final SupervisionLogService supervisionLogService;
 
 	@Transactional
@@ -52,13 +53,13 @@ public class IncidentImpactService {
 				request.getIncidentReference(),
 				request.getVehiculeId(),
 				null,
-				null,
+				"CONFIRME",
 				request.getResume(),
 				writeJson(payload),
 				Instant.now());
 		IncidentImpactResponse dto = EntityMapper.toDto(saved);
 		g9IncidentClient.acknowledgeCorrelation(request.getIncidentReference(), dto.getId());
-		postG5IfIncidentConfirmed(saved, mission, null);
+		applyG9StatutActions(G9IncidentStatut.CONFIRME, saved, mission, null);
 		return dto;
 	}
 
@@ -80,7 +81,8 @@ public class IncidentImpactService {
 				message.getDescription(),
 				buildPayloadJson(message, rawMessage),
 				occurredAt);
-		postG5IfIncidentConfirmed(saved, mission, message.getLigneId());
+		G9IncidentStatut statut = G9IncidentStatut.fromRaw(message.getStatut());
+		applyG9StatutActions(statut, saved, mission, message.getLigneId());
 		return EntityMapper.toDto(saved);
 	}
 
@@ -108,6 +110,52 @@ public class IncidentImpactService {
 				.collect(Collectors.toList());
 	}
 
+	private void applyG9StatutActions(
+			G9IncidentStatut statut,
+			MissionIncidentImpact impact,
+			Mission mission,
+			String ligneIdHint) {
+		switch (statut) {
+			case CONFIRME -> handleConfirme(impact, mission, ligneIdHint);
+			case RESOLU -> handleResolu(impact, mission);
+			case REJETE -> handleRejete(impact);
+			default -> supervisionLogService.add("WARN", "INCIDENT-G9",
+					"Statut G9 non géré ref=" + impact.getG9ReferenceIncident()
+							+ " statut=" + impact.getG9Statut());
+		}
+	}
+
+	/** CONFIRME : alerter usagers (G5) + marquer perturbation véhicule (G7 INCIDENT). */
+	private void handleConfirme(MissionIncidentImpact impact, Mission mission, String ligneIdHint) {
+		String lineId = StringUtils.hasText(ligneIdHint) ? ligneIdHint.trim()
+				: (mission != null && mission.getLigne() != null ? mission.getLigne().getCode() : "N/A");
+		String lieu = StringUtils.hasText(impact.getDescription()) ? impact.getDescription() : impact.getG9Type();
+		g5ContractNotificationService.postIncidentConfirmed(lineId, lieu);
+		if (StringUtils.hasText(impact.getVehiculeId())) {
+			vehiculeReferentielService.markIncidentFromG9(impact.getVehiculeId());
+		}
+		supervisionLogService.add("INFO", "INCIDENT-G9",
+				"CONFIRME ref=" + impact.getG9ReferenceIncident()
+						+ " — perturbation active, alerte G5 envoyée"
+						+ (mission != null ? " mission=" + mission.getId() : ""));
+	}
+
+	/** RESOLU : retour circulation normale (G7 EN_SERVICE ou DISPONIBLE). */
+	private void handleResolu(MissionIncidentImpact impact, Mission mission) {
+		if (StringUtils.hasText(impact.getVehiculeId())) {
+			boolean missionEnCours = mission != null && mission.getStatut() == StatutMission.EN_COURS;
+			vehiculeReferentielService.markNormalAfterIncidentResolved(impact.getVehiculeId(), missionEnCours);
+		}
+		supervisionLogService.add("INFO", "INCIDENT-G9",
+				"RESOLU ref=" + impact.getG9ReferenceIncident() + " — circulation normale");
+	}
+
+	/** REJETE : fausse alerte — aucune mesure réseau. */
+	private void handleRejete(MissionIncidentImpact impact) {
+		supervisionLogService.add("INFO", "INCIDENT-G9",
+				"REJETE ref=" + impact.getG9ReferenceIncident() + " — fausse alerte, mesures annulées");
+	}
+
 	private MissionIncidentImpact persist(
 			Mission mission,
 			String g9Reference,
@@ -129,8 +177,8 @@ public class IncidentImpactService {
 				.build();
 		MissionIncidentImpact saved = impactRepository.save(entity);
 		supervisionLogService.add("INFO", "INCIDENT-G9",
-				"Impact mission=" + (mission != null ? mission.getId() : "n/a")
-						+ " ref=" + g9Reference);
+				"Impact enregistré mission=" + (mission != null ? mission.getId() : "n/a")
+						+ " ref=" + g9Reference + " statut=" + g9Statut);
 		return saved;
 	}
 
@@ -174,15 +222,5 @@ public class IncidentImpactService {
 		} catch (JsonProcessingException e) {
 			throw new BadRequestException("Payload JSON : " + e.getOriginalMessage());
 		}
-	}
-
-	private void postG5IfIncidentConfirmed(MissionIncidentImpact impact, Mission mission, String ligneIdHint) {
-		if (!CoordinationDetectionUtils.isG9IncidentConfirmed(impact.getG9Statut())) {
-			return;
-		}
-		String lineId = StringUtils.hasText(ligneIdHint) ? ligneIdHint.trim()
-				: (mission != null && mission.getLigne() != null ? mission.getLigne().getCode() : "N/A");
-		String lieu = StringUtils.hasText(impact.getDescription()) ? impact.getDescription() : impact.getG9Type();
-		g5ContractNotificationService.postIncidentConfirmed(lineId, lieu);
 	}
 }

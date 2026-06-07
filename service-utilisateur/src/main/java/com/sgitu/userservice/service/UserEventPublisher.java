@@ -20,7 +20,8 @@ import java.util.List;
  * Publishes user status-change events to external consumers.
  *
  * Resilience4j Circuit Breaker intercepts Kafka publication.
- * If Kafka is down (or simulated DOWN), the fallback method persists the event to PostgreSQL.
+ * If Kafka is down (real outage or Chaos Monkey injected fault), the fallback
+ * method persists the event to PostgreSQL for later retry.
  */
 @Slf4j
 @Service
@@ -30,7 +31,6 @@ public class UserEventPublisher {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final FailedEventRepository failedEventRepository;
-    private final ChaosMonkeyService chaosMonkeyService;
 
     @Value("${events.user-status.topic:g8-user-events}")
     private String topic;
@@ -44,8 +44,6 @@ public class UserEventPublisher {
     @Async
     @CircuitBreaker(name = "kafkaAnalytics", fallbackMethod = "publishFallback")
     public void publish(Long userId, String action) {
-        chaosMonkeyService.checkKafka();
-
         if (topic == null || topic.isBlank()) {
             log.debug("events.user-status.topic not configured — skipping event publication.");
             return;

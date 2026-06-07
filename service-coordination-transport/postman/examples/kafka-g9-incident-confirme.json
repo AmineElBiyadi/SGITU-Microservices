@@ -1,0 +1,11 @@
+{
+  "referenceIncident": "INC-2026-CONFIRME",
+  "type": "PANNE_VEHICULE",
+  "statut": "CONFIRME",
+  "vehiculeId": "00000000-0000-4000-8000-000000000001",
+  "ligneId": "L12",
+  "description": "Panne confirmée — perturbation active",
+  "latitude": 35.57,
+  "longitude": -5.36,
+  "timestamp": "2026-05-20T14:35:00"
+}

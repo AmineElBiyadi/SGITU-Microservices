@@ -112,4 +112,147 @@ class AnomalyDetectionServiceTest {
         );
         verify(alertService, never()).resoudreAutomatiquement(vehiculeId, TypeAlert.VITESSE_EXCESSIVE);
     }
+
+    @Test
+    void detecterAnomalies_WhenTemperatureIsHigh_ShouldCreateAlert() {
+        // Arrange
+        Telemetrie hotTelemetrie = Telemetrie.builder()
+                .id(UUID.randomUUID())
+                .vehiculeId(vehiculeId)
+                .temperature(110.0) // Seuil 90.0
+                .timestamp(LocalDateTime.now())
+                .build();
+        when(seuilConfigService.getTemperatureCritique()).thenReturn(90.0);
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, hotTelemetrie);
+
+        // Assert
+        verify(alertService, times(1)).creerOuMettreAJour(
+                eq(vehiculeId),
+                eq(TypeAlert.TEMPERATURE_CRITIQUE),
+                eq(48.8566),
+                eq(2.3522),
+                eq(110.0),
+                eq(90.0),
+                eq(Severite.CRITIQUE),
+                anyString()
+        );
+    }
+
+    @Test
+    void detecterAnomalies_WhenTemperatureIsNormal_ShouldResolveAlert() {
+        // Arrange
+        Telemetrie normalTelemetrie = Telemetrie.builder()
+                .id(UUID.randomUUID())
+                .vehiculeId(vehiculeId)
+                .temperature(75.0) // Seuil 90.0
+                .timestamp(LocalDateTime.now())
+                .build();
+        when(seuilConfigService.getTemperatureCritique()).thenReturn(90.0);
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, normalTelemetrie);
+
+        // Assert
+        verify(alertService, times(1)).resoudreAutomatiquement(vehiculeId, TypeAlert.TEMPERATURE_CRITIQUE);
+    }
+
+    @Test
+    void detecterAnomalies_WhenFuelIsLow_ShouldCreateAlert() {
+        // Arrange
+        Telemetrie lowFuel = Telemetrie.builder()
+                .id(UUID.randomUUID())
+                .vehiculeId(vehiculeId)
+                .carburant(4.0) // Seuil 10.0
+                .timestamp(LocalDateTime.now())
+                .build();
+        when(seuilConfigService.getCarburantCritique()).thenReturn(10.0);
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, lowFuel);
+
+        // Assert
+        verify(alertService, times(1)).creerOuMettreAJour(
+                eq(vehiculeId),
+                eq(TypeAlert.CARBURANT_CRITIQUE),
+                eq(48.8566),
+                eq(2.3522),
+                eq(4.0),
+                eq(10.0),
+                eq(Severite.CRITIQUE),
+                anyString()
+        );
+    }
+
+    @Test
+    void detecterAnomalies_WhenFuelIsNormal_ShouldResolveAlert() {
+        // Arrange
+        Telemetrie normalFuel = Telemetrie.builder()
+                .id(UUID.randomUUID())
+                .vehiculeId(vehiculeId)
+                .carburant(60.0)
+                .timestamp(LocalDateTime.now())
+                .build();
+        when(seuilConfigService.getCarburantCritique()).thenReturn(10.0);
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, normalFuel);
+
+        // Assert
+        verify(alertService, times(1)).resoudreAutomatiquement(vehiculeId, TypeAlert.CARBURANT_CRITIQUE);
+    }
+
+    @Test
+    void detecterAnomalies_WhenImmobilizedNearStop_ShouldNotCreateAlert() {
+        // Arrange
+        LocalDateTime now = LocalDateTime.now();
+        PositionGPS p1 = PositionGPS.builder().vitesse(0.0).timestamp(now).build();
+        PositionGPS p2 = PositionGPS.builder().vitesse(0.0).timestamp(now.minusMinutes(3)).build();
+        PositionGPS p3 = PositionGPS.builder().vitesse(0.0).timestamp(now.minusMinutes(6)).build();
+
+        when(positionGPSRepository.findByVehiculeIdOrderByTimestampDesc(eq(vehiculeId), any()))
+                .thenReturn(java.util.Arrays.asList(p1, p2, p3));
+        
+        // Simule un arrêt proche
+        when(arretRepository.findArretsDansRayon(anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(java.util.Collections.singletonList(new com.g7suivivehicules.entity.Arret()));
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, null);
+
+        // Assert
+        verify(alertService, times(1)).resoudreAutomatiquement(vehiculeId, TypeAlert.IMMOBILISATION);
+    }
+
+    @Test
+    void detecterAnomalies_WhenImmobilizedFarFromStop_ShouldCreateAlert() {
+        // Arrange
+        LocalDateTime now = LocalDateTime.now();
+        PositionGPS p1 = PositionGPS.builder().vitesse(0.0).timestamp(now).build();
+        PositionGPS p2 = PositionGPS.builder().vitesse(0.0).timestamp(now.minusMinutes(3)).build();
+        PositionGPS p3 = PositionGPS.builder().vitesse(0.0).timestamp(now.minusMinutes(6)).build();
+
+        when(positionGPSRepository.findByVehiculeIdOrderByTimestampDesc(eq(vehiculeId), any()))
+                .thenReturn(java.util.Arrays.asList(p1, p2, p3));
+        
+        // Simule aucun arrêt proche
+        when(arretRepository.findArretsDansRayon(anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(java.util.Collections.emptyList());
+
+        // Act
+        anomalyDetectionService.detecterAnomalies(normalPosition, null);
+
+        // Assert
+        verify(alertService, times(1)).creerOuMettreAJour(
+                eq(vehiculeId),
+                eq(TypeAlert.IMMOBILISATION),
+                eq(48.8566),
+                eq(2.3522),
+                eq(5.0),
+                eq(5.0),
+                eq(Severite.MOYENNE),
+                anyString()
+        );
+    }
 }

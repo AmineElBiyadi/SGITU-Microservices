@@ -58,7 +58,7 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/v3/api-docs.yaml",
                     "/actuator/**",
-                    "/chaos/**"
+                    "/resilience/**"
                 ).permitAll()
 
                 // Existence check -- any authenticated service

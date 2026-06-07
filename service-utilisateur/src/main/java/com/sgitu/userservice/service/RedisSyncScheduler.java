@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Background scheduler that flushes locally blacklisted tokens to Redis when it recovers.
- * Part of the Chaos Monkey Redis Fallback system.
+ * Part of the Redis Fallback system for resilience.
  */
 @Slf4j
 @Service
@@ -23,18 +23,14 @@ public class RedisSyncScheduler {
 
     private final RedisTokenBlacklistService blacklistService;
     private final StringRedisTemplate redisTemplate;
-    private final ChaosMonkeyService chaosMonkeyService;
 
     /**
-     * Runs every 60 seconds to synchronize local blacklist to Redis.
+     * Runs periodically to synchronize local blacklist to Redis.
+     * Always attempts sync — if Redis is still down, the exception is caught
+     * and the tokens remain in the local cache for the next cycle.
      */
-    @Scheduled(fixedDelayString = "${chaos.scheduler.redis-sync-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${resilience.scheduler.redis-sync-delay-ms:60000}")
     public void syncLocalBlacklistToRedis() {
-        if (chaosMonkeyService.isRedisDown()) {
-            log.debug("[REDIS SYNC] Redis is currently simulated as DOWN — skipping sync cycle");
-            return;
-        }
-
         ConcurrentHashMap<String, Instant> localBlacklist = blacklistService.getLocalBlacklist();
         if (localBlacklist.isEmpty()) {
             return;

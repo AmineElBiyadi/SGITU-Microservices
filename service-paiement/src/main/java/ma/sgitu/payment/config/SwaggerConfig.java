@@ -6,11 +6,24 @@ import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Configuration
 public class SwaggerConfig {
+
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+            "/payments",
+            "/payments/{paymentId}/refund",
+            "/payments/{ticketId}/cancel",
+            "/test-cards",
+            "/test-mobile-money-accounts",
+            "/health"
+    );
 
     @Bean
     public OpenAPI customOpenAPI() {
@@ -27,5 +40,14 @@ public class SwaggerConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")));
+    }
+
+    @Bean
+    public OpenApiCustomizer publicEndpointsCustomizer() {
+        return openApi -> openApi.getPaths().forEach((path, pathItem) -> {
+            if (PUBLIC_PATHS.contains(path)) {
+                pathItem.readOperations().forEach(operation -> operation.setSecurity(Collections.emptyList()));
+            }
+        });
     }
 }

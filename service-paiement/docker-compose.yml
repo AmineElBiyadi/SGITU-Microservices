@@ -1,11 +1,11 @@
-version: '3.9'
 
 networks:
-  sgitu-network:
+  g6-local-network:
     driver: bridge
 
 volumes:
   mysql_payment_data:
+  grafana_data:
 
 services:
 
@@ -16,7 +16,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - sgitu-network
+      - g6-local-network
 
   kafka:
     image: confluentinc/cp-kafka:7.3.0
@@ -33,14 +33,14 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
-      - sgitu-network
+      - g6-local-network
 
   payment-db:
     image: mysql:8.0
     container_name: payment-db
     hostname: payment-db
     networks:
-      - sgitu-network
+      - g6-local-network
     ports:
       - "3316:3306"
     environment:
@@ -62,7 +62,7 @@ services:
     image: phpmyadmin:latest
     container_name: phpmyadmin-payment
     networks:
-      - sgitu-network
+      - g6-local-network
     ports:
       - "8896:80"
     environment:
@@ -83,7 +83,7 @@ services:
     container_name: payment-service
     hostname: payment-service
     networks:
-      - sgitu-network
+      - g6-local-network
     ports:
       - "8086:8086"
     environment:
@@ -105,8 +105,46 @@ services:
       kafka:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 60s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: g6-local-prometheus
+    hostname: g6-local-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - g6-local-network
+    depends_on:
+      payment-service:
+        condition: service_healthy
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: g6-local-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # Montage des datasources provisionnées (recréation safe : Grafana DB fraîche)
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks:
+      - g6-local-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped

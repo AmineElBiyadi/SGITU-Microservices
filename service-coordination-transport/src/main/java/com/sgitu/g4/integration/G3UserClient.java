@@ -8,9 +8,6 @@ import com.sgitu.g4.dto.G3NotificationRecipientsPage;
 import com.sgitu.g4.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -29,6 +26,7 @@ import java.util.List;
 public class G3UserClient {
 
 	private final IntegrationProperties integrationProperties;
+	private final InterServiceHttpAuth interServiceHttpAuth;
 	private final ObjectMapper objectMapper;
 
 	public record NotificationRecipient(String userId, String email) {
@@ -41,13 +39,11 @@ public class G3UserClient {
 		String id = chauffeurId.trim();
 		Long driverId = parseDriverId(id);
 		try {
-			RestClient.RequestHeadersSpec<?> request = RestClient.create(integrationProperties.getG3BaseUrl())
-					.get()
-					.uri(integrationProperties.getG3DriversIdsPath());
-			String bearer = resolveBearerToken();
-			if (StringUtils.hasText(bearer)) {
-				request = request.header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
-			}
+			RestClient.RequestHeadersSpec<?> request = interServiceHttpAuth.apply(
+					RestClient.create(integrationProperties.getG3BaseUrl())
+							.get()
+							.uri(integrationProperties.getG3DriversIdsPath()),
+					InterServiceHttpAuth.Peer.G3);
 			String body = request.retrieve().body(String.class);
 			if (body == null) {
 				handleUnavailable("Réponse vide G3 (drivers/ids)");
@@ -114,11 +110,9 @@ public class G3UserClient {
 		if (StringUtils.hasText(integrationProperties.getG3NotificationRecipientRoles())) {
 			uri.queryParam("roles", integrationProperties.getG3NotificationRecipientRoles());
 		}
-		RestClient.RequestHeadersSpec<?> request = RestClient.create().get().uri(uri.build(true).toUri());
-		String bearer = resolveBearerToken();
-		if (StringUtils.hasText(bearer)) {
-			request = request.header(HttpHeaders.AUTHORIZATION, "Bearer " + bearer);
-		}
+		RestClient.RequestHeadersSpec<?> request = interServiceHttpAuth.apply(
+				RestClient.create().get().uri(uri.build(true).toUri()),
+				InterServiceHttpAuth.Peer.G3);
 		String body = request.retrieve().body(String.class);
 		if (body == null || body.isBlank()) {
 			return new G3NotificationRecipientsPage();
@@ -132,25 +126,6 @@ public class G3UserClient {
 		} catch (NumberFormatException ex) {
 			throw new BadRequestException("chauffeurId doit être l'identifiant numérique G3 (ex. 1, 42)");
 		}
-	}
-
-	/** JWT de la requête HTTP en cours, sinon token service G4 (alertes Kafka / batch). */
-	private String resolveBearerToken() {
-		String fromRequest = currentBearerToken();
-		if (StringUtils.hasText(fromRequest)) {
-			return fromRequest;
-		}
-		String serviceToken = integrationProperties.getG3ServiceBearerToken();
-		return StringUtils.hasText(serviceToken) ? serviceToken.trim() : null;
-	}
-
-	private static String currentBearerToken() {
-		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		if (auth == null || auth.getCredentials() == null) {
-			return null;
-		}
-		String token = auth.getCredentials().toString();
-		return StringUtils.hasText(token) ? token : null;
 	}
 
 	private void handleUnavailable(String detail) {

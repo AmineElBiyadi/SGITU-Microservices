@@ -162,6 +162,46 @@ public class VehiculeReferentielService {
 	}
 
 	@Transactional
+	public void markIncidentFromG9(String vehiculeIdRaw) {
+		if (!integrationProperties.isG7FlowEnabled()) {
+			return;
+		}
+		String vehiculeId = normalizeVehiculeId(vehiculeIdRaw);
+		g7VehicleClient.notifyIncident(vehiculeId);
+		vehiculeReferentielRepository.findById(vehiculeId).ifPresent(ref -> {
+			ref.setStatutG7(StatutVehiculeG7.INCIDENT);
+			ref.setDisponiblePourAffectation(false);
+			vehiculeReferentielRepository.save(ref);
+		});
+		supervisionLogService.add("INFO", "INCIDENT-G9",
+				"Perturbation active — véhicule " + vehiculeId + " → G7 INCIDENT");
+	}
+
+	/** Après RESOLU G9 : retour circulation normale (EN_SERVICE si mission en cours, sinon DISPONIBLE). */
+	@Transactional
+	public void markNormalAfterIncidentResolved(String vehiculeIdRaw, boolean missionEnCours) {
+		if (!integrationProperties.isG7FlowEnabled()) {
+			return;
+		}
+		String vehiculeId = normalizeVehiculeId(vehiculeIdRaw);
+		if (missionEnCours) {
+			g7VehicleClient.notifyEnService(vehiculeId);
+			vehiculeReferentielRepository.findById(vehiculeId).ifPresent(ref -> {
+				ref.setStatutG7(StatutVehiculeG7.EN_SERVICE);
+				ref.setDisponiblePourAffectation(false);
+				vehiculeReferentielRepository.save(ref);
+			});
+			supervisionLogService.add("INFO", "INCIDENT-G9",
+					"Incident clos — véhicule " + vehiculeId + " reprend EN_SERVICE (mission active)");
+		} else {
+			g7VehicleClient.notifyDisponible(vehiculeId);
+			markDisponibleAfterRelease(vehiculeId);
+			supervisionLogService.add("INFO", "INCIDENT-G9",
+					"Incident clos — circulation normale, véhicule " + vehiculeId + " → DISPONIBLE");
+		}
+	}
+
+	@Transactional
 	public void markDisponibleAfterRelease(String vehiculeIdRaw) {
 		String vehiculeId = normalizeVehiculeId(vehiculeIdRaw);
 		vehiculeReferentielRepository.findById(vehiculeId).ifPresent(ref -> {

@@ -7,7 +7,7 @@ import com.g7suivivehicules.entity.Vehicule;
 import com.g7suivivehicules.repository.AlertRepository;
 import com.g7suivivehicules.repository.PositionGPSRepository;
 import com.g7suivivehicules.repository.VehiculeRepository;
-import com.g7suivivehicules.exception.VehiculeNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ public class SnapshotService {
     @Transactional(readOnly = true)
     public VehicleSnapshotDTO getVehicleSnapshot(UUID vehiculeId) {
         Vehicule vehicule = vehiculeRepository.findById(vehiculeId)
-                .orElseThrow(() -> new VehiculeNotFoundException(vehiculeId));
+                .orElseThrow(() -> new EntityNotFoundException("Véhicule introuvable avec l'ID : " + vehiculeId));
 
         Optional<PositionGPS> lastPositionOpt = positionGPSRepository.findTopByVehiculeIdOrderByTimestampDesc(vehiculeId);
         List<AlertResponseDTO> activeAlerts = alertRepository.findActiveByVehiculeId(vehiculeId)
