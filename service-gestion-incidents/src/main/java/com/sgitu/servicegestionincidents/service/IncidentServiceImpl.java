@@ -23,11 +23,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,6 +45,7 @@ public class IncidentServiceImpl implements IncidentService {
     private final AnalytiqueProducer analytiqueProducer;
     private final ReferenceGenerator referenceGenerator;
     private final ModelMapper modelMapper;
+    private final StorageService storageService;
 
     @Value("${incident.duplicate.radius-meters:500}")
     private Double duplicateRadiusMeters;
@@ -50,9 +54,11 @@ public class IncidentServiceImpl implements IncidentService {
     // Dual duplicate detection + default gravity per type + source tracking
     // ============================================================
     @Override
-    public SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId) {
-        log.info("Nouveau signalement reçu - Type: {}, DeclarantId: {}, Role: {}",
-                request.getType(), declarantId, request.getRole());
+    public SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId,
+                                                   List<MultipartFile> fichiers) {
+        log.info("Nouveau signalement reçu - Type: {}, DeclarantId: {}, Role: {}, Fichiers: {}",
+                request.getType(), declarantId, request.getRole(),
+                fichiers != null ? fichiers.size() : 0);
 
         // Determine source based on role
         String source = determinerSource(request.getRole());
@@ -65,7 +71,7 @@ public class IncidentServiceImpl implements IncidentService {
         }
 
         // --- NO DUPLICATE: CREATE NEW INCIDENT ---
-        return creerNouvelIncident(request, source, declarantId);
+        return creerNouvelIncident(request, source, declarantId, fichiers);
     }
 
     // ============================================================
@@ -481,6 +487,17 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     /**
+     * Détecte le TypePreuve à partir du type MIME du fichier.
+     */
+    private TypePreuve detecterTypeDepuisMime(String contentType) {
+        if (contentType == null) return TypePreuve.DOCUMENT;
+        if (contentType.startsWith("image/")) return TypePreuve.PHOTO;
+        if (contentType.startsWith("video/")) return TypePreuve.VIDEO;
+        if (contentType.startsWith("audio/")) return TypePreuve.AUDIO;
+        return TypePreuve.DOCUMENT;
+    }
+
+    /**
      * Détection de doublon : par vehiculeId si présent, sinon par localisation + type.
      */
     private Optional<Incident> detecterDoublon(SignalementRequestDTO request) {
@@ -544,9 +561,10 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     /**
-     * Crée un nouvel incident à partir du signalement.
+     * Crée un nouvel incident à partir du signalement et téléverse les fichiers joints vers MinIO.
      */
-    private SignalementResponseDTO creerNouvelIncident(SignalementRequestDTO request, String source, Long declarantId) {
+    private SignalementResponseDTO creerNouvelIncident(SignalementRequestDTO request, String source,
+                                                       Long declarantId, List<MultipartFile> fichiers) {
         // Gravité par défaut basée sur le type d'incident
         NiveauGravite gravite = request.getType().getGraviteParDefaut();
 
@@ -571,17 +589,43 @@ public class IncidentServiceImpl implements IncidentService {
                 .dateLimiteResolution(LocalDateTime.now().plusHours(gravite.getDelaiMaxTraitement()))
                 .build();
 
-        // Ajouter les preuves si fournies
-        if (request.getPreuves() != null) {
-            request.getPreuves().forEach(preuveDTO -> {
-                Preuve preuve = Preuve.builder()
-                        .type(preuveDTO.getType())
-                        .fichier(preuveDTO.getFichierBase64())
-                        .description(preuveDTO.getDescription())
-                        .dateAjout(LocalDateTime.now())
-                        .build();
-                incident.addPreuve(preuve);
-            });
+        // Ajouter les preuves : upload réel vers MinIO + métadonnées
+        List<MultipartFile> files = fichiers != null ? fichiers : Collections.emptyList();
+        List<com.sgitu.servicegestionincidents.dto.request.PreuveDTO> metadonnees =
+                request.getPreuves() != null ? request.getPreuves() : Collections.emptyList();
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            if (file == null || file.isEmpty()) continue;
+
+            // Générer une clé unique dans MinIO
+            String extension = "";
+            String originalName = file.getOriginalFilename();
+            if (originalName != null && originalName.contains(".")) {
+                extension = originalName.substring(originalName.lastIndexOf("."));
+            }
+            String stockageKey = "preuves/" + UUID.randomUUID() + extension;
+
+            // Téléverser vers MinIO
+            log.info("Téléversement du fichier {} vers MinIO (clé: {})", originalName, stockageKey);
+            storageService.uploadFile(file, stockageKey);
+
+            // Récupérer les métadonnées si fournies, sinon détecter depuis le MIME
+            TypePreuve type = (i < metadonnees.size() && metadonnees.get(i).getType() != null)
+                    ? metadonnees.get(i).getType()
+                    : detecterTypeDepuisMime(file.getContentType());
+            String description = (i < metadonnees.size()) ? metadonnees.get(i).getDescription() : null;
+
+            Preuve preuve = Preuve.builder()
+                    .type(type)
+                    .fichier(originalName)
+                    .stockageKey(stockageKey)
+                    .tailleFichier(file.getSize())
+                    .description(description)
+                    .dateAjout(LocalDateTime.now())
+                    .build();
+            incident.addPreuve(preuve);
+            log.info("Preuve ajoutée : type={}, clé={}, taille={} bytes", type, stockageKey, file.getSize());
         }
 
         // Action de création dans l'historique

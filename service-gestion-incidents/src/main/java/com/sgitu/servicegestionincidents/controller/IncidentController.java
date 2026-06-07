@@ -9,9 +9,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -24,15 +26,16 @@ public class IncidentController {
 
     private final IncidentService incidentService;
 
-    @PostMapping("/signaler")
+    @PostMapping(value = "/signaler", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ROLE_PASSENGER', 'ROLE_DRIVER', 'ROLE_DISPATCHER', 'ROLE_SUPERVISOR')")
-    @Operation(summary = "Signaler un nouvel incident")
+    @Operation(summary = "Signaler un nouvel incident (avec pièces jointes optionnelles)")
     public ResponseEntity<SignalementResponseDTO> signalerIncident(
-            @Valid @RequestBody SignalementRequestDTO request,
+            @RequestPart("request") @Valid SignalementRequestDTO request,
+            @RequestPart(value = "fichiers", required = false) List<MultipartFile> fichiers,
             @RequestHeader("X-User-Id") Long userId,
             @RequestHeader("X-User-Role") String userRole) {
         request.setRole(userRole);
-        SignalementResponseDTO response = incidentService.signalerIncident(request, userId);
+        SignalementResponseDTO response = incidentService.signalerIncident(request, userId, fichiers);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

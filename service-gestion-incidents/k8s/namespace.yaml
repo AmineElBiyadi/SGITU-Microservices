@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: service-gestion-incidents
+  labels:
+    name: service-gestion-incidents
+    environment: local

@@ -1,89 +1,228 @@
-# SGITU - Microservice Gestion des Incidents (G9)
+# SGITU — Service Gestion des Incidents (G9)
 
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.x-brightgreen.svg)
-![Apache Kafka](https://img.shields.io/badge/Kafka-Event_Driven-black.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.x-brightgreen.svg)
+![Apache Kafka](https://img.shields.io/badge/Kafka-3.7.0-black.svg)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)
 
-Le microservice **Gestion des Incidents (G9)** est le centre névralgique du projet **SGITU** (Système de Gestion Intelligente des Transports Urbains). Il agit comme la passerelle principale entre le monde physique (capteurs IoT des véhicules, applications usagers) et la salle de contrôle numérique.
-
-## 🎯 Objectif et Fonctionnalités
-
-Ce module gère l'intégralité du cycle de vie des anomalies survenant sur le réseau de transport (pannes mécaniques, accidents, routes encombrées, etc.). 
-
-*   **Réception Omnicanale** : Accepte les signalements via API REST pour les acteurs humains (passagers, conducteurs) et via un Consumer Kafka pour la télémétrie IoT des bus de la ville.
-*   **Smart-Regrouping (Anti-doublons)** : Afin d'éviter de saturer les tableaux de bord des superviseurs en cas d'incident majeur, le système intègre un algorithme géographique s'appuyant sur la formule de *Haversine*. Il détecte les requêtes géographiquement et temporellement proches et les regroupe dans l'historique d'un incident parent sans créer de nouveaux tickets.
-*   **Machine à États Stricte** : Pilote de manière sécurisée les transitions de l'incident. Le passage entre `NOUVEAU` → `ANALYSE` → `ASSIGNE` → `EN_TRAITEMENT` → `RESOLU` → `CLOTURE` est verrouillé au niveau du backend pour empêcher toute anomalie de gestion (ex: clôturer un ticket non résolu).
-*   **Chef d'Orchestre Événementiel** : L'architecture est totalement non-bloquante. G9 déclenche des actions asynchrones vers d'autres services via Apache Kafka : déviation du trafic, alertes utilisateurs, envoi de rapports statistiques.
-*   **Audit Trail & SLA** : Chaque action est historisée dans une table dédiée (`Action`) avec l'ID exact de son auteur (extrait dynamiquement du JWT). Le système calcule dynamiquement le temps limite de résolution (SLA) selon la gravité de l'alerte.
-
-## 🏗️ Architecture et Technologies
-
-L'application repose sur les paradigmes de l'Architecture Hexagonale et de l'Event-Driven Architecture (EDA).
-
-*   **Core Backend** : Java 21, Spring Boot 3.2.x
-*   **Base de Données** : MySQL 8 (Modélisation via Spring Data JPA / Hibernate)
-*   **Message Broker** : Apache Kafka (Topics dédiés pour le transport, l'analytique et les notifications)
-*   **Sécurité** : JWT (JSON Web Tokens) validés par la Gateway et traités via des filtres personnalisés (`HeaderAuthenticationFilter`)
-*   **Documentation API** : OpenAPI 3 (Swagger UI) intégré nativement
-*   **Conteneurisation** : Déploiement via Docker et Docker Compose avec *Multi-Stage Build*.
-
-## 🚀 Démarrage Rapide (Docker)
-
-L'environnement de déploiement `docker-compose.yml` démarre de manière synchrone le service G9, ainsi qu'une base de données MySQL persistante et un cluster Kafka (avec Zookeeper).
-
-```bash
-# 1. Cloner le repository
-git clone https://github.com/votre-org/SGITU-Gestion-Incidents.git
-cd SGITU-Gestion-Incidents/service-gestion-incidents
-
-# 2. Lancer l'environnement complet
-docker-compose up --build -d
-
-# 3. Vérifier les logs de démarrage
-docker-compose logs -f service-gestion-incidents
-```
-
-L'API sera disponible sur : **http://localhost:8089**  
-La documentation technique interactive (Swagger) sera accessible sur : **http://localhost:8089/swagger-ui.html**
-
-## 📡 Détail des Endpoints de l'API
-
-L'API REST est protégée par des rôles (`VOYAGEUR`, `CONDUCTEUR`, `SUPERVISEUR_INCIDENTS`). L'API Gateway en amont injecte les headers `X-User-Id` et `X-User-Role`.
-
-### Gestion et Signalement des Incidents
-*   `POST /api/incidents/signaler` : Créer un nouveau signalement *(Rôles : VOYAGEUR, CONDUCTEUR, SUPERVISEUR)*.
-*   `GET /api/incidents` : Lister et filtrer les incidents *(Rôles : AGENT, SUPERVISEUR)*.
-*   `GET /api/incidents/{id}` : Récupérer la vue consolidée d'un incident *(Rôles : VOYAGEUR, CONDUCTEUR, AGENT, SUPERVISEUR)*.
-*   `GET /api/incidents/{id}/suivi` : Récupérer l'historique complet et immuable d'un incident (Audit Trail) *(Rôles : AGENT, SUPERVISEUR)*.
-
-### Opérations Métier de la Machine à États (Accès Réservé)
-*   `PUT /api/incidents/{id}/statut` : Faire avancer l'incident vers `ANALYSE`, `EN_TRAITEMENT`, `RESOLU` *(Rôles : AGENT, SUPERVISEUR)*.
-*   `PUT /api/incidents/{id}/affecter` : Assigner un technicien spécifique à l'intervention *(Rôle : SUPERVISEUR)*.
-*   `PUT /api/incidents/{id}/escalader` : Faire passer l'incident en `CRITIQUE` *(Rôle : SUPERVISEUR)*.
-*   `PUT /api/incidents/{id}/cloturer` : Fermer définitivement l'incident *(Rôle : SUPERVISEUR)*.
-*   `PUT /api/incidents/{id}/annuler` : Invalider une fausse alerte et informer les services tiers *(Rôle : SUPERVISEUR)*.
-
-### Reporting & Tableaux de Bord
-*   `GET /api/rapports/generer?periode={periode}` : Obtenir un rapport détaillé des statistiques d'intervention *(Rôle : SUPERVISEUR)*.
-*   `GET /api/rapports/dashboard` : Obtenir les KPIs en temps réel pour l'affichage en salle de contrôle *(Rôle : SUPERVISEUR)*.
-
-## ✉️ Intégration Kafka (Événements)
-
-Le microservice interagit de manière totalement asynchrone avec l'écosystème SGITU afin d'éviter les goulots d'étranglement :
-
-*   **🎧 Consumer `suivi-vehicules`** : Écoute en continu les anomalies remontées par les véhicules connectés (G7). Un incident est généré automatiquement avec la source `IOT`.
-*   **📢 Producer `incidents-transport`** : G9 ordonne au service de Gestion du Trafic (G4) de dévier les itinéraires (Événement `CONFIRME`) ou de reprendre une circulation normale (Événement `RESOLU`).
-*   **📢 Producer `notifications`** : G9 demande au service de Communication (G5) d'alerter les usagers par Push, les techniciens par SMS, ou la direction par Email.
-*   **📢 Producer `analytique`** : G9 envoie le dossier technique complet (statistiques, heures de traitement, preuves) au service de Data Warehouse (G8) lors de la clôture de l'incident.
-
-## 🛡️ Modèle de Sécurité (Stateless)
-
-Ce microservice suit le pattern "Stateless Authentication". Il assume qu'une API Gateway a déjà intercepté et vérifié le token JWT du client.
-1. La requête arrive avec les headers `X-User-Id` et `X-User-Role`.
-2. Le `HeaderAuthenticationFilter` intercepte la requête et hydrate le `SecurityContextHolder` de Spring Security.
-3. Les méthodes du Controller sont sécurisées via les annotations `@PreAuthorize("hasRole('SUPERVISEUR_INCIDENTS')")`, garantissant un contrôle d'accès fin aux fonctions d'escalade, de clôture et d'annulation.
-4. Le `X-User-Id` est réutilisé en profondeur dans la couche métier pour alimenter le champ `auteurId` de la table d'historisation `Action`.
+Microservice du projet **SGITU** (Système de Gestion Intelligente des Transports Urbains) responsable de la gestion complète du cycle de vie des incidents sur le réseau de transport urbain.
 
 ---
-*Projet développé dans le cadre du cursus SGITU.*
+
+## 📋 Prérequis
+
+Avant de démarrer, assurez-vous d'avoir installé sur votre machine :
+
+| Outil | Version minimale | Vérification |
+|---|---|---|
+| **Java (JDK)** | 21 | `java -version` |
+| **Maven** | 3.9+ | `mvn -version` |
+| **Docker Desktop** | 4.x | `docker -v` |
+| **Docker Compose** | 2.x | `docker compose version` |
+
+---
+
+## 🚀 Option 1 — Lancer avec Docker (Recommandé)
+
+Cette option démarre **tout l'environnement** (MySQL + Kafka + le service) en une seule commande.
+
+```bash
+# 1. Lancer tous les conteneurs
+docker compose up --build -d
+
+# 2. Vérifier que tout est bien démarré
+docker compose ps
+
+# 3. Suivre les logs du service
+docker compose logs -f gestion-incidents
+```
+
+**Services démarrés :**
+
+| Service | URL locale |
+|---|---|
+| **API REST** | http://localhost:8089/api/incidents |
+| **Swagger UI** | http://localhost:8089/swagger-ui.html |
+| **Prometheus** | http://localhost:9090 |
+| **Grafana** | http://localhost:3000 (admin / admin123) |
+| **MySQL** | localhost:3306 — base: `sgitu_incidents` |
+| **Kafka** | localhost:9092 |
+
+**Arrêter l'environnement :**
+```bash
+docker compose down
+# Pour supprimer aussi les volumes (base de données)
+docker compose down -v
+```
+
+---
+
+## 🛠️ Option 2 — Lancer en mode Développement (IDE / IntelliJ)
+
+Dans ce mode, vous lancez le service directement sur votre machine, mais les dépendances (MySQL + Kafka) doivent tourner dans Docker.
+
+### Étape 1 — Démarrer uniquement MySQL et Kafka
+
+```bash
+cd service-gestion-incidents
+
+# Démarrer uniquement les dépendances (sans le service lui-même)
+docker compose up mysql-db kafka -d
+
+# Vérifier que MySQL est prêt
+docker compose logs mysql-db
+# Attendez de voir : "ready for connections"
+```
+
+### Étape 2 — Configurer `application.properties`
+
+Le fichier est déjà pré-configuré pour le développement local.  
+Vérifiez que les valeurs suivantes dans `src/main/resources/application.properties` correspondent à votre environnement :
+
+```properties
+# Base de données
+spring.datasource.url=jdbc:mysql://localhost:3306/sgitu_incidents?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=          # Laisser vide si MySQL sans mot de passe
+
+# Kafka
+spring.kafka.bootstrap-servers=localhost:9092
+
+# URL du service utilisateur (G3)
+microservices.utilisateur.url=http://localhost:8083
+```
+
+### Étape 3 — Lancer le service
+
+**Avec Maven (terminal) :**
+```bash
+./mvnw spring-boot:run
+```
+
+**Sur Windows :**
+```cmd
+mvnw.cmd spring-boot:run
+```
+
+**Avec IntelliJ IDEA :**
+- Ouvrir `ServiceGestionIncidentsApplication.java`
+- Cliquer sur le bouton ▶️ Run
+
+### Étape 4 — Vérifier le démarrage
+
+```bash
+# L'API doit répondre sur :
+curl http://localhost:8089/api/incidents/tous \
+  -H "X-User-Id: 1" \
+  -H "X-User-Role: ROLE_SUPERVISOR"
+```
+
+---
+
+## ⚙️ Variables d'environnement
+
+En production ou dans Docker, ces variables surchargent `application.properties` :
+
+| Variable | Valeur par défaut | Description |
+|---|---|---|
+| `DB_URL` | `jdbc:mysql://localhost:3306/...` | URL JDBC de la base de données |
+| `DB_USERNAME` | `root` | Utilisateur MySQL |
+| `DB_PASSWORD` | *(vide)* | Mot de passe MySQL |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Adresse du broker Kafka |
+| `JWT_SECRET` | `SGITU_G3_JWT_SECRET_KEY...` | Clé secrète JWT (à changer en prod !) |
+| `SPRING_PROFILES_ACTIVE` | *(non défini)* | Profil Spring (`docker`, etc.) |
+
+---
+
+## 🔐 Authentification pour les tests
+
+Ce service utilise l'authentification par headers injectés par la Gateway. Pour les tests directs via Postman ou `curl`, ajoutez toujours ces deux headers :
+
+```
+X-User-Id: <id_de_l_utilisateur>
+X-User-Role: <ROLE_PASSENGER | ROLE_DRIVER | ROLE_TECHNICIAN | ROLE_DISPATCHER | ROLE_SUPERVISOR | ROLE_SECURITY | ROLE_MEDIC | ROLE_CLEANER>
+```
+
+Pour les endpoints qui contactent le `service-utilisateur` (ex: disponibilité des agents), un **token JWT Bearer** est également requis :
+```
+Authorization: Bearer <votre_jwt_token>
+```
+
+**Obtenir un token via le service-utilisateur (port 8083) :**
+```bash
+curl -X POST http://localhost:8083/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "dispatcher@sgitu.com", "password": "Password123!"}'
+```
+
+---
+
+## 📬 Collection Postman
+
+Une collection Postman complète est incluse dans le projet :
+
+```
+SGITU-Incidents.postman_collection.json
+```
+
+**Importer dans Postman :**
+1. Ouvrir Postman → `File` → `Import`
+2. Sélectionner `SGITU-Incidents.postman_collection.json`
+3. Définir la variable de collection `baseUrl` → `http://localhost:8089/api/incidents`
+4. Exécuter les requêtes dans l'ordre numéroté (1.1 → 1.2 → ...)
+
+---
+
+## 🗂️ Structure du Projet
+
+```
+service-gestion-incidents/
+├── src/main/java/com/sgitu/servicegestionincidents/
+│   ├── controller/         # Endpoints REST (IncidentController, RapportController)
+│   ├── service/            # Logique métier (IncidentServiceImpl, RapportServiceImpl)
+│   ├── repository/         # Accès base de données (Spring Data JPA)
+│   ├── model/
+│   │   ├── entity/         # Entités JPA (Incident, Action, Renfort, Preuve...)
+│   │   └── enums/          # Enums (StatutIncident, NiveauGravite, TypeIncident...)
+│   ├── dto/
+│   │   ├── request/        # DTOs de requête (SignalementRequestDTO...)
+│   │   └── response/       # DTOs de réponse (IncidentResponseDTO...)
+│   ├── messaging/
+│   │   ├── event/          # Événements Kafka (IncidentTransportEvent...)
+│   │   ├── producer/       # Producteurs Kafka (TransportProducer, NotificationProducer...)
+│   │   └── consumer/       # Consommateur Kafka (VehiculeConsumer)
+│   ├── config/             # Configuration Spring (Security, Feign, ModelMapper...)
+│   ├── client/             # Clients Feign vers d'autres services
+│   ├── scheduler/          # Tâches planifiées (SLA, escalades automatiques)
+│   └── exception/          # Gestion des erreurs
+├── src/main/resources/
+│   ├── application.properties          # Configuration locale
+│   └── application-docker.yml          # Configuration Docker
+├── docker-compose.yml      # Infrastructure locale complète
+├── Dockerfile              # Image de production (multi-stage)
+└── SGITU-Incidents.postman_collection.json
+```
+
+---
+
+## 📡 Endpoints Principaux
+
+| Méthode | Endpoint | Rôles requis | Description |
+|---|---|---|---|
+| `POST` | `/signaler` | Tous | Signaler un nouvel incident |
+| `GET` | `/{id}` | Tous | Consulter un incident |
+| `GET` | `/{id}/suivi` | Agents + | Historique des actions |
+| `GET` | `` | Agents + | Filtrer les incidents |
+| `PUT` | `/{id}/statut` | Agents + | Changer le statut |
+| `PUT` | `/{id}/affecter` | Dispatcher + | Affecter un responsable |
+| `GET` | `/agents/disponibilite?role=ROLE_TECHNICIAN` | Dispatcher + | Voir la disponibilité des agents |
+| `PUT` | `/{id}/demander-escalade` | Techniciens | Soumettre une demande d'escalade |
+| `PUT` | `/{id}/escalader` | Dispatcher + | Confirmer une escalade |
+| `PUT` | `/{id}/annuler` | Dispatcher + | Annuler (fausse alerte) |
+| `PUT` | `/{id}/cloturer` | Dispatcher + | Clôturer définitivement |
+| `GET` | `/rapports/generer?periode=mois` | Supervisor | Générer un rapport |
+| `GET` | `/rapports/dashboard` | Dispatcher + | Tableau de bord temps réel |
+
+---
+
