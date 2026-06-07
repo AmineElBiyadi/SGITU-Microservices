@@ -7,11 +7,14 @@ Objectif prof : prouver que G4 **ne plante pas** quand un voisin est indisponibl
 | Étape | Action | Résultat attendu |
 |-------|--------|------------------|
 | 1 | G4 up (`docker compose up -d`) | `/api/g4/health` → OK |
-| 2 | G5 ou G10 arrêté / URL invalide | — |
-| 3 | `POST /api/notifications/send` (JWT DISPATCHER) | **202** + `"status": "DEGRADED"` + stockage PENDING |
-| 4 | `GET /api/g4/pending-notifications` (JWT admin) | entrée **PENDING** |
-| 5 | `GET /api/g4/logs` | `NOTIFICATION_PENDING` |
-| 6 | Relancer G5 + retry auto (30s) ou `POST .../retry` | `pendingNotifications=0` dans `/health` |
+| 2 | `docker stop notification-service` | — |
+| 3 | Postman dossier **100 — Chaos G5** → login flotte → POST notification | **202** + `"status": "DEGRADED"` |
+| 4 | Login admin → `GET /api/g4/pending-notifications` | entrée **PENDING** |
+| 5 | `GET /api/g4/health` | `pendingNotifications` > 0 |
+| 6 | `GET /api/g4/logs` | `NOTIFICATION_PENDING` ou `DEGRADED` |
+| 7 | `docker start notification-service` + POST `/retry` (étape 7 du dossier 100) | `pendingNotifications=0` |
+
+Collection : `postman/SGITU-G4-Coordination-Transport.postman_collection.json` — régénérer avec `node postman/build-collection.js`.
 
 ## Scénario secondaire : G3 validation off
 

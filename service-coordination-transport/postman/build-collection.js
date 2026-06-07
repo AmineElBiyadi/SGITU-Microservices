@@ -40,6 +40,71 @@ const expectStatus = (...codes) => ({
 	},
 });
 
+const chaosNotificationIdPreRequest = {
+	listen: 'prerequest',
+	script: {
+		type: 'text/javascript',
+		exec: [
+			"pm.collectionVariables.set('chaosNotificationId', 'CHAOS-' + Date.now());",
+		],
+	},
+};
+
+const expectDegradedNotification = {
+	listen: 'test',
+	script: {
+		type: 'text/javascript',
+		exec: [
+			"pm.test('HTTP 202', function () { pm.response.to.have.status(202); });",
+			"pm.test('status DEGRADED (G5 down)', function () {",
+			"  const j = pm.response.json();",
+			"  pm.expect(j.status).to.eql('DEGRADED');",
+			"  pm.expect(j.detail).to.include('G5');",
+			"});",
+		],
+	},
+};
+
+const expectPendingQueue = {
+	listen: 'test',
+	script: {
+		type: 'text/javascript',
+		exec: [
+			'pm.test("HTTP 200", function () { pm.response.to.have.status(200); });',
+			'pm.test("Au moins 1 notification PENDING", function () {',
+			'  const list = pm.response.json();',
+			'  pm.expect(Array.isArray(list)).to.be.true;',
+			'  pm.expect(list.length).to.be.at.least(1);',
+			"  pm.expect(list[0].status).to.eql('PENDING');",
+			'});',
+		],
+	},
+};
+
+const expectHealthPending = {
+	listen: 'test',
+	script: {
+		type: 'text/javascript',
+		exec: [
+			'pm.test("HTTP 200", function () { pm.response.to.have.status(200); });',
+			'pm.test("pendingNotifications > 0", function () {',
+			'  const j = pm.response.json();',
+			'  pm.expect(Number(j.components.pendingNotifications)).to.be.above(0);',
+			'});',
+		],
+	},
+};
+
+const chaosNotificationBody = () =>
+	'{\n' +
+	'  "notificationId": "{{chaosNotificationId}}",\n' +
+	'  "sourceService": "COORDINATION",\n' +
+	'  "eventType": "DELAY_ALERT",\n' +
+	'  "channel": "EMAIL",\n' +
+	'  "recipient": { "userId": "{{recipientUserId}}", "email": "{{recipientEmail}}" },\n' +
+	'  "metadata": { "lineId": "L12", "reason": "RETARD_SIGNIFICATIF", "variables": { "vehiculeId": "{{vehiculeId}}", "valeur": "12", "arret": "Gare Sud" } }\n' +
+	'}';
+
 const notificationBody = () =>
 	'{\n' +
 	'  "notificationId": "G4-POSTMAN-001",\n' +
@@ -99,6 +164,7 @@ const collection = {
 		{ key: 'g7BaseUrl', value: 'http://localhost:8087' },
 		{ key: 'g3BaseUrl', value: 'http://localhost:8083' },
 		{ key: 'g3AccessToken', value: '' },
+		{ key: 'chaosNotificationId', value: '' },
 	],
 	auth: {
 		type: 'bearer',
@@ -498,12 +564,105 @@ collection.item.push(
 );
 
 collection.item.push(
-	folder('100 — Chaos G5 (optionnel)', 'Arrêter G5 puis tester', [
-		req('POST notification DEGRADED', 'POST', '{{baseUrl}}/api/notifications/send', {
-			body:
-				'{\n  "notificationId": "CHAOS-001",\n  "sourceService": "COORDINATION",\n  "eventType": "DELAY_ALERT",\n  "channel": "EMAIL",\n  "recipient": { "userId": "{{recipientUserId}}", "email": "{{recipientEmail}}" },\n  "metadata": { "lineId": "L12", "reason": "RETARD_SIGNIFICATIF", "variables": { "vehiculeId": "{{vehiculeId}}", "valeur": "12", "arret": "Gare Sud" } }\n}',
-		}),
-	])
+	folder(
+		'100 — Chaos G5 (optionnel)',
+		'Challenge Chaos Monkey — G5 arrêté\n\n' +
+			'Prérequis terminal (racine monorepo) :\n' +
+			'  docker stop notification-service\n' +
+			'(ou docker compose stop notification-service)\n\n' +
+			'Ordre Postman :\n' +
+			'  1) Login flotte (DISPATCHER)\n' +
+			'  2) POST notification → 202 DEGRADED\n' +
+			'  3) Login admin → GET pending + GET health\n' +
+			'  4) Relancer G5 : docker start notification-service\n' +
+			'  5) POST retry → pendingNotifications repasse à 0\n\n' +
+			'Captures soutenance : étape 2 + GET pending + docker ps sans G5.',
+		[
+			{
+				...req('1. Login gestionnaire.flotte (DISPATCHER)', 'POST', '{{baseUrl}}/api/auth/login', {
+					noauth: true,
+					body: '{\n  "username": "gestionnaire.flotte",\n  "password": "password"\n}',
+					desc: 'Obligatoire pour POST /api/notifications/send',
+				}),
+				event: [loginEvent],
+			},
+			{
+				...req('2. POST notification → DEGRADED (G5 down)', 'POST', '{{baseUrl}}/api/notifications/send', {
+					body: chaosNotificationBody(),
+					desc: 'Attendu : HTTP 202, body.status = DEGRADED, notification en file PENDING',
+				}),
+				event: [chaosNotificationIdPreRequest, expectDegradedNotification],
+			},
+			{
+				...req('3. Login admin.technique (supervision)', 'POST', '{{baseUrl}}/api/auth/login', {
+					noauth: true,
+					body: '{\n  "username": "admin.technique",\n  "password": "password"\n}',
+				}),
+				event: [loginEvent],
+			},
+			{
+				...req('4. GET pending notifications', 'GET', '{{baseUrl}}/api/g4/pending-notifications', {
+					desc: 'Doit lister au moins une entrée PENDING',
+				}),
+				event: [expectPendingQueue],
+			},
+			{
+				...req('5. GET health (pendingNotifications > 0)', 'GET', '{{baseUrl}}/api/g4/health', {
+					noauth: true,
+					desc: 'components.pendingNotifications doit être > 0',
+				}),
+				event: [expectHealthPending],
+			},
+			req('6. GET logs (NOTIFICATION_PENDING)', 'GET', '{{baseUrl}}/api/g4/logs', {
+				noauth: true,
+				desc: 'Chercher une ligne WARN NOTIFICATION_PENDING ou NOTIFICATION -> DEGRADED',
+			}),
+			{
+				...req('7. POST retry (après docker start notification-service)', 'POST', '{{baseUrl}}/api/g4/pending-notifications/retry', {
+					desc: 'Relancer G5 avant cette étape. Attendu : retried >= 1, remainingPending = 0',
+				}),
+				event: [
+					{
+						listen: 'test',
+						script: {
+							type: 'text/javascript',
+							exec: [
+								'pm.test("HTTP 200", function () { pm.response.to.have.status(200); });',
+								'pm.test("retry OK si G5 UP", function () {',
+								'  const j = pm.response.json();',
+								'  if (pm.response.code === 200) {',
+								'    pm.expect(j).to.have.property("retried");',
+								'    pm.expect(j).to.have.property("remainingPending");',
+								'  }',
+								'});',
+							],
+						},
+					},
+				],
+			},
+			{
+				...req('8. GET health (pendingNotifications = 0)', 'GET', '{{baseUrl}}/api/g4/health', {
+					noauth: true,
+					desc: 'Après retry réussi avec G5 UP',
+				}),
+				event: [
+					{
+						listen: 'test',
+						script: {
+							type: 'text/javascript',
+							exec: [
+								'pm.test("HTTP 200", function () { pm.response.to.have.status(200); });',
+								'pm.test("pendingNotifications = 0 (si G5 UP)", function () {',
+								'  const j = pm.response.json();',
+								'  pm.expect(Number(j.components.pendingNotifications)).to.eql(0);',
+								'});',
+							],
+						},
+					},
+				],
+			},
+		]
+	)
 );
 
 collection.item.push(
