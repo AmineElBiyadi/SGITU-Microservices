@@ -18,11 +18,12 @@ import org.springframework.context.annotation.Configuration;
 
             **Responsabilités de G3 :**
             - Création et gestion des comptes utilisateurs
+            - Vérification d'email par code à 6 chiffres (2FA) avant activation du compte
             - Gestion des profils (nom, téléphone, adresse, date de naissance)
             - Attribution des rôles (ROLE_PASSENGER, ROLE_DRIVER, ROLE_ADMIN, etc.)
             - Émission des tokens JWT (G3 est l'unique source de vérité pour l'identité)
             - Activation / désactivation des comptes
-            - Notification de G8 (Analytics) lors des changements d'état
+            - Notification de G5 (Notifications) et G8 (Analytics) via Kafka
 
             ---
 
@@ -58,7 +59,7 @@ import org.springframework.context.annotation.Configuration;
             3. Cliquer sur **Authorize 🔒** en haut à droite et coller le token
             4. Toutes les requêtes suivantes incluront automatiquement le header `Authorization: Bearer {token}`
 
-            Endpoints publics (sans token) : `POST /auth/login`, `POST /users`
+            Endpoints publics (sans token) : `POST /auth/login`, `POST /auth/refresh`, `POST /auth/verify-email`, `POST /auth/resend-code`, `POST /users`
             """,
         contact = @Contact(name = "Groupe 3 — SGITU", email = "g3@sgitu.ma")
     ),
