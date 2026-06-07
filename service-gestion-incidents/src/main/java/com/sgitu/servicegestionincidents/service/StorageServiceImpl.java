@@ -2,7 +2,10 @@ package com.sgitu.servicegestionincidents.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -15,6 +18,7 @@ import software.amazon.awssdk.regions.Region;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 
@@ -46,14 +50,36 @@ public class StorageServiceImpl implements StorageService {
 
     @PostConstruct
     public void init() {
-        // Initialisation du Presigner S3
+        // Initialisation du Presigner S3 — pathStyleAccessEnabled requis pour MinIO
         this.presigner = S3Presigner.builder()
                 .endpointOverride(URI.create(endpoint))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)
                 ))
                 .region(Region.of(region))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
                 .build();
+    }
+
+    @Override
+    public String uploadFile(MultipartFile file, String objectKey) {
+        try {
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectKey)
+                    .contentType(file.getContentType())
+                    .contentLength(file.getSize())
+                    .build();
+
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+            return objectKey;
+        } catch (IOException e) {
+            throw new RuntimeException("Erreur lors de la lecture du fichier: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors du téléversement vers MinIO: " + e.getMessage(), e);
+        }
     }
 
     @Override

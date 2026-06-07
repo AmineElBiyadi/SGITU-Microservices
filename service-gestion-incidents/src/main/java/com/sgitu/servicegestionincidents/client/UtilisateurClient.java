@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 @FeignClient(name = "utilisateur-service", url = "${microservices.utilisateur.url}")
 public interface UtilisateurClient {
 
-    @GetMapping("/api/utilisateurs/{id}")
+    @GetMapping("/api/users/{id}")
     UtilisateurDTO obtenirUtilisateur(@PathVariable Long id);
 
     /*
@@ -16,6 +16,6 @@ public interface UtilisateurClient {
     Boolean verifierRole(@PathVariable Long userId, @PathVariable String role);
     */
 
-    @GetMapping("/api/utilisateurs/roles/{role}")
+    @GetMapping("/api/users/roles/{role}")
     java.util.List<UtilisateurDTO> obtenirUtilisateursParRole(@PathVariable String role);
 }

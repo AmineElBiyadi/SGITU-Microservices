@@ -3,13 +3,15 @@ package com.sgitu.servicegestionincidents.service;
 import com.sgitu.servicegestionincidents.dto.request.SignalementRequestDTO;
 import com.sgitu.servicegestionincidents.dto.response.*;
 import com.sgitu.servicegestionincidents.model.enums.StatutIncident;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
 
 public interface IncidentService {
 
-    SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId);
+    SignalementResponseDTO signalerIncident(SignalementRequestDTO request, Long declarantId, List<MultipartFile> fichiers);
+
     IncidentResponseDTO consulterIncident(Long id);
     List<ActionDTO> consulterSuivi(Long incidentId);
     List<IncidentResponseDTO> filtrerIncidents(Map<String, Object> criteres);

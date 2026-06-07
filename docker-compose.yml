@@ -573,7 +573,7 @@ services:
 
   # Script de création automatique du bucket "preuves-incidents" au démarrage
   minio-create-buckets:
-    image: minio/mc:RELEASE.2024-02-17T01-52-32Z
+    image: minio/mc:latest
     container_name: sgitu-minio-setup
     depends_on:
       - minio
