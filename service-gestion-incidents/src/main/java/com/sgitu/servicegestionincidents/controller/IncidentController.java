@@ -11,7 +11,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,10 +35,13 @@ public class IncidentController {
     public ResponseEntity<SignalementResponseDTO> signalerIncident(
             @RequestPart("request") @Valid SignalementRequestDTO request,
             @RequestPart(value = "fichiers", required = false) List<MultipartFile> fichiers,
-            @RequestHeader("X-User-Id") Long userId,
-            @RequestHeader("X-User-Role") String userRole) {
-        request.setRole(userRole);
-        SignalementResponseDTO response = incidentService.signalerIncident(request, userId, fichiers);
+            Authentication authentication) {
+        // Utiliser le rôle du request si fourni, sinon extraire depuis le JWT
+        if (request.getRole() == null || request.getRole().isBlank()) {
+            request.setRole(extractFirstRole(authentication));
+        }
+        SignalementResponseDTO response = incidentService.signalerIncident(
+                request, extractUserId(authentication), fichiers);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -96,8 +102,8 @@ public class IncidentController {
     @GetMapping("/affectes")
     @PreAuthorize("hasAnyRole('ROLE_TECHNICIAN', 'ROLE_SECURITY', 'ROLE_MEDIC', 'ROLE_CLEANER', 'ROLE_DISPATCHER', 'ROLE_SUPERVISOR')")
     @Operation(summary = "Récupérer les incidents affectés à l'utilisateur actuel (responsable ou renfort)")
-    public ResponseEntity<List<IncidentResponseDTO>> obtenirIncidentsAffectes(@RequestHeader("X-User-Id") Long userId) {
-        List<IncidentResponseDTO> incidents = incidentService.obtenirIncidentsAffectes(userId);
+    public ResponseEntity<List<IncidentResponseDTO>> obtenirIncidentsAffectes(Authentication authentication) {
+        List<IncidentResponseDTO> incidents = incidentService.obtenirIncidentsAffectes(extractUserId(authentication));
         return ResponseEntity.ok(incidents);
     }
 
@@ -112,8 +118,8 @@ public class IncidentController {
     @GetMapping("/mes-signalements")
     @PreAuthorize("hasAnyRole('ROLE_PASSENGER', 'ROLE_DRIVER', 'ROLE_TECHNICIAN', 'ROLE_DISPATCHER', 'ROLE_SUPERVISOR', 'ROLE_SECURITY', 'ROLE_MEDIC', 'ROLE_CLEANER')")
     @Operation(summary = "Récupérer les incidents signalés par l'utilisateur actuel")
-    public ResponseEntity<List<IncidentResponseDTO>> obtenirMesSignalements(@RequestHeader("X-User-Id") Long userId) {
-        List<IncidentResponseDTO> incidents = incidentService.obtenirMesSignalements(userId);
+    public ResponseEntity<List<IncidentResponseDTO>> obtenirMesSignalements(Authentication authentication) {
+        List<IncidentResponseDTO> incidents = incidentService.obtenirMesSignalements(extractUserId(authentication));
         return ResponseEntity.ok(incidents);
     }
 
@@ -123,8 +129,8 @@ public class IncidentController {
     public ResponseEntity<Void> cloturerIncident(
             @PathVariable Long id,
             @Valid @RequestBody ClotureRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.cloturerIncident(id, request.getMotif(), userId);
+            Authentication authentication) {
+        incidentService.cloturerIncident(id, request.getMotif(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -134,8 +140,8 @@ public class IncidentController {
     public ResponseEntity<Void> escaladerIncident(
             @PathVariable Long id,
             @Valid @RequestBody EscaladeRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.escaladerIncident(id, request.getMotif(), userId);
+            Authentication authentication) {
+        incidentService.escaladerIncident(id, request.getMotif(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -145,8 +151,8 @@ public class IncidentController {
     public ResponseEntity<Void> demanderEscalade(
             @PathVariable Long id,
             @Valid @RequestBody EscaladeRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.demanderEscalade(id, request.getMotif(), userId);
+            Authentication authentication) {
+        incidentService.demanderEscalade(id, request.getMotif(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -156,8 +162,8 @@ public class IncidentController {
     public ResponseEntity<Void> refuserEscalade(
             @PathVariable Long id,
             @Valid @RequestBody EscaladeRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.refuserEscalade(id, request.getMotif(), userId);
+            Authentication authentication) {
+        incidentService.refuserEscalade(id, request.getMotif(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -167,8 +173,8 @@ public class IncidentController {
     public ResponseEntity<Void> affecterResponsable(
             @PathVariable Long id,
             @Valid @RequestBody AffectationRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.affecterResponsable(id, request.getResponsableId(), userId);
+            Authentication authentication) {
+        incidentService.affecterResponsable(id, request.getResponsableId(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -178,8 +184,8 @@ public class IncidentController {
     public ResponseEntity<Void> ajouterRenfort(
             @PathVariable Long id,
             @PathVariable Long agentId,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.ajouterRenfort(id, agentId, userId);
+            Authentication authentication) {
+        incidentService.ajouterRenfort(id, agentId, extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -197,8 +203,8 @@ public class IncidentController {
     public ResponseEntity<Void> mettreAJourStatut(
             @PathVariable Long id,
             @Valid @RequestBody StatutUpdateRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.mettreAJourStatut(id, request.getStatut(), userId);
+            Authentication authentication) {
+        incidentService.mettreAJourStatut(id, request.getStatut(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -208,8 +214,36 @@ public class IncidentController {
     public ResponseEntity<Void> annulerIncident(
             @PathVariable Long id,
             @Valid @RequestBody AnnulationRequestDTO request,
-            @RequestHeader("X-User-Id") Long userId) {
-        incidentService.annulerIncident(id, request.getMotif(), userId);
+            Authentication authentication) {
+        incidentService.annulerIncident(id, request.getMotif(), extractUserId(authentication));
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    /**
+     * Extrait le userId depuis le principal de l'Authentication.
+     * Le JwtFilter stocke le userId (Long) comme principal.
+     */
+    private Long extractUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new AccessDeniedException("Utilisateur non authentifié");
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof Long) return (Long) principal;
+        if (principal instanceof Number) return ((Number) principal).longValue();
+        throw new AccessDeniedException("Impossible de récupérer l'ID utilisateur du token JWT");
+    }
+
+    /**
+     * Extrait le premier rôle disponible depuis le JWT (fallback quand aucun rôle
+     * n'est fourni dans le request body).
+     */
+    private String extractFirstRole(Authentication authentication) {
+        if (authentication == null) return "";
+        return authentication.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("");
     }
 }

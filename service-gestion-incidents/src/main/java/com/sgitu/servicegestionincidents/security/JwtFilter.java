@@ -22,8 +22,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Filtre JWT — Lit et valide le token Bearer.
- * Le service de gestion des incidents ne fait que valider les tokens émis par le service utilisateur.
+ * Filtre JWT — Lit et valide le token Bearer émis par G3.
+ * Extrait userId (claim "userId") et roles (claim "roles") depuis le token
+ * et les place dans le SecurityContext.
+ * Principal = userId (Long), accessible via authentication.getPrincipal().
  */
 @Component
 @RequiredArgsConstructor
@@ -51,18 +53,23 @@ public class JwtFilter extends OncePerRequestFilter {
                         .parseClaimsJws(token)
                         .getBody();
 
-                String email = claims.getSubject();
+                // Extraire userId depuis la claim "userId" (émise par G3)
+                Object userIdObj = claims.get("userId");
+                Long userId = userIdObj instanceof Number
+                        ? ((Number) userIdObj).longValue()
+                        : null;
 
                 @SuppressWarnings("unchecked")
                 List<String> roles = claims.get("roles", List.class);
 
-                if (email != null && roles != null) {
+                if (userId != null && roles != null) {
                     List<SimpleGrantedAuthority> authorities = roles.stream()
                             .map(SimpleGrantedAuthority::new)
                             .collect(Collectors.toList());
 
+                    // Principal = userId (Long) — récupérable via authentication.getPrincipal()
                     UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(email, null, authorities);
+                            new UsernamePasswordAuthenticationToken(userId, null, authorities);
 
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
