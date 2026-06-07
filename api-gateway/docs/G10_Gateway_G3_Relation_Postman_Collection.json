@@ -1,0 +1,1585 @@
+﻿{
+    "info":  {
+                 "_postman_id":  "g10-gateway-g3-relation-collection",
+                 "name":  "G10 - Gateway vers G3 Utilisateurs - Tests complets",
+                 "description":  "Collection Postman dediee a la validation de la relation Client -\u003e G10 API Gateway -\u003e G3 service-utilisateur. Elle couvre les preconditions, creation de compte, login, validation JWT/RBAC, endpoints utilisateurs, erreurs 400/401/403/404/409 et coherence du routage. Les JWT de test sont generes automatiquement avec le secret partage G3/G10. Pour utiliser de vrais JWT G3, mettre autoGenerateTokens=false et renseigner adminToken, userToken et expiredToken.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "const now = new Date();",
+                                                  "pm.collectionVariables.set(\u0027isoNow\u0027, now.toISOString());",
+                                                  "if (!pm.collectionVariables.get(\u0027runId\u0027)) {",
+                                                  "  pm.collectionVariables.set(\u0027runId\u0027, \u0027g3-\u0027 + Date.now());",
+                                                  "}",
+                                                  "pm.collectionVariables.set(\u0027testEmail\u0027, \u0027postman.\u0027 + pm.collectionVariables.get(\u0027runId\u0027) + \u0027@sgitu.ma\u0027);",
+                                                  "",
+                                                  "const autoGenerate = String(pm.collectionVariables.get(\u0027autoGenerateTokens\u0027) || \u0027true\u0027).toLowerCase() === \u0027true\u0027;",
+                                                  "if (autoGenerate) {",
+                                                  "  if (typeof CryptoJS === \u0027undefined\u0027) {",
+                                                  "    throw new Error(\u0027CryptoJS indisponible dans Postman: mettre autoGenerateTokens=false et coller des JWT G3.\u0027);",
+                                                  "  }",
+                                                  "",
+                                                  "  const secret = pm.collectionVariables.get(\u0027jwtSecret\u0027);",
+                                                  "  const nowSec = Math.floor(Date.now() / 1000);",
+                                                  "",
+                                                  "  function base64Url(wordArray) {",
+                                                  "    return CryptoJS.enc.Base64.stringify(wordArray)",
+                                                  "      .replace(/=+$/, \u0027\u0027)",
+                                                  "      .replace(/\\+/g, \u0027-\u0027)",
+                                                  "      .replace(/\\//g, \u0027_\u0027);",
+                                                  "  }",
+                                                  "",
+                                                  "  function encodeObject(obj) {",
+                                                  "    return base64Url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+                                                  "  }",
+                                                  "",
+                                                  "  function makeJwt(email, userId, roles, ttlSeconds) {",
+                                                  "    const header = { alg: \u0027HS256\u0027, typ: \u0027JWT\u0027 };",
+                                                  "    const payload = {",
+                                                  "      sub: email,",
+                                                  "      userId: String(userId),",
+                                                  "      roles: roles,",
+                                                  "      iat: nowSec,",
+                                                  "      exp: nowSec + ttlSeconds,",
+                                                  "      jti: \u0027postman-\u0027 + Math.random().toString(36).slice(2)",
+                                                  "    };",
+                                                  "    const headerPart = encodeObject(header);",
+                                                  "    const payloadPart = encodeObject(payload);",
+                                                  "    const signature = base64Url(CryptoJS.HmacSHA256(headerPart + \u0027.\u0027 + payloadPart, secret));",
+                                                  "    return headerPart + \u0027.\u0027 + payloadPart + \u0027.\u0027 + signature;",
+                                                  "  }",
+                                                  "",
+                                                  "  pm.collectionVariables.set(\u0027adminToken\u0027, makeJwt(\u0027admin.g10@sgitu.ma\u0027, \u00271\u0027, [\u0027ROLE_ADMIN\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027userToken\u0027, makeJwt(\u0027user.g10@sgitu.ma\u0027, \u00272\u0027, [\u0027ROLE_PASSENGER\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027operatorToken\u0027, makeJwt(\u0027operator.g10@sgitu.ma\u0027, \u00273\u0027, [\u0027ROLE_OPERATOR\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027expiredToken\u0027, makeJwt(\u0027expired.g10@sgitu.ma\u0027, \u00274\u0027, [\u0027ROLE_ADMIN\u0027], -60));",
+                                                  "}"
+                                              ]
+                                 }
+                  }
+              ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080",
+                         "type":  "string",
+                         "description":  "URL publique de la Gateway G10"
+                     },
+                     {
+                         "key":  "jwtSecret",
+                         "value":  "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "autoGenerateTokens",
+                         "value":  "true",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "userToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "operatorToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "expiredToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "createdUserId",
+                         "value":  "1",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "testEmail",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "runId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "isoNow",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "createdUserToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "createdUserRefreshToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "revokedToken",
+                         "value":  "",
+                         "type":  "string"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "00 - Preconditions",
+                     "item":  [
+                                  {
+                                      "name":  "00.1 - Gateway health public",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Gateway is UP\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027UP\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/actuator/health",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "actuator",
+                                                                               "health"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie que G10 est demarre."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "00.2 - Swagger G10 accessible",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027OpenAPI title G10\u0027, function () { pm.expect(pm.response.json().info.title).to.include(\u0027API Gateway G10\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/v3/api-docs",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "v3",
+                                                                               "api-docs"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie que la documentation OpenAPI de G10 expose les routes G3."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "01 - Auth publique et creation de compte",
+                     "item":  [
+                                  {
+                                      "name":  "01.1 - 201 create user public via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Created user payload valid\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.id).to.exist;",
+                                                                                    "  pm.expect(json.email).to.eql(pm.collectionVariables.get(\u0027testEmail\u0027));",
+                                                                                    "  pm.expect(json.roles).to.include(\u0027ROLE_PASSENGER\u0027);",
+                                                                                    "  pm.collectionVariables.set(\u0027createdUserId\u0027, String(json.id));",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g3-create-user\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-create-user"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\",\n  \"profile\": {\n    \"firstName\": \"Postman\",\n    \"lastName\": \"G3\",\n    \"phone\": \"+212600000000\",\n    \"address\": \"Casablanca\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ]
+                                                              },
+                                                      "description":  "Inscription publique via G10. G10 route vers G3 /api/users sans JWT."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.2 - 409 duplicate email",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 409\u0027, function () { pm.response.to.have.status(409); });",
+                                                                                    "pm.test(\u0027Error payload\u0027, function () { pm.expect(pm.response.json().message).to.exist; });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-duplicate-user"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\",\n  \"role\": \"ROLE_PASSENGER\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie la gestion d\u0027erreur metier G3 lorsque l\u0027email existe deja."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.3 - 400 invalid user payload",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 400\u0027, function () { pm.response.to.have.status(400); });",
+                                                                                    "pm.test(\u0027Bad request message exists\u0027, function () { pm.expect(pm.response.json().message).to.exist; });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-invalid-create"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"email-invalide\",\n  \"password\": \"123\",\n  \"role\": \"ROLE_PASSENGER\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie la validation DTO de G3 via G10."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.4 - 200 login created user via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Login response contains G3 JWT\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.token).to.be.a(\u0027string\u0027);",
+                                                                                    "  pm.expect(json.refreshToken).to.be.a(\u0027string\u0027);",
+                                                                                    "  pm.expect(json.email).to.eql(pm.collectionVariables.get(\u0027testEmail\u0027));",
+                                                                                    "  pm.collectionVariables.set(\u0027createdUserToken\u0027, json.token);",
+                                                                                    "  pm.collectionVariables.set(\u0027createdUserRefreshToken\u0027, json.refreshToken);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-login"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"Password123\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/auth/login",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "auth",
+                                                                               "login"
+                                                                           ]
+                                                              },
+                                                      "description":  "G10 route /auth/login vers G3 /api/auth/login. Le JWT est emis par G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.5 - 401 login wrong password",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"WrongPassword123\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/auth/login",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "auth",
+                                                                               "login"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie que G3 refuse les mauvais identifiants."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - Securite Gateway JWT/RBAC",
+                     "item":  [
+                                  {
+                                      "name":  "02.1 - 401 protected route without JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Gateway error format\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-no-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "G10 bloque les routes /api/** protegees si le JWT est absent."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.2 - 401 invalid JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Invalid token code\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027INVALID_TOKEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer token-invalide"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-invalid-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "G10 valide la signature et le format JWT avant routage vers G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.3 - 401 expired JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Invalid token code\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027INVALID_TOKEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{expiredToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-expired-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "G10 refuse un JWT expire."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.4 - 403 list users with ROLE_PASSENGER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 403\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Forbidden code\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027FORBIDDEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-forbidden-list"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ]
+                                                              },
+                                                      "description":  "GET /api/users est reserve a ROLE_ADMIN au niveau G10 et G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.5 - 403 update roles with ROLE_OPERATOR",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-forbidden-roles"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"roles\": [\"ROLE_OPERATOR\"]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/roles",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "roles"
+                                                                           ]
+                                                              },
+                                                      "description":  "ROLE_OPERATOR est autorise pour analytics G8, mais pas pour administrer les roles G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.6 - 404 unknown route with valid JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 404\u0027, function () { pm.response.to.have.status(404); });",
+                                                                                    "pm.test(\u0027Route not found code\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027ROUTE_NOT_FOUND\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-unknown-route"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/g3/unknown",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "g3",
+                                                                               "unknown"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie le format d\u0027erreur 404 de G10 lorsque la route n\u0027existe pas."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Endpoints utilisateurs via G10",
+                     "item":  [
+                                  {
+                                      "name":  "03.1 - 200 list users admin",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-list-users"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ]
+                                                              },
+                                                      "description":  "Liste des utilisateurs via G10, reservee a ROLE_ADMIN."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.2 - 200 list users filtered by role",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-list-role"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users?role=ROLE_PASSENGER",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users"
+                                                                           ],
+                                                                  "query":  [
+                                                                                {
+                                                                                    "key":  "role",
+                                                                                    "value":  "ROLE_PASSENGER"
+                                                                                }
+                                                                            ]
+                                                              },
+                                                      "description":  "Filtrage par role via G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.3 - 200 get user by id",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Correct user id\u0027, function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get(\u0027createdUserId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-get-user"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "Consultation d\u0027un utilisateur existant."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.4 - 200 user exists",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Exists true\u0027, function () { pm.expect(pm.response.json().exists).to.eql(true); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-user-exists"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/exists",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "exists"
+                                                                           ]
+                                                              },
+                                                      "description":  "Endpoint leger utilise par les autres microservices."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.5 - 200 update user profile",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Profile updated\u0027, function () { pm.expect(pm.response.json().profile.firstName).to.eql(\u0027Updated\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-update-profile"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"profile\": {\n    \"firstName\": \"Updated\",\n    \"lastName\": \"G3\",\n    \"phone\": \"+212611111111\",\n    \"address\": \"Rabat\",\n    \"birthDate\": \"2000-01-01\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "Modification du profil utilisateur."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.6 - 200 change password",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-change-password"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"newPassword\": \"NewPassword123\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/password",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "password"
+                                                                           ]
+                                                              },
+                                                      "description":  "Changement de mot de passe via G3."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.7 - 400 change password missing field",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/password",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "password"
+                                                                           ]
+                                                              },
+                                                      "description":  "Cas d\u0027erreur fonctionnel sur changement de mot de passe."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.8 - 404 get unknown user",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 404\u0027, function () { pm.response.to.have.status(404); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/999999",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "999999"
+                                                                           ]
+                                                              },
+                                                      "description":  "Cas 404 metier retourne par G3."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Administration utilisateurs via G10",
+                     "item":  [
+                                  {
+                                      "name":  "04.1 - 200 update roles admin",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Roles updated\u0027, function () {",
+                                                                                    "  const roles = pm.response.json().roles;",
+                                                                                    "  pm.expect(roles).to.include(\u0027ROLE_OPERATOR\u0027);",
+                                                                                    "  pm.expect(roles).to.include(\u0027ROLE_STAFF\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-update-roles"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"roles\": [\"ROLE_OPERATOR\", \"ROLE_STAFF\"]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/roles",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "roles"
+                                                                           ]
+                                                              },
+                                                      "description":  "Admin G10/G3: modification des roles utilisateur."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.2 - 400 update roles empty list",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 400\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"roles\": []\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/roles",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "roles"
+                                                                           ]
+                                                              },
+                                                      "description":  "Erreur lorsque la liste des roles est vide."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.3 - 200 deactivate user admin",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027User inactive\u0027, function () { pm.expect(pm.response.json().active).to.eql(false); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-deactivate"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/deactivate",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "deactivate"
+                                                                           ]
+                                                              },
+                                                      "description":  "Desactivation d\u0027un compte. G3 publie un evenement utilisateur vers G8 si configure."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.4 - 403 login deactivated user",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 403\u0027, function () { pm.response.to.have.status(403); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"NewPassword123\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/auth/login",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "auth",
+                                                                               "login"
+                                                                           ]
+                                                              },
+                                                      "description":  "G3 refuse le login d\u0027un compte desactive."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.5 - 200 activate user admin",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027User active\u0027, function () { pm.expect(pm.response.json().active).to.eql(true); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-activate"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}/activate",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}",
+                                                                               "activate"
+                                                                           ]
+                                                              },
+                                                      "description":  "Reactivation du compte utilisateur."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.6 - 204 delete user admin",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 204\u0027, function () { pm.response.to.have.status(204); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-delete"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "Suppression finale de l\u0027utilisateur cree par la collection."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.7 - 404 get deleted user",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 404\u0027, function () { pm.response.to.have.status(404); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-get-deleted"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/users/{{createdUserId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "users",
+                                                                               "{{createdUserId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "Confirme que l\u0027utilisateur de test a bien ete supprime."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04bis - Verification email G3 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "04bis.1 - 400 verify email code invalide",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test('Status 400 ou 404 selon etat utilisateur', function () { pm.expect([400, 404]).to.include(pm.response.code); });",
+                                                                                    "pm.test('Reponse erreur JSON', function () { const json = pm.response.json(); pm.expect(json.status || pm.response.code).to.exist; });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-verify-email-invalid"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/verify-email",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\",\n  \"code\": \"000000\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "description":  "Couvre le nouvel endpoint G3 /auth/verify-email via G10 avec un code volontairement invalide."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04bis.2 - resend verification code G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test('Endpoint resend-code route via G10', function () { pm.expect([200, 400, 404]).to.include(pm.response.code); });",
+                                                                                    "pm.test('Reponse JSON', function () { const json = pm.response.json(); pm.expect(json).to.be.an('object'); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g3-resend-code"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/resend-code",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{testEmail}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "description":  "Couvre le nouvel endpoint G3 /auth/resend-code via G10. Le statut exact depend de l'etat du compte cree pendant la collection."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - Refresh logout et blacklist G3 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "05.1 - 200 refresh token G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027G3 retourne un nouveau JWT et refreshToken\u0027, function () { const json = pm.response.json(); pm.expect(json.token).to.be.a(\u0027string\u0027); pm.expect(json.refreshToken).to.be.a(\u0027string\u0027); pm.collectionVariables.set(\u0027createdUserToken\u0027, json.token); pm.collectionVariables.set(\u0027createdUserRefreshToken\u0027, json.refreshToken); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/refresh",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"refreshToken\": \"{{createdUserRefreshToken}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05.2 - 204 logout G3 via G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "prerequest",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.collectionVariables.set(\u0027revokedToken\u0027, pm.collectionVariables.get(\u0027createdUserToken\u0027));"
+                                                                                ]
+                                                                   }
+                                                    },
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 204\u0027, function () { pm.response.to.have.status(204); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{createdUserToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/auth/logout",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"refreshToken\": \"{{createdUserRefreshToken}}\"\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05.3 - 401 token revoque apres logout",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Erreur de token revoque ou invalide\u0027, function () { const json = pm.response.json(); pm.expect([\u0027TOKEN_REVOKED\u0027, \u0027INVALID_TOKEN\u0027, \u0027UNAUTHORIZED\u0027]).to.include(json.code); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{revokedToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/users"
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}

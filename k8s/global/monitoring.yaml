@@ -1,0 +1,285 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: sgitu
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: service-billetterie
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['service-billetterie:8081']
+
+      - job_name: service-abonnement
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['service-abonnement:8082']
+
+      - job_name: g3-user-service
+        metrics_path: /api/actuator/prometheus
+        static_configs:
+          - targets: ['g3-user-service:8083']
+
+      - job_name: g4-coordination
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['g4-coordination:8084']
+
+      - job_name: g5-notification
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['notification-service:8085']
+
+      - job_name: payment-service
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['payment-service:8086']
+
+      - job_name: service-suivi-vehicule
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['g7-service:8087']
+
+      - job_name: g8-analytics
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['g8-analytics-service:8088']
+
+      - job_name: g9-gestion-incidents
+        metrics_path: /api/incidents/actuator/prometheus
+        static_configs:
+          - targets: ['service-gestion-incidents:8089']
+
+      - job_name: g10-api-gateway
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['api-gateway:8080']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          ports:
+            - containerPort: 9090
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: sgitu
+spec:
+  type: NodePort
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+      nodePort: 30090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-provisioning
+  namespace: sgitu
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+  dashboard-provider.yml: |
+    apiVersion: 1
+    providers:
+      - name: SGITU
+        orgId: 1
+        folder: SGITU
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  g10-api-gateway-dashboard.json: |
+    {
+      "title": "SGITU - G10 API Gateway",
+      "uid": "sgitu-g10-api-gateway-k8s",
+      "schemaVersion": 36,
+      "version": 1,
+      "refresh": "10s",
+      "tags": ["SGITU", "G10", "Kubernetes"],
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Gateway UP",
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "up{job=\"g10-api-gateway\"}", "refId": "A"}]
+        },
+        {
+          "type": "timeseries",
+          "title": "Gateway Requests/s",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{job=\"g10-api-gateway\"}[1m]))", "refId": "A"}]
+        },
+        {
+          "type": "timeseries",
+          "title": "HTTP 5xx",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{job=\"g10-api-gateway\",status=~\"5..\"}[1m]))", "refId": "A"}]
+        }
+      ]
+    }
+  sgitu-global-services-dashboard.json: |
+    {
+      "title": "SGITU - Vue Globale Tous les Groupes",
+      "uid": "sgitu-global-all-groups-k8s",
+      "schemaVersion": 36,
+      "version": 1,
+      "refresh": "10s",
+      "tags": ["SGITU", "Global", "Kubernetes"],
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Services UP",
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum(up)", "refId": "A"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+        },
+        {
+          "type": "stat",
+          "title": "Services DOWN",
+          "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "count(up) - sum(up)", "refId": "A"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+        },
+        {
+          "type": "table",
+          "title": "Etat Prometheus de tous les services",
+          "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "up", "format": "table", "instant": true, "refId": "A"}],
+          "fieldConfig": {"defaults": {"custom": {"align": "auto"}}}
+        },
+        {
+          "type": "timeseries",
+          "title": "Requetes HTTP par seconde par service",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 9},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum by (job) (rate(http_server_requests_seconds_count[1m]))", "refId": "A"}]
+        },
+        {
+          "type": "timeseries",
+          "title": "Erreurs HTTP 5xx par service",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [{"expr": "sum by (job) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))", "refId": "A"}]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: sgitu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sgitu-secrets
+                  key: GRAFANA_ADMIN_PASSWORD
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+          volumeMounts:
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/datasources/datasource.yml
+              subPath: datasource.yml
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/dashboard-provider.yml
+              subPath: dashboard-provider.yml
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/g10-api-gateway-dashboard.json
+              subPath: g10-api-gateway-dashboard.json
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/sgitu-global-services-dashboard.json
+              subPath: sgitu-global-services-dashboard.json
+            - name: data
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: provisioning
+          configMap:
+            name: grafana-provisioning
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: sgitu
+spec:
+  type: NodePort
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30300
+

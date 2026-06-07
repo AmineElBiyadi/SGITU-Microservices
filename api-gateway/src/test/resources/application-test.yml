@@ -1,0 +1,23 @@
+server:
+  port: 0
+
+spring:
+  cloud:
+    gateway:
+      enabled: true
+
+jwt:
+  secret: SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!
+  expiration: 3600000
+  refresh-expiration: 604800000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO

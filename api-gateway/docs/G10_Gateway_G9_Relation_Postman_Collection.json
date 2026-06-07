@@ -1,0 +1,268 @@
+{
+  "info": {
+    "_postman_id": "g10-g9-incidents-integration",
+    "name": "G10 Gateway - G9 Incidents Integration",
+    "description": "Tests Postman pour valider la relation G10 -> G9. G10 valide le JWT, propage X-User-Id/X-User-Email/X-Roles/X-User-Role/X-Correlation-Id, puis route vers le service de gestion des incidents.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const secret = pm.collectionVariables.get('jwtSecret');",
+          "function b64url(input) { return CryptoJS.enc.Base64.stringify(input).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_'); }",
+          "function makeJwt(email, userId, roles, ttl) {",
+          "  const now = Math.floor(Date.now() / 1000);",
+          "  const header = { alg: 'HS256', typ: 'JWT' };",
+          "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttl, jti: 'g10-g9-' + Math.random().toString(36).slice(2) };",
+          "  const h = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "  const p = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "  const s = b64url(CryptoJS.HmacSHA256(h + '.' + p, secret));",
+          "  return h + '.' + p + '.' + s;",
+          "}",
+          "pm.collectionVariables.set('passengerToken', makeJwt('passenger.g9@sgitu.ma', 91, ['ROLE_PASSENGER'], 3600));",
+          "pm.collectionVariables.set('dispatcherToken', makeJwt('dispatcher.g9@sgitu.ma', 92, ['ROLE_DISPATCHER'], 3600));",
+          "pm.collectionVariables.set('supervisorToken', makeJwt('supervisor.g9@sgitu.ma', 93, ['ROLE_SUPERVISOR'], 3600));",
+          "pm.collectionVariables.set('technicianToken', makeJwt('technician.g9@sgitu.ma', 94, ['ROLE_TECHNICIAN'], 3600));",
+          "pm.collectionVariables.set('expiredToken', makeJwt('expired.g9@sgitu.ma', 95, ['ROLE_DISPATCHER'], -60));",
+          "pm.collectionVariables.set('invalidToken', 'invalid.jwt.token');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "jwtSecret", "value": "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!" },
+    { "key": "g9IncidentId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "00 - Disponibilite G10 et G9",
+      "item": [
+        {
+          "name": "00.1 - 200 health G10",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Gateway disponible', function () { pm.response.to.have.status(200); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "00.2 - 200 health G9 via G10",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g9-health" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/actuator/health"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('G9 health route via G10', function () { pm.response.to.have.status(200); });",
+              "pm.test('Correlation id retourne', function () { pm.expect(pm.response.headers.get('X-Correlation-Id')).to.eql('g10-g9-health'); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Securite JWT avant G9",
+      "item": [
+        {
+          "name": "01.1 - 401 incidents sans JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-Id", "value": "g10-g9-no-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/mes-signalements"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('JWT absent bloque', function () { pm.response.to.have.status(401); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "01.2 - 401 incidents JWT invalide",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{invalidToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-invalid-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/mes-signalements"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('JWT invalide bloque', function () { pm.response.to.have.status(401); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "01.3 - 401 incidents JWT expire",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{expiredToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-expired-jwt" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/mes-signalements"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('JWT expire bloque', function () { pm.response.to.have.status(401); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - RBAC G9",
+      "item": [
+        {
+          "name": "02.1 - 403 ROLE_PASSENGER tableau de bord",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-passenger-dashboard" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/rapports/tableau-bord"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Passenger refuse sur rapport', function () { pm.response.to.have.status(403); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "02.2 - 200 ROLE_DISPATCHER tableau de bord",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-dispatcher-dashboard" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/rapports/tableau-bord"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Dispatcher autorise', function () { pm.expect([200, 500]).to.include(pm.response.code); });",
+              "pm.test('Pas bloque par G10/G9 security', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "02.3 - 200 ROLE_SUPERVISOR tous incidents",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{supervisorToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-supervisor-all" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/tous"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Supervisor non bloque', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Flux metier incidents G9",
+      "item": [
+        {
+          "name": "03.1 - 201 ROLE_PASSENGER signaler incident",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{passengerToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-create-incident" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"RETARD\",\n  \"description\": \"Retard important constate sur la ligne L1 pendant la circulation.\",\n  \"dateIncident\": \"2026-06-02T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"ligneTransport\": \"L1\"\n}"
+            },
+            "url": "{{baseUrl}}/api/incidents/signaler"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Signalement accepte ou erreur metier non securite', function () { pm.expect([201, 400, 500]).to.include(pm.response.code); });",
+              "pm.test('Headers G10 acceptes par G9', function () { pm.expect([401, 403]).to.not.include(pm.response.code); });",
+              "if (pm.response.code === 201) { const body = pm.response.json(); if (body.id) pm.collectionVariables.set('g9IncidentId', body.id); }"
+            ] } }
+          ]
+        },
+        {
+          "name": "03.2 - 200/404 consulter incident avec ROLE_TECHNICIAN",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{technicianToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-get-incident" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/{{g9IncidentId}}"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Technician non bloque', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Route legacy rapports",
+      "item": [
+        {
+          "name": "04.1 - 200 legacy /api/rapports via RewritePath",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-legacy-rapports" }
+            ],
+            "url": "{{baseUrl}}/api/rapports/tableau-bord"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Route legacy routee vers G9', function () { pm.expect([200, 500]).to.include(pm.response.code); });",
+              "pm.test('Pas de 404 Gateway', function () { pm.expect(pm.response.code).to.not.eql(404); });"
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Resilience manuelle G9",
+      "item": [
+        {
+          "name": "05.1 - 503 G9 indisponible via G10",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dispatcherToken}}" },
+              { "key": "X-Correlation-Id", "value": "g10-g9-down" }
+            ],
+            "url": "{{baseUrl}}/api/incidents/rapports/tableau-bord"
+          },
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('A executer apres docker stop service-gestion-incidents', function () { pm.expect([503, 504]).to.include(pm.response.code); });"
+            ] } }
+          ]
+        }
+      ]
+    }
+  ]
+}

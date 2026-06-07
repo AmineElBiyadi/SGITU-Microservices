@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: SGITU-G10
+    orgId: 1
+    folder: SGITU G10
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+

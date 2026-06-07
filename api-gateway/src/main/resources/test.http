@@ -1,164 +1,194 @@
-### Health
-GET http://localhost:8080/actuator/health
+### ============================================================
+### G10 - API Gateway & Securite
+### Architecture adaptee : G3 est source de verite utilisateurs/JWT.
+### G10 valide le JWT, controle les roles, route vers G1-G9.
+### ============================================================
+
+@baseUrl = http://localhost:8080
+@userToken = COLLER_ACCESS_TOKEN_G3_ROLE_USER
+@adminToken = COLLER_ACCESS_TOKEN_G3_ROLE_ADMIN
+@operatorToken = COLLER_ACCESS_TOKEN_G3_ROLE_OPERATOR
+@staffToken = COLLER_ACCESS_TOKEN_G3_ROLE_STAFF
 
 
-### Register ROLE_USER
-### Apres cette requete, copier le token/lien affiche dans les logs:
-### DEV email verification link for user1@sgitu.ma: http://localhost:8080/auth/verify-email?token=...
-POST http://localhost:8080/auth/register
+### Health G10
+GET {{baseUrl}}/actuator/health
+
+
+### Swagger G10
+GET {{baseUrl}}/swagger-ui.html
+
+
+### Auth G3 routee par G10 - login
+### G10 ne traite pas le mot de passe. Il route vers G3.
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "user1@sgitu.ma",
-  "password": "123456",
-  "role": "ROLE_USER"
+  "email": "user@sgitu.ma",
+  "password": "Password123"
 }
 
 
-### Login avant verification email - attendu 401
-POST http://localhost:8080/auth/login
+### G3 route par G10 - creation de compte
+POST {{baseUrl}}/api/users
 Content-Type: application/json
 
 {
-  "email": "user1@sgitu.ma",
-  "password": "123456"
+  "email": "new.user@sgitu.ma",
+  "password": "Password123",
+  "role": "ROLE_PASSENGER"
 }
 
 
-### Verify email
-GET http://localhost:8080/auth/verify-email?token=COLLER_EMAIL_VERIFICATION_TOKEN_ICI
-
-
-### Login apres verification email
-POST http://localhost:8080/auth/login
+### Auth G3 routee par G10 - refresh
+POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
 
 {
-  "email": "user1@sgitu.ma",
-  "password": "123456"
+  "refreshToken": "COLLER_REFRESH_TOKEN_G3"
 }
 
 
-### Forgot password
-### Copier ensuite le reset token affiche dans les logs:
-### DEV password reset token for user1@sgitu.ma: ...
-POST http://localhost:8080/auth/forgot-password
-Content-Type: application/json
-
-{
-  "email": "user1@sgitu.ma"
-}
+### 401 - route protegee sans JWT
+GET {{baseUrl}}/api/payments/1
 
 
-### Reset password
-POST http://localhost:8080/auth/reset-password
-Content-Type: application/json
-
-{
-  "token": "COLLER_PASSWORD_RESET_TOKEN_ICI",
-  "newPassword": "newPassword123"
-}
-
-
-### Login avec nouveau mot de passe
-POST http://localhost:8080/auth/login
-Content-Type: application/json
-
-{
-  "email": "user1@sgitu.ma",
-  "password": "newPassword123"
-}
-
-
-### 401 - Route protegee sans JWT
-GET http://localhost:8080/api/payments/1
+### 401 - route protegee avec JWT invalide
+GET {{baseUrl}}/api/payments/1
+Authorization: Bearer token-invalide
+X-Correlation-Id: test-invalid-token
 
 
 ### 404 - JWT valide mais route inconnue
-GET http://localhost:8080/api/unknown/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/unknown/test
+Authorization: Bearer {{adminToken}}
 X-Correlation-Id: test-404
 
 
-### 403 - ROLE_USER interdit sur route admin
-PUT http://localhost:8080/api/users/1/roles
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+### 403 - ROLE_USER interdit sur endpoint admin G3 route par G10
+PUT {{baseUrl}}/api/users/1/roles
+Authorization: Bearer {{userToken}}
+X-Correlation-Id: test-403-admin-users
 Content-Type: application/json
-X-Correlation-Id: test-403
 
 {
-  "role": "ROLE_ADMIN"
+  "roles": ["ROLE_OPERATOR"]
 }
 
 
-### Routage G1 Billetterie
-GET http://localhost:8080/api/tickets/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+### G3 route par G10 - lister comptes utilisateurs
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{adminToken}}
+X-Correlation-Id: test-admin-users
+
+
+### Admin G3 route par G10 - changer roles
+PUT {{baseUrl}}/api/users/1/roles
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-Correlation-Id: test-admin-role
+
+{
+  "roles": ["ROLE_OPERATOR"]
+}
+
+
+### Routage G1 Billetterie - details ticket
+GET {{baseUrl}}/api/v1/tickets/1
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g1
 
 
+### Routage G1 Billetterie - admin dashboard
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+X-Correlation-Id: test-g1-admin
+
+
 ### Routage G2 Abonnements
-GET http://localhost:8080/api/abonnements/1
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/abonnements/1
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g2
 
 
-### Routage G3 Utilisateurs
-GET http://localhost:8080/api/users/1
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+### Routage G2 Admin - suspendre abonnement
+POST {{baseUrl}}/api/abonnements/admin/1/suspendre?motif=test
+Authorization: Bearer {{adminToken}}
+X-Correlation-Id: test-g2-admin
+
+
+### Routage G3 Utilisateurs - profil
+GET {{baseUrl}}/api/users/1
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g3
 
 
 ### Routage G4 Coordination
-GET http://localhost:8080/api/coordination/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/g4/health
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g4
 
 
 ### Routage G5 Notifications
-GET http://localhost:8080/api/notifications/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/notifications/1
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g5
 
 
 ### Routage G6 Paiement
-GET http://localhost:8080/api/payments/1
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/payments/1
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g6
 
 
 ### Routage G7 Suivi Vehicules
-GET http://localhost:8080/api/vehicles/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/suivi-vehicules/health
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g7
 
 
-### Routage G8 Analytics
-GET http://localhost:8080/api/analytics/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
-X-Correlation-Id: test-g8
+### Routage G8 Ingestion - tickets
+POST {{baseUrl}}/api/v1/ingestion/tickets
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+X-Correlation-Id: test-g8-ingestion-tickets
+
+[
+  {
+    "ticketId": "TCK-1",
+    "userId": "1",
+    "timestamp": "2026-05-07T10:00:00Z",
+    "status": "validated",
+    "amount": 6.0,
+    "line": "L1",
+    "zone": "Centre"
+  }
+]
+
+
+### Routage G8 Analytics - dashboard admin/operator/staff
+GET {{baseUrl}}/api/v1/analytics/dashboard
+Authorization: Bearer {{adminToken}}
+X-Correlation-Id: test-g8-dashboard
+
+
+### Routage G8 ML - prediction peak hours admin/operator/staff
+POST {{baseUrl}}/predict/peak-hours
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+X-Correlation-Id: test-g8-predict-peak-hours
+
+{
+  "data": [
+    { "hour": 8, "validationCount": 120 },
+    { "hour": 17, "validationCount": 180 },
+    { "hour": 18, "validationCount": 160 }
+  ]
+}
 
 
 ### Routage G9 Incidents
-GET http://localhost:8080/api/incidents/test
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
+GET {{baseUrl}}/api/incidents/test
+Authorization: Bearer {{userToken}}
 X-Correlation-Id: test-g9
-
-
-### Refresh token
-POST http://localhost:8080/auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "COLLER_REFRESH_TOKEN_ICI"
-}
-
-
-### Logout
-POST http://localhost:8080/auth/logout
-Authorization: Bearer COLLER_ACCESS_TOKEN_ICI
-Content-Type: application/json
-
-{
-  "refreshToken": "COLLER_REFRESH_TOKEN_ICI"
-}

@@ -1,0 +1,1602 @@
+﻿{
+    "info":  {
+                 "_postman_id":  "g10-gateway-g8-relation-collection",
+                 "name":  "G10 - Gateway vers G8 Analytics - Tests complets",
+                 "description":  "Collection Postman dediee a la validation de la relation Client -\u003e G10 API Gateway -\u003e G8 Analytics/ML. Elle couvre les preconditions, la securite JWT/RBAC, les endpoints d\u0027ingestion, les endpoints analytics, les rapports, le ML et les cas d\u0027erreur. Par defaut, les JWT de test sont generes automatiquement avec le secret local partage avec G3. Pour utiliser de vrais JWT G3, mettre autoGenerateTokens=false et renseigner adminToken, operatorToken, staffToken et userToken.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "const now = new Date();",
+                                                  "pm.collectionVariables.set(\u0027today\u0027, now.toISOString().slice(0, 10));",
+                                                  "pm.collectionVariables.set(\u0027isoNow\u0027, now.toISOString());",
+                                                  "if (!pm.collectionVariables.get(\u0027runId\u0027)) {",
+                                                  "  pm.collectionVariables.set(\u0027runId\u0027, \u0027postman-\u0027 + Date.now());",
+                                                  "}",
+                                                  "",
+                                                  "const autoGenerate = String(pm.collectionVariables.get(\u0027autoGenerateTokens\u0027) || \u0027true\u0027).toLowerCase() === \u0027true\u0027;",
+                                                  "if (autoGenerate) {",
+                                                  "  if (typeof CryptoJS === \u0027undefined\u0027) {",
+                                                  "    throw new Error(\u0027CryptoJS indisponible dans Postman: mettre autoGenerateTokens=false et coller des JWT G3.\u0027);",
+                                                  "  }",
+                                                  "",
+                                                  "  const secret = pm.collectionVariables.get(\u0027jwtSecret\u0027);",
+                                                  "  const nowSec = Math.floor(Date.now() / 1000);",
+                                                  "",
+                                                  "  function base64Url(wordArray) {",
+                                                  "    return CryptoJS.enc.Base64.stringify(wordArray)",
+                                                  "      .replace(/=+$/, \u0027\u0027)",
+                                                  "      .replace(/\\+/g, \u0027-\u0027)",
+                                                  "      .replace(/\\//g, \u0027_\u0027);",
+                                                  "  }",
+                                                  "",
+                                                  "  function encodeObject(obj) {",
+                                                  "    return base64Url(CryptoJS.enc.Utf8.parse(JSON.stringify(obj)));",
+                                                  "  }",
+                                                  "",
+                                                  "  function makeJwt(email, userId, roles, ttlSeconds) {",
+                                                  "    const header = { alg: \u0027HS256\u0027, typ: \u0027JWT\u0027 };",
+                                                  "    const payload = {",
+                                                  "      sub: email,",
+                                                  "      userId: userId,",
+                                                  "      roles: roles,",
+                                                  "      iat: nowSec,",
+                                                  "      exp: nowSec + ttlSeconds,",
+                                                  "      jti: \u0027postman-\u0027 + Math.random().toString(36).slice(2)",
+                                                  "    };",
+                                                  "    const headerPart = encodeObject(header);",
+                                                  "    const payloadPart = encodeObject(payload);",
+                                                  "    const signature = base64Url(CryptoJS.HmacSHA256(headerPart + \u0027.\u0027 + payloadPart, secret));",
+                                                  "    return headerPart + \u0027.\u0027 + payloadPart + \u0027.\u0027 + signature;",
+                                                  "  }",
+                                                  "",
+                                                  "  pm.collectionVariables.set(\u0027adminToken\u0027, makeJwt(\u0027admin.g10@sgitu.ma\u0027, \u00271\u0027, [\u0027ROLE_ADMIN\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027operatorToken\u0027, makeJwt(\u0027operator.g10@sgitu.ma\u0027, \u00272\u0027, [\u0027ROLE_OPERATOR\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027staffToken\u0027, makeJwt(\u0027staff.g10@sgitu.ma\u0027, \u00275\u0027, [\u0027ROLE_STAFF\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027userToken\u0027, makeJwt(\u0027user.g10@sgitu.ma\u0027, \u00273\u0027, [\u0027ROLE_USER\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027expiredToken\u0027, makeJwt(\u0027expired.g10@sgitu.ma\u0027, \u00274\u0027, [\u0027ROLE_ADMIN\u0027], -60));",
+                                                  "}"
+                                              ]
+                                 }
+                  }
+              ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080",
+                         "type":  "string",
+                         "description":  "URL publique de la Gateway G10"
+                     },
+                     {
+                         "key":  "jwtSecret",
+                         "value":  "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "autoGenerateTokens",
+                         "value":  "true",
+                         "type":  "string",
+                         "description":  "true: JWT locaux generes par Postman. false: utiliser les JWT G3 colles dans les variables."
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "operatorToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "staffToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "userToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "expiredToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "runId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "isoNow",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "today",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "reportId",
+                         "value":  "",
+                         "type":  "string"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "00 - Preconditions",
+                     "item":  [
+                                  {
+                                      "name":  "00.1 - Gateway health public",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Gateway is UP\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.status).to.eql(\u0027UP\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/actuator/health",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "actuator",
+                                                                               "health"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie que la Gateway G10 est demarree."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "01 - Securite Gateway JWT/RBAC",
+                     "item":  [
+                                  {
+                                      "name":  "01.1 - 401 analytics sans JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Gateway returns UNAUTHORIZED\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.code).to.eql(\u0027UNAUTHORIZED\u0027);",
+                                                                                    "  pm.expect(json.correlationId).to.eql(\u0027g10-g8-no-jwt\u0027);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Correlation id propagated by Gateway\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-no-jwt\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-no-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "Un endpoint analytics est protege. Sans JWT, la Gateway doit refuser avant routage vers G8."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.2 - 401 analytics avec JWT invalide",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Gateway returns INVALID_TOKEN\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.code).to.eql(\u0027INVALID_TOKEN\u0027);",
+                                                                                    "  pm.expect(json.correlationId).to.eql(\u0027g10-g8-invalid-jwt\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer token-invalide"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-invalid-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "La signature ou le format du JWT est invalide. La Gateway doit retourner 401."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.3 - 401 analytics avec JWT expire",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 401\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Gateway returns INVALID_TOKEN\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.code).to.eql(\u0027INVALID_TOKEN\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{expiredToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-expired-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "JWT bien signe mais expire. La Gateway doit retourner 401."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.4 - 403 analytics avec ROLE_USER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 403\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Gateway returns FORBIDDEN\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.code).to.eql(\u0027FORBIDDEN\u0027);",
+                                                                                    "  pm.expect(json.correlationId).to.eql(\u0027g10-g8-user-forbidden\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-user-forbidden"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "ROLE_USER est authentifie mais n\u0027a pas acces aux analytics. La Gateway doit retourner 403."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.5 - 200 analytics avec ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Gateway routed to G8\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-admin-analytics\u0027);",
+                                                                                    "  pm.expect(pm.response.json()).to.be.an(\u0027array\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-admin-analytics"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "ROLE_ADMIN peut acceder aux analytics via la Gateway."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.6 - 200 analytics avec ROLE_OPERATOR",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Gateway routed to G8\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-operator-analytics\u0027);",
+                                                                                    "  pm.expect(pm.response.json()).to.be.an(\u0027array\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-operator-analytics"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "ROLE_OPERATOR peut acceder aux analytics via la Gateway."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.7 - 200 analytics avec ROLE_STAFF",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Gateway routed to G8\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-staff-analytics\u0027);",
+                                                                                    "  pm.expect(pm.response.json()).to.be.an(\u0027array\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{staffToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-staff-analytics"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "ROLE_STAFF peut acceder aux analytics via la Gateway."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - Ingestion G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "02.1 - Ingest tickets",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.status).to.eql(\u0027SUCCESS\u0027);",
+                                                                                    "  pm.expect(json.totalAccepted).to.be.above(0);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-ingest-tickets\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-tickets"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-001\",\n    \"userId\": \"USR-{{runId}}-001\",\n    \"status\": \"validated\",\n    \"line\": \"L1\",\n    \"stationId\": \"ST-05\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"scanType\": \"NFC\"\n  },\n  {\n    \"ticketId\": \"TCK-{{runId}}-002\",\n    \"userId\": \"USR-{{runId}}-002\",\n    \"status\": \"validated\",\n    \"line\": \"L2\",\n    \"stationId\": \"ST-10\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"scanType\": \"QR\"\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/tickets",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "tickets"
+                                                                           ]
+                                                              },
+                                                      "description":  "Teste le routage Gateway vers l\u0027ingestion tickets G8. ROLE_USER suffit car /api/v1/ingestion/** exige seulement un JWT valide."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.2 - Ingest incidents",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027SUCCESS\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-incidents"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"incidentId\": \"INC-{{runId}}-001\",\n    \"type\": \"breakdown\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"severity\": \"HIGH\",\n    \"resolutionMinutes\": 25\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/incidents",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "incidents"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.3 - Ingest payments",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027SUCCESS\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-payments"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"transactionId\": \"TXN-{{runId}}-001\",\n    \"status\": \"completed\",\n    \"line\": \"L1\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"amount\": 25.50,\n    \"method\": \"CARD\"\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/payments",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "payments"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.4 - Ingest subscriptions",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027SUCCESS\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-subscriptions"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"userId\": \"USR-{{runId}}-SUB\",\n    \"action\": \"created\",\n    \"planType\": \"MONTHLY_STUDENT\",\n    \"timestamp\": \"{{isoNow}}\"\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/subscriptions",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "subscriptions"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.5 - Ingest vehicles",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027SUCCESS\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-vehicles"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"vehicleId\": \"BUS-{{runId}}-001\",\n    \"status\": \"in_service\",\n    \"line\": \"L1\",\n    \"zone\": \"Z_CENTER\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"speed\": 42.5,\n    \"occupancy\": 80,\n    \"delayMinutes\": 0\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/vehicles",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "vehicles"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.6 - Ingest users",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                    "pm.test(\u0027Batch accepted\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027SUCCESS\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ingest-users"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"userId\": \"USR-{{runId}}-MOBILE\",\n    \"action\": \"active\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"deviceOS\": \"Android\"\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/users",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "users"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Analytics G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "03.1 - GET dashboard",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Dashboard is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-dashboard\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-dashboard"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "Endpoint principal utilise par le tableau de bord."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.2 - GET trips summary",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-trips"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/trips/summary",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "trips",
+                                                                               "summary"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.3 - GET revenue summary",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-revenue"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/revenue/summary",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "revenue",
+                                                                               "summary"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.4 - GET incidents stats",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-incidents"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/incidents/stats",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "incidents",
+                                                                               "stats"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.5 - GET vehicles activity",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-vehicles"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/vehicles/activity",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "vehicles",
+                                                                               "activity"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.6 - GET users stats",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-users"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/users/stats",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "users",
+                                                                               "stats"
+                                                                           ]
+                                                              }
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.7 - GET subscriptions stats",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Response is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-subscriptions"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/subscriptions/stats",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "subscriptions",
+                                                                               "stats"
+                                                                           ]
+                                                              }
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Reports G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "04.1 - POST generate report",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Report id saved\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.id).to.exist;",
+                                                                                    "  pm.collectionVariables.set(\u0027reportId\u0027, json.id);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-report-generate"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"period\": \"{{today}}\",\n  \"types\": [\"TRIPS\", \"REVENUE\", \"INCIDENTS\", \"VEHICLES\", \"SUBSCRIPTIONS\", \"USERS\"]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/reports/generate",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "reports",
+                                                                               "generate"
+                                                                           ]
+                                                              },
+                                                      "description":  "Genere un rapport G8 via G10 et sauvegarde automatiquement reportId pour la requete suivante."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "04.2 - GET report by saved id",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Returned report matches saved id\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.id).to.eql(pm.collectionVariables.get(\u0027reportId\u0027));",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-report-by-id"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/reports/{{reportId}}",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "reports",
+                                                                               "{{reportId}}"
+                                                                           ]
+                                                              },
+                                                      "description":  "A lancer apres 04.1 car reportId est rempli par le test script de generation."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - ML G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "05.1 - POST predict peak hours",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Prediction payload valid\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.predicted_peak_hours).to.be.an(\u0027array\u0027);",
+                                                                                    "  pm.expect(json.distribution).to.be.an(\u0027array\u0027);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-ml-peak-hours\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ml-peak-hours"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 },\n    { \"hour\": 17, \"validationCount\": 180 },\n    { \"hour\": 18, \"validationCount\": 160 }\n  ]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/predict/peak-hours",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "predict",
+                                                                               "peak-hours"
+                                                                           ]
+                                                              },
+                                                      "description":  "Teste le routage Gateway vers le service ML G8. ROLE_OPERATOR est autorise."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "05.2 - POST predict incidents",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Incident prediction payload valid\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.at_risk_zones).to.be.an(\u0027array\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ml-incidents"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"data\": [\n    { \"zone\": \"Z_CENTER\", \"incidentCount\": 5, \"severity\": \"HIGH\" },\n    { \"zone\": \"Z_NORTH\", \"incidentCount\": 2, \"severity\": \"CRITICAL\" },\n    { \"zone\": \"Z_SOUTH\", \"incidentCount\": 1, \"severity\": \"MEDIUM\" },\n    { \"zone\": \"Z_WEST\", \"incidentCount\": 8, \"severity\": \"LOW\" }\n  ]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/predict/incidents",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "predict",
+                                                                               "incidents"
+                                                                           ]
+                                                              },
+                                                      "description":  "Teste le second endpoint ML G8 via G10."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "06 - Cas d\u0027erreur G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "06.1 - 400 empty ingestion batch",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 400\u0027, function () { pm.response.to.have.status(400); });",
+                                                                                    "pm.test(\u0027Error routed through Gateway\u0027, function () {",
+                                                                                    "  pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-empty-batch\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-empty-batch"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/tickets",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "tickets"
+                                                                           ]
+                                                              },
+                                                      "description":  "Le batch vide doit etre rejete par G8 avec 400, tout en conservant le correlationId de G10."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "06.2 - 207 partial ingestion missing timestamp",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 207\u0027, function () { pm.response.to.have.status(207); });",
+                                                                                    "pm.test(\u0027Partial response\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.status).to.eql(\u0027PARTIAL\u0027);",
+                                                                                    "  pm.expect(json.totalRejected).to.be.above(0);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-partial-batch"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "[\n  {\n    \"ticketId\": \"TCK-{{runId}}-GOOD\",\n    \"userId\": \"USR-GOOD\",\n    \"timestamp\": \"{{isoNow}}\",\n    \"status\": \"validated\"\n  },\n  {\n    \"ticketId\": \"TCK-{{runId}}-BAD\",\n    \"userId\": \"USR-BAD\",\n    \"status\": \"validated\"\n  }\n]",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/ingestion/tickets",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "ingestion",
+                                                                               "tickets"
+                                                                           ]
+                                                              },
+                                                      "description":  "Un evenement valide et un evenement sans timestamp. G8 doit retourner 207 PARTIAL."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "06.3 - 404 report inexistant",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 404\u0027, function () { pm.response.to.have.status(404); });",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-report-404\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-report-404"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/reports/000000000000000000000000",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "reports",
+                                                                               "000000000000000000000000"
+                                                                           ]
+                                                              },
+                                                      "description":  "Verifie que les erreurs fonctionnelles G8 restent visibles a travers la Gateway."
+                                                  }
+                                  },
+                                  {
+                                      "name":  "06.4 - 403 ML avec ROLE_USER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status 403\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Gateway blocks USER before ML\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.code).to.eql(\u0027FORBIDDEN\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{userToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-ml-user-forbidden"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"data\": [\n    { \"hour\": 8, \"validationCount\": 120 }\n  ]\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/predict/peak-hours",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "predict",
+                                                                               "peak-hours"
+                                                                           ]
+                                                              },
+                                                      "description":  "Le service ML est protege comme les analytics: seuls ROLE_ADMIN, ROLE_OPERATOR et ROLE_STAFF sont autorises."
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "07 - Resilience G8 via Gateway",
+                     "item":  [
+                                  {
+                                      "name":  "07.1 - G8 down -\u003e 503 via G10",
+                                      "description":  "Verifier que la Gateway retourne une erreur propre lorsque G8 Analytics est indisponible.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027G8 up ou indisponible gere proprement\u0027, function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g8-down\u0027); });",
+                                                                                    "if (pm.response.code === 503) { pm.test(\u0027Gateway retourne SERVICE_UNAVAILABLE\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027SERVICE_UNAVAILABLE\u0027); }); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g8-down"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/v1/analytics/dashboard",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "analytics",
+                                                                               "dashboard"
+                                                                           ]
+                                                              },
+                                                      "description":  "Test manuel de resilience. Avant execution, arreter G8: docker stop sgitu-int-g8-analytics ou docker stop g8-analytics-service. Si G8 tourne encore, la reponse peut etre 200."
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}

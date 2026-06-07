@@ -1,10 +1,10 @@
 # Documentation Technique — Microservice G6 Paiement
 ### Système de Gestion Intelligente des Transports Urbains (SGITU)
 
-**Version** : 1.0.0 — Rapport Technique Final  
-**Groupe** : G6 — Paiement  
-**Port** : 8086 (HTTPS)  
-**Base de données** : `payment_db` (MySQL)  
+**Version** : 1.0.0 — Rapport Technique Final
+**Groupe** : G6 — Paiement
+**Port** : 8086 (HTTPS)
+**Base de données** : `payment_db` (MySQL)
 **Enseignante** : Pr. Besri — AU 2025–2026
 
 ---
@@ -41,6 +41,11 @@ docker compose up -d payment-service g6-payment-db kafka prometheus grafana
 | `grafana` | Dashboard de monitoring | 3000 | 3000 |
 
 ### Vérification du démarrage
+
+### B. Authentification JWT
+- Chaque requête (sauf Swagger et `/health`) exige un token JWT valide dans le Header.
+- Secret utilisé pour tester : `SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!`
+- G6 ne génère pas les JWT, il valide ceux générés par G10 ou l'API Gateway.
 
 ```bash
 # Vérifier que les conteneurs sont actifs
@@ -333,7 +338,7 @@ G10 route toutes les requêtes vers G6 sur le port 8086 et transmet le token JWT
 }
 ```
 
-Valeurs possibles pour `sourceType` : `TICKET`, `SUBSCRIPTION`  
+Valeurs possibles pour `sourceType` : `TICKET`, `SUBSCRIPTION`
 Valeurs possibles pour `paymentMethod` : `CARD`, `MOBILE_MONEY`
 
 ### 6.2 Réponse — Paiement validé

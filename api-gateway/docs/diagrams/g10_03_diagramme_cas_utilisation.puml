@@ -1,0 +1,41 @@
+@startuml
+title G10 - Diagramme de cas d'utilisation adapte
+
+left to right direction
+skinparam shadowing false
+
+actor "Visiteur" as Visitor
+actor "Utilisateur authentifie" as User
+actor "Administrateur" as Admin
+actor "G3 Gestion utilisateurs" as G3
+actor "Microservice metier" as Service
+
+rectangle "G10 - API Gateway & Securite" {
+  usecase "Router inscription/login vers G3" as UC_AuthRoute
+  usecase "Valider JWT emis par G3" as UC_CheckJwt
+  usecase "Verifier role" as UC_CheckRole
+  usecase "Acceder a un service metier" as UC_Route
+  usecase "Transmettre headers utilisateur" as UC_Headers
+  usecase "Router administration utilisateurs vers G3" as UC_AdminUsers
+  usecase "Gerer erreurs 401/403/404/503" as UC_Errors
+  usecase "Journaliser requete avec correlation id" as UC_Logs
+}
+
+Visitor --> UC_AuthRoute
+User --> UC_Route
+Admin --> UC_AdminUsers
+Admin --> UC_Route
+
+UC_AuthRoute --> G3
+UC_AdminUsers --> G3
+
+UC_Route ..> UC_CheckJwt : <<include>>
+UC_Route ..> UC_CheckRole : <<include>>
+UC_Route ..> UC_Headers : <<include>>
+UC_Route ..> UC_Errors : <<include>>
+UC_Route ..> UC_Logs : <<include>>
+UC_AdminUsers ..> UC_CheckRole : <<include>>
+
+Service <-- UC_Headers
+
+@enduml

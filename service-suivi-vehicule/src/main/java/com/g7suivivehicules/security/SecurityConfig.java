@@ -27,8 +27,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/test/**", "/api-docs", "/api-docs/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/**").permitAll()
                 
                 // Gestion des véhicules (Admin G7 uniquement)
-                .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN_G7")
-                .requestMatchers(HttpMethod.DELETE, "/api/suivi-vehicules/vehicules/**").hasAuthority("ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.POST,
+                        "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                        "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**").hasAuthority("ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.PUT,
+                        "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                        "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**").hasAuthority("ROLE_ADMIN_G7")
+                .requestMatchers(HttpMethod.DELETE,
+                        "/api/suivi-vehicules/vehicules", "/api/suivi-vehicules/vehicules/**",
+                        "/api/suivi-vehicules/vehicles", "/api/suivi-vehicules/vehicles/**").hasAuthority("ROLE_ADMIN_G7")
                 
                 // Envoi de positions et alertes (Driver et Admin G7)
                 .requestMatchers(HttpMethod.POST, "/api/suivi-vehicules/positions/**").hasAnyAuthority("ROLE_DRIVER", "ROLE_ADMIN_G7")

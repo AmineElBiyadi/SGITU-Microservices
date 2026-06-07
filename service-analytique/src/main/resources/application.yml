@@ -52,7 +52,7 @@ ml:
 
 # JWT
 jwt:
-  secret: sgitu_g8_secret_key_2025_very_long_secret_for_analytics
+  secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
   expiration: 86400000
 
 resilience4j:

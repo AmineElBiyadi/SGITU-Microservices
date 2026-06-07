@@ -1,0 +1,823 @@
+﻿{
+    "info":  {
+                 "name":  "SGITU - G10 Gateway x G5 Notifications",
+                 "description":  "Collection Postman complete pour verifier la relation Client -\u003e G10 -\u003e G5 Notifications. Postman envoie Authorization: Bearer JWT a G10; G10 valide ce JWT, retire Authorization avant le routage vers G5, puis transmet X-User-Id, X-User-Email, X-Roles, X-Source-Group et X-Correlation-Id. Elle couvre health public, JWT, RBAC admin, envoi notification LOG, consultation, retry, filtres admin, erreurs 400/401/403 et resilience 503.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "const secret = pm.collectionVariables.get(\u0027jwtSecret\u0027) || \u0027SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!\u0027;",
+                                                  "function b64url(input) {",
+                                                  "  return CryptoJS.enc.Base64.stringify(input).replace(/=+$/,\u0027\u0027).replace(/\\+/g,\u0027-\u0027).replace(/\\//g,\u0027_\u0027);",
+                                                  "}",
+                                                  "function makeJwt(email, userId, roles, ttlSeconds) {",
+                                                  "  const now = Math.floor(Date.now() / 1000);",
+                                                  "  const header = { alg: \u0027HS256\u0027, typ: \u0027JWT\u0027 };",
+                                                  "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: \u0027g5-postman-\u0027 + Math.random().toString(36).slice(2) };",
+                                                  "  const encodedHeader = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+                                                  "  const encodedPayload = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+                                                  "  const signature = b64url(CryptoJS.HmacSHA256(encodedHeader + \u0027.\u0027 + encodedPayload, secret));",
+                                                  "  return encodedHeader + \u0027.\u0027 + encodedPayload + \u0027.\u0027 + signature;",
+                                                  "}",
+                                                  "if (pm.collectionVariables.get(\u0027autoGenerateTokens\u0027) !== \u0027false\u0027) {",
+                                                  "  pm.collectionVariables.set(\u0027adminToken\u0027, makeJwt(\u0027admin.g10@sgitu.ma\u0027, \u00271\u0027, [\u0027ROLE_ADMIN\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027passengerToken\u0027, makeJwt(\u0027passenger.g5@sgitu.ma\u0027, \u0027501\u0027, [\u0027ROLE_PASSENGER\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027operatorToken\u0027, makeJwt(\u0027operator.g5@sgitu.ma\u0027, \u0027502\u0027, [\u0027ROLE_OPERATOR\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027staffToken\u0027, makeJwt(\u0027staff.g5@sgitu.ma\u0027, \u0027503\u0027, [\u0027ROLE_STAFF\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027expiredToken\u0027, makeJwt(\u0027expired.g5@sgitu.ma\u0027, \u0027599\u0027, [\u0027ROLE_ADMIN\u0027], -60));",
+                                                  "  pm.collectionVariables.set(\u0027invalidToken\u0027, pm.collectionVariables.get(\u0027adminToken\u0027) + \u0027invalid\u0027);",
+                                                  "}",
+                                                  "if (!pm.collectionVariables.get(\u0027runId\u0027)) {",
+                                                  "  pm.collectionVariables.set(\u0027runId\u0027, Date.now().toString());",
+                                                  "}",
+                                                  "pm.collectionVariables.set(\u0027g5NotificationId\u0027, \u0027g10-g5-\u0027 + pm.collectionVariables.get(\u0027runId\u0027));"
+                                              ]
+                                 }
+                  }
+              ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "jwtSecret",
+                         "value":  "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "autoGenerateTokens",
+                         "value":  "true",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "passengerToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "operatorToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "staffToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "expiredToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "invalidToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "runId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "g5NotificationId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "missingNotificationId",
+                         "value":  "notification-introuvable-g10-g5",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "g5InternalNotificationId",
+                         "value":  "",
+                         "type":  "string"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "00 - Preconditions G10 et G5",
+                     "item":  [
+                                  {
+                                      "name":  "00.1 - 200 health G10",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027G10 UP\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Body contains UP\u0027, function () { pm.expect(pm.response.text()).to.include(\u0027UP\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-health-gateway"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/actuator/health"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "00.2 - 200 health G5 via G10 public",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027G5 health via G10\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g5-health\u0027); });",
+                                                                                    "pm.test(\u0027G5 UP\u0027, function () { pm.expect(pm.response.json().status).to.eql(\u0027UP\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-health"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/health"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "00.3 - 200 OpenAPI G10 contient route G5",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027OpenAPI accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Documentation mentions notifications path\u0027, function () { pm.expect(pm.response.text()).to.include(\u0027/api/notifications\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/v3/api-docs"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "01 - Securite JWT avant G5",
+                     "item":  [
+                                  {
+                                      "name":  "01.1 - 401 list notifications sans JWT",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Sans JWT refuse par G10\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Error code coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-no-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.2 - 401 list notifications JWT invalide",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027JWT invalide refuse\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Error code coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{invalidToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-invalid-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.3 - 401 list notifications JWT expire",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027JWT expire refuse\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                    "pm.test(\u0027Error code coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{expiredToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-expired-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "01.4 - 403 admin stats avec ROLE_PASSENGER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027ROLE_PASSENGER refuse sur admin G5\u0027, function () { pm.response.to.have.status(403); });",
+                                                                                    "pm.test(\u0027Error code coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027FORBIDDEN\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-passenger"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/stats"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - Notifications G5 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "02.1 - 202 send notification LOG ROLE_PASSENGER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Notification acceptee\u0027, function () { pm.expect([202]).to.include(pm.response.code); });",
+                                                                                    "pm.test(\u0027Response notificationId saved\u0027, function () {",
+                                                                                    "  const json = pm.response.json();",
+                                                                                    "  pm.expect(json.notificationId).to.eql(pm.collectionVariables.get(\u0027g5NotificationId\u0027));",
+                                                                                    "  pm.collectionVariables.set(\u0027g5NotificationId\u0027, json.notificationId);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Correlation id returned\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.eql(\u0027g10-g5-send-log\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-send-log"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"notificationId\": \"{{g5NotificationId}}\",\n  \"sourceService\": \"G10_GATEWAY\",\n  \"eventType\": \"AUTH_LOGIN_SUCCESS\",\n  \"channel\": \"LOG\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"501\",\n    \"email\": \"passenger.g5@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"email\": \"passenger.g5@sgitu.ma\",\n    \"source\": \"Postman G10-G5\",\n    \"correlationId\": \"g10-g5-send-log\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/notifications/send"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.2 - 202 idempotence send same notification",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Duplicate accepted idempotently\u0027, function () { pm.response.to.have.status(202); });",
+                                                                                    "pm.test(\u0027Same notificationId\u0027, function () { pm.expect(pm.response.json().notificationId).to.eql(pm.collectionVariables.get(\u0027g5NotificationId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-send-idempotent"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"notificationId\": \"{{g5NotificationId}}\",\n  \"sourceService\": \"G10_GATEWAY\",\n  \"eventType\": \"AUTH_LOGIN_SUCCESS\",\n  \"channel\": \"LOG\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"501\",\n    \"email\": \"passenger.g5@sgitu.ma\"\n  },\n  \"metadata\": {\n    \"email\": \"passenger.g5@sgitu.ma\",\n    \"source\": \"Postman G10-G5 duplicate\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/notifications/send"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.3 - 200 get notification by id ROLE_PASSENGER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Notification found\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Same notificationId\u0027, function () { pm.expect(pm.response.json().notificationId).to.eql(pm.collectionVariables.get(\u0027g5NotificationId\u0027)); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-get-by-id"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/{{g5NotificationId}}"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.4 - 200 list notifications filtered ROLE_PASSENGER",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027List accessible with JWT\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Page response\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027content\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-list-filtered"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications?sourceService=G10_GATEWAY\u0026page=0\u0026size=10"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.5 - 202 retry notification ROLE_OPERATOR",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Retry endpoint routed\u0027, function () { pm.response.to.have.status(202); });",
+                                                                                    "pm.test(\u0027Response has notificationId\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027notificationId\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{operatorToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-retry"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/{{g5NotificationId}}/retry"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.6 - 400 send notification payload invalide",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Payload invalide refuse\u0027, function () { pm.response.to.have.status(400); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-invalid-payload"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"notificationId\": \"invalid-{{runId}}\",\n  \"sourceService\": \"G10_GATEWAY\",\n  \"eventType\": \"AUTH_LOGIN_SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"priority\": \"NORMAL\",\n  \"recipient\": {\n    \"userId\": \"501\"\n  }\n}",
+                                                                   "options":  {
+                                                                                   "raw":  {
+                                                                                               "language":  "json"
+                                                                                           }
+                                                                               }
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/notifications/send"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "02.7 - 400/500 get notification introuvable",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Notification introuvable geree\u0027, function () { pm.expect([400, 404, 500]).to.include(pm.response.code); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-not-found"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/{{missingNotificationId}}"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Administration G5 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "03.1 - 200 admin stats ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Admin stats accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Stats body\u0027, function () { const json = pm.response.json(); pm.expect(json).to.have.property(\u0027total\u0027); pm.expect(json).to.have.property(\u0027byStatus\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-stats"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/stats"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.2 - 200 admin list notifications ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Admin list accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "const body = pm.response.json();",
+                                                                                    "const rows = body.content || body.notifications || body.data || [];",
+                                                                                    "pm.test(\u0027Admin list body is pageable/array\u0027, function () { pm.expect(Array.isArray(rows)).to.eql(true); });",
+                                                                                    "if (rows.length \u003e 0 \u0026\u0026 rows[0].id) { pm.collectionVariables.set(\u0027g5InternalNotificationId\u0027, String(rows[0].id)); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-list"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications?sourceService=G10_GATEWAY\u0026page=0\u0026size=10"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.3 - 200 admin failed notifications ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Failed list accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Page response\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027content\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-failed"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications/failed?page=0\u0026size=10"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.4 - 200 admin logs notifications ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Log notifications accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Page response\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027content\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-logs"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications/logs?page=0\u0026size=10"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.5 - 200 admin by source ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027By source accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Page response\u0027, function () { pm.expect(pm.response.json()).to.have.property(\u0027content\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-by-source"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications/by-source/G10_GATEWAY?page=0\u0026size=10"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.6 - 200 admin detailed health ROLE_ADMIN",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Detailed health accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "pm.test(\u0027Service G5\u0027, function () { pm.expect(pm.response.json().service).to.eql(\u0027notification-service\u0027); });"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-health-detailed"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/health/detailed"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.7 - 200 admin force retry notification ROLE_ADMIN",
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Force retry admin retourne 200 ou 404 si aucune notification disponible\u0027, function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                                                                                "if (pm.response.code === 200) { const body = pm.response.json(); pm.expect(body.message).to.exist; }"
+                                                                            ]
+                                                               }
+                                                },
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-force-retry"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications/{{g5InternalNotificationId}}/force-retry"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "03.8 - 200 admin delete notification ROLE_ADMIN",
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Delete admin retourne 200 ou 404 si deja absente\u0027, function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                                                                                "if (pm.response.code === 200) { const body = pm.response.json(); pm.expect(body.message).to.exist; }"
+                                                                            ]
+                                                               }
+                                                },
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-admin-delete"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/admin/notifications/{{g5InternalNotificationId}}"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Resilience manuelle G5",
+                     "item":  [
+                                  {
+                                      "name":  "04.1 - G5 down -\u003e 503 via G10",
+                                      "description":  "Avant ce test manuel : docker stop sgitu-int-notification-service. Si G5 tourne encore, la reponse peut etre 200.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027G5 up ou indisponible gere proprement\u0027, function () { pm.expect([200, 503]).to.include(pm.response.code); });",
+                                                                                    "if (pm.response.code === 503) { pm.test(\u0027Gateway error code coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027SERVICE_UNAVAILABLE\u0027); }); }"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g5-down"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/notifications/health"
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
+}

@@ -1,0 +1,100 @@
+@startuml
+title G10 - Diagramme de classes simplifie de l'API Gateway
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+hide empty members
+
+package "Application" {
+  class ApiGatewayApplication <<SpringBootApplication>>
+}
+
+package "Configuration" {
+  class SecurityConfig <<Configuration>> {
+    +configure securite WebFlux
+    +definir routes publiques/protegees
+  }
+
+  class SwaggerConfig <<Configuration>> {
+    +documenter API Gateway
+  }
+}
+
+package "Filtres Gateway" {
+  class JwtAuthFilter <<WebFilter>> {
+    +extraire Bearer token
+    +valider JWT
+    +creer authentification
+  }
+
+  class GatewayHeadersFilter <<GlobalFilter>> {
+    +ajouter X-Correlation-Id
+    +ajouter X-User-Id
+    +ajouter X-User-Email
+    +ajouter X-Roles
+  }
+}
+
+package "Securite JWT" {
+  class JwtService <<Service>> {
+    +valider signature et expiration
+    +extraire email, roles, userId
+  }
+
+  class JwtPrincipal <<record>> {
+    +userId
+    +email
+  }
+}
+
+package "Gestion des erreurs" {
+  class ApiErrorWriter <<Component>> {
+    +ecrire erreur JSON standardisee
+  }
+
+  class GatewayExceptionHandler <<Component>> {
+    +transformer exceptions en 401/403/404/503
+  }
+}
+
+package "Fallback" {
+  class GatewayFallbackController <<RestController>> {
+    +retourner ROUTE_NOT_FOUND
+  }
+}
+
+ApiGatewayApplication "1" ..> "1" SecurityConfig
+ApiGatewayApplication "1" ..> "1" SwaggerConfig
+
+SecurityConfig "1" --> "1" JwtAuthFilter : utilise
+SecurityConfig "1" --> "1" ApiErrorWriter : erreurs 401/403
+
+JwtAuthFilter "1" --> "1" JwtService : valide token
+JwtAuthFilter "1" --> "0..*" JwtPrincipal : cree principal par requete
+JwtAuthFilter "1" --> "1" ApiErrorWriter : token invalide
+
+GatewayHeadersFilter "1" --> "0..1" JwtPrincipal : lit identite
+GatewayHeadersFilter "1" ..> "1" JwtAuthFilter : contexte securite
+
+GatewayExceptionHandler "1" --> "1" ApiErrorWriter : delegue reponse
+GatewayFallbackController "1" --> "1" ApiErrorWriter : reponse 404
+
+note right of JwtService
+  Le JWT est emis par G3.
+  G10 le valide puis applique
+  les regles de securite.
+end note
+
+note right of JwtAuthFilter
+  Les roles du JWT sont transformes
+  en authorities Spring Security.
+  Il n'est pas stocke dans JwtPrincipal.
+end note
+
+note bottom of ApiGatewayApplication
+  G10 ne contient pas de base utilisateurs.
+  Pas d'entites User, Role ou Token dans la Gateway.
+end note
+
+@enduml

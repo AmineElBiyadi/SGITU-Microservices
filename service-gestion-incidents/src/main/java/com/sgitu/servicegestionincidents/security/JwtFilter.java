@@ -18,6 +18,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,8 +55,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 String email = claims.getSubject();
 
-                @SuppressWarnings("unchecked")
-                List<String> roles = claims.get("roles", List.class);
+                List<String> roles = extractRoles(claims);
 
                 if (email != null && roles != null) {
                     List<SimpleGrantedAuthority> authorities = roles.stream()
@@ -73,5 +74,33 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private List<String> extractRoles(Claims claims) {
+        List<String> roles = new ArrayList<>();
+        addRoles(roles, claims.get("role"));
+        addRoles(roles, claims.get("roles"));
+        return roles.stream()
+                .map(String::trim)
+                .filter(role -> !role.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private void addRoles(List<String> roles, Object claimValue) {
+        if (claimValue == null) {
+            return;
+        }
+        if (claimValue instanceof Collection<?> collection) {
+            collection.forEach(value -> addRoles(roles, value));
+            return;
+        }
+        if (claimValue instanceof String value) {
+            for (String role : value.split(",")) {
+                roles.add(role);
+            }
+            return;
+        }
+        roles.add(claimValue.toString());
     }
 }

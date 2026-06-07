@@ -1,0 +1,1177 @@
+% ============================================================
+% Projet SGITU - Groupe 10
+% Rapport technique final - API Gateway & Securite
+% AU 2025/2026
+% ============================================================
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{tcolorbox}
+
+\geometry{top=2.4cm,bottom=2.4cm,left=2.4cm,right=2.4cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlist[itemize]{leftmargin=1.4em,itemsep=2pt,topsep=3pt}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=2pt,topsep=3pt}
+\sloppy
+
+\definecolor{navy}{RGB}{13,27,62}
+\definecolor{blue}{RGB}{30,86,160}
+\definecolor{green}{RGB}{5,130,90}
+\definecolor{red}{RGB}{190,40,40}
+\definecolor{graybg}{RGB}{245,247,250}
+\definecolor{codebg}{RGB}{20,24,32}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  urlcolor=blue
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small SGITU}
+\chead{\small Groupe 10 - API Gateway \& Securite}
+\rhead{\small Livraison finale}
+\cfoot{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\Large\bfseries\color{navy}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{navy}}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{navy}}{\thesubsubsection.}{0.5em}{}
+
+\lstdefinestyle{code}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small\color{white},
+  keywordstyle=\color{cyan},
+  stringstyle=\color{yellow},
+  commentstyle=\color{gray},
+  frame=single,
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible
+}
+
+\newtcolorbox{infoBox}{
+  colback=blue!5!white,
+  colframe=blue,
+  boxrule=0.5pt,
+  arc=3pt,
+  left=6pt,
+  right=6pt,
+  top=6pt,
+  bottom=6pt
+}
+
+\newtcolorbox{successBox}{
+  colback=green!5!white,
+  colframe=green,
+  boxrule=0.5pt,
+  arc=3pt,
+  left=6pt,
+  right=6pt,
+  top=6pt,
+  bottom=6pt
+}
+
+\newtcolorbox{warningBox}{
+  colback=red!5!white,
+  colframe=red,
+  boxrule=0.5pt,
+  arc=3pt,
+  left=6pt,
+  right=6pt,
+  top=6pt,
+  bottom=6pt
+}
+
+\newcommand{\diagram}[3]{
+\begin{figure}[H]
+  \centering
+  \IfFileExists{#1}{
+    \includegraphics[width=#2\textwidth]{#1}
+  }{
+    \fbox{
+      \begin{minipage}[c][4cm][c]{#2\textwidth}
+        \centering
+        Diagramme non trouve : \texttt{\detokenize{#1}}
+      \end{minipage}
+    }
+  }
+  \caption{#3}
+\end{figure}
+}
+
+\newcommand{\screenshot}[3]{
+\begin{figure}[H]
+  \centering
+  \IfFileExists{#1}{
+    \includegraphics[width=#2\textwidth]{#1}
+  }{
+    \fbox{
+      \begin{minipage}[c][5cm][c]{#2\textwidth}
+        \centering
+        Capture a ajouter : \texttt{\detokenize{#1}}\\[0.2cm]
+        #3
+      \end{minipage}
+    }
+  }
+  \caption{#3}
+\end{figure}
+}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{0.7cm}
+{\Large\bfseries Universite Abdelmalek Essaadi}\\[0.2cm]
+{\Large\bfseries Ecole Nationale des Sciences Appliquees de Tetouan}\\[0.3cm]
+{\large Filiere : GI2 - Genie Informatique}\\[0.2cm]
+{\large Module : Dev Mobile et Microservices}\\[1cm]
+
+\rule{\linewidth}{1pt}\\[0.5cm]
+{\Large\bfseries Projet de Synthese - SGITU}\\[0.2cm]
+{\large Systeme de Gestion Intelligente des Transports Urbains}\\[0.5cm]
+\rule{\linewidth}{1pt}\\[1.2cm]
+
+{\Huge\bfseries Rapport Technique Final}\\[0.7cm]
+{\LARGE\bfseries Groupe 10}\\[0.3cm]
+{\LARGE\bfseries API Gateway \& Securite}\\[0.8cm]
+
+\begin{infoBox}
+\centering
+Point d'entree global du systeme SGITU : routage vers les microservices, validation JWT, controle d'acces par roles, propagation du contexte utilisateur, traces, Docker, Kubernetes et monitoring Prometheus/Grafana.
+\end{infoBox}
+
+\vfill
+\begin{tabular}{>{\bfseries}p{5cm}p{8cm}}
+Membres du groupe & [Nom Prenom] \quad [Nom Prenom] \quad [Nom Prenom] \quad [Nom Prenom] \\
+Encadrant & Pr. BESRI \\
+Annee universitaire & AU 2025/2026 \\
+Date de rendu & 29 mai 2026 \\
+\end{tabular}
+\end{center}
+\end{titlepage}
+
+\section*{Objectifs}
+Ce rapport presente la livraison finale du microservice G10 du projet SGITU. L'objectif est de documenter une API Gateway fonctionnelle, securisee, testable et conteneurisee. Le rapport decrit la conception avancee, les contrats REST, la securite JWT, les tests, Docker, Kubernetes et le monitoring. Il montre aussi comment G10 s'integre avec les groupes G1 a G9 dans un environnement distribue.
+
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Introduction et perimetre du microservice}
+
+\subsection{Contexte de la livraison finale}
+
+Le projet SGITU a pour objectif de construire un systeme distribue pour la gestion intelligente des transports urbains. Chaque groupe realise un microservice autonome correspondant a un sous-systeme du domaine : billetterie, abonnements, utilisateurs, coordination, notifications, paiement, suivi des vehicules, analytique et incidents.
+
+Le groupe 10 occupe une position transversale : il fournit l'API Gateway et la couche de securite d'entree. Il ne remplace pas les microservices metier. Son role est de recevoir les requetes externes, appliquer les controles communs, puis transmettre les appels vers le service responsable.
+
+\begin{successBox}
+Le perimetre G10 est conforme a la consigne finale : API REST fonctionnelle, documentation Swagger, securite JWT, Dockerfile, docker-compose, README, tests Postman, monitoring Prometheus/Grafana et simulation Kubernetes.
+\end{successBox}
+
+\subsection{Valeur ajoutee du groupe 10}
+
+Sans API Gateway, chaque client devrait connaitre les ports, les adresses, les regles d'authentification et les chemins internes de tous les microservices. Cela creerait un couplage fort avec les services metier. G10 simplifie cette architecture en exposant un point d'entree unique :
+
+\begin{lstlisting}[style=code]
+Client / Postman / Frontend -> http://localhost:8080 -> G10 -> G1..G9
+\end{lstlisting}
+
+La Gateway permet donc :
+
+\begin{itemize}
+  \item une entree unique pour les clients externes ;
+  \item une validation centralisee du JWT ;
+  \item un controle d'acces avant le routage ;
+  \item une propagation uniforme des headers utilisateur ;
+  \item une reponse propre si un microservice cible est indisponible ;
+  \item une observabilite centralisee via logs, Actuator, Prometheus et Grafana.
+\end{itemize}
+
+\subsection{Responsabilites de G10}
+
+\begin{longtable}{p{4.5cm}p{10cm}}
+\toprule
+\textbf{Responsabilite} & \textbf{Description} \\
+\midrule
+Routage & Rediriger les appels REST vers G1 a G9 selon les prefixes. \\
+Securite & Valider le token JWT, verifier l'expiration et extraire les roles. \\
+RBAC & Autoriser ou refuser l'acces selon les roles. \\
+Headers & Injecter \texttt{X-User-Id}, \texttt{X-User-Email}, \texttt{X-Roles}, \texttt{X-User-Role}, \texttt{X-Source-Group}. \\
+Correlation & Generer ou propager \texttt{X-Correlation-Id}. \\
+Erreurs & Retourner des erreurs JSON coherentes pour \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503}. \\
+Blacklist & Prendre en charge la revocation des tokens via Redis lorsque l'option est active. \\
+Observabilite & Exposer \texttt{/actuator/prometheus} et alimenter Grafana. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Ce que G10 ne fait pas}
+
+\begin{warningBox}
+G10 ne gere pas les comptes, les mots de passe, les profils, les roles ni l'emission des JWT. Ces responsabilites appartiennent au service utilisateur G3, qui reste la source de verite. G10 valide seulement les tokens recus et utilise leurs claims pour proteger les routes.
+\end{warningBox}
+
+\newpage
+
+% ============================================================
+\section{Conception avancee}
+
+\subsection{Architecture globale SGITU}
+
+\diagram{diagrams/g10_01_architecture_globale.png}{0.95}{Architecture globale avec G10 comme point d'entree}
+
+L'architecture finale conserve une separation claire entre les services. Les clients n'appellent pas directement les ports metier exposes dans le reseau Docker. Dans la demonstration, les appels passent par la Gateway, qui applique d'abord la securite puis route vers le service cible.
+
+\subsection{Diagramme de composants}
+
+\diagram{diagrams/g10_02_diagramme_composants.png}{0.95}{Diagramme de composants de l'API Gateway}
+
+Les composants principaux sont les suivants :
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Composant} & \textbf{Role} \\
+\midrule
+\texttt{SecurityConfig} & Definit les routes publiques, les routes protegees et les roles autorises. \\
+\texttt{JwtAuthFilter} & Lit le header \texttt{Authorization}, valide le token et cree l'authentification WebFlux. \\
+\texttt{JwtService} & Parse le JWT, verifie la signature, l'expiration, le subject, \texttt{userId}, \texttt{role}/\texttt{roles} et \texttt{jti}. \\
+\texttt{TokenBlacklistService} & Verifie si un token a ete revoque apres logout. \\
+\texttt{GatewayHeadersFilter} & Injecte les headers utilisateur et journalise request/response avec correlation id. \\
+\texttt{ApiErrorWriter} & Produit les reponses JSON d'erreur. \\
+\texttt{GatewayExceptionHandler} & Transforme les erreurs techniques en \texttt{503} ou \texttt{500} lisibles. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Diagramme de cas d'utilisation}
+
+\diagram{diagrams/g10_03_diagramme_cas_utilisation.png}{0.82}{Cas d'utilisation principaux}
+
+Les acteurs principaux sont le client externe, l'administrateur, l'operateur, le passager et les microservices cibles. Les cas d'utilisation couvrent le login route vers G3, l'appel d'une route protegee, l'acces analytics, l'envoi de notification, l'appel paiement et la consultation des etats de supervision.
+
+\subsection{Diagramme de classes}
+
+\diagram{diagrams/g10_09_diagramme_classes_gateway.png}{0.95}{Diagramme de classes simplifie}
+
+Le diagramme de classes ne contient pas d'entite \texttt{User}, \texttt{Role} ou \texttt{Permission}, car ces elements appartiennent au domaine de G3. Les classes G10 sont techniques : filtres, services de validation, objets de principal JWT et gestionnaires d'erreurs.
+
+\subsection{Source de verite des donnees}
+
+\diagram{diagrams/g10_04_modele_base_donnees.png}{0.86}{Responsabilite des donnees utilisateurs}
+
+G10 est stateless pour les donnees metier. La seule persistance technique ajoutee dans la livraison finale est Redis pour la blacklist des tokens revoques. Redis ne contient pas les utilisateurs ; il contient uniquement des identifiants de tokens ou des empreintes avec une duree de vie limitee.
+
+\newpage
+
+\subsection{Diagrammes de sequence}
+
+\subsubsection{Inscription et verification email}
+
+\diagram{diagrams/g10_05_sequence_inscription_email.png}{0.95}{Inscription via G10 puis traitement par G3}
+
+Le client envoie l'inscription a G10. G10 reconnait que \texttt{POST /api/users} est public, route vers G3, puis G3 cree l'utilisateur et gere la verification email.
+
+\subsubsection{Login et emission du JWT}
+
+\diagram{diagrams/g10_06_sequence_login_jwt.png}{0.95}{Login route par G10 vers G3}
+
+Le flux corrige respecte la remarque du rendu intermediaire : le client appelle la Gateway, et la Gateway route vers G3. Le JWT est emis par G3, pas par G10.
+
+\subsubsection{Routage d'une requete protegee}
+
+\diagram{diagrams/g10_07_sequence_routage_gateway.png}{0.95}{Routage securise avec validation JWT}
+
+Lorsqu'une route est protegee, G10 extrait le JWT, valide les claims, verifie le role, enrichit la requete avec les headers puis transmet au microservice cible.
+
+\subsubsection{Flux G5 vers G8}
+
+\diagram{diagrams/g10_10_sequence_g5_g8_analytics.png}{0.95}{Flux notifications vers analytique}
+
+Le flux G5 vers G8 illustre la coherence globale : les evenements de notification ou les donnees d'usage peuvent etre transmis vers l'analytique. Dans la demonstration REST protegee, l'appel passe par G10 ; dans les flux asynchrones Kafka, le passage par la Gateway n'est pas requis.
+
+\newpage
+
+% ============================================================
+\section{Architecture technique et organisation du code}
+
+\subsection{Architecture en couches}
+
+\begin{lstlisting}[style=code]
+api-gateway
+|-- src/main/java/com/sgitu/apigateway
+|   |-- config
+|   |   |-- SecurityConfig.java
+|   |   `-- OpenApiConfig.java
+|   |-- controller
+|   |   `-- GatewayFallbackController.java
+|   |-- error
+|   |   |-- ApiErrorWriter.java
+|   |   `-- GatewayExceptionHandler.java
+|   |-- filter
+|   |   |-- JwtAuthFilter.java
+|   |   `-- GatewayHeadersFilter.java
+|   |-- security
+|   |   `-- JwtPrincipal.java
+|   |-- service
+|   |   |-- JwtService.java
+|   |   `-- TokenBlacklistService.java
+|   `-- ApiGatewayApplication.java
+|-- src/main/resources
+|   |-- application.yml
+|   `-- test.http
+|-- docs
+|   |-- G10_Rapport_Complet.tex
+|   |-- ENDPOINTS.md
+|   |-- G10_*_Postman_Collection.json
+|   |-- diagrams
+|   `-- screenshots
+|-- monitoring
+|-- k8s
+|-- Dockerfile
+|-- docker-compose.yml
+|-- README.md
+`-- pom.xml
+\end{lstlisting}
+
+\subsection{Justification des choix technologiques}
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Technologie} & \textbf{Justification} \\
+\midrule
+Java 17 & Version stable compatible avec Spring Boot 3.2.5 utilisee dans G10. \\
+Spring Boot 3.2.5 & Demarrage rapide, Actuator, configuration par profils et ecosysteme mature. \\
+Spring Cloud Gateway & Gateway reactive adaptee au routage HTTP, filtres globaux et timeouts. \\
+Spring Security WebFlux & Securite compatible avec la pile reactive de Gateway. \\
+JJWT & Validation et parsing des tokens JWT HS256 emis par G3. \\
+Redis & Stockage temporaire des tokens revoques apres logout. \\
+Springdoc OpenAPI & Documentation Swagger accessible via navigateur. \\
+Actuator + Micrometer & Exposition des metriques pour Prometheus. \\
+Docker Compose & Simulation locale distribuee avec G1 a G10. \\
+Kubernetes & Simulation de deploiement orchestre pour le bonus. \\
+Prometheus/Grafana & Dashboard de monitoring demande dans la phase finale. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Configuration applicative principale}
+
+La configuration \texttt{application.yml} definit les routes, la securite, Redis, les timeouts et les metriques.
+
+\begin{lstlisting}[style=code]
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:3000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:5s}
+
+jwt:
+  secret: ${JWT_SECRET:SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!}
+
+token-blacklist:
+  enabled: ${TOKEN_BLACKLIST_ENABLED:false}
+\end{lstlisting}
+
+\newpage
+
+% ============================================================
+\section{Contrats REST et endpoints exposes}
+
+\subsection{Table globale des routes G1 a G10}
+
+\begin{longtable}{p{1.3cm}p{2cm}p{5.4cm}p{3.2cm}p{3.1cm}}
+\toprule
+\textbf{Grp} & \textbf{Methodes} & \textbf{Endpoints via G10} & \textbf{Roles principaux} & \textbf{Service cible} \\
+\midrule
+G1 & GET, POST, PUT, DELETE & \texttt{/api/v1/tickets/**}, \texttt{/api/v1/admin/**}, \texttt{/api/v1/ticket-types/**} & JWT, ROLE\_ADMIN pour admin & Billetterie \\
+G2 & GET, POST, PUT, DELETE & \texttt{/api/abonnements/**}, \texttt{/api/plans/**} & Public lecture plans, ROLE\_ADMIN\_G2 admin & Abonnement \\
+G3 & POST & \texttt{/auth/login}, \texttt{/auth/refresh} & Public & Utilisateurs \\
+G3 & GET, PUT, DELETE & \texttt{/api/users/**}, \texttt{/api/profiles/**} & JWT, ROLE\_ADMIN & Utilisateurs \\
+G4 & GET, POST, PUT, DELETE & \texttt{/api/g4/**}, \texttt{/api/v1/lignes/**}, \texttt{/api/v1/arrets/**} & ROLE\_G4\_OPERATOR, ROLE\_DISPATCHER, ROLE\_G4\_ADMIN & Coordination \\
+G5 & GET, POST, PUT, DELETE & \texttt{/api/notifications/**} & JWT, ROLE\_ADMIN pour admin & Notifications \\
+G6 & GET, POST, PUT, DELETE & \texttt{/api/payments/**}, \texttt{/api/refunds/**}, \texttt{/api/invoices/**} & JWT & Paiement \\
+G7 & GET, POST, PUT, DELETE & \texttt{/api/suivi-vehicules/**} & ROLE\_ADMIN\_G7, ROLE\_OPERATOR, ROLE\_TECHNICIAN, ROLE\_DRIVER & Suivi vehicules \\
+G8 & GET, POST & \texttt{/api/v1/ingestion/**}, \texttt{/api/v1/analytics/**} & ROLE\_ADMIN, ROLE\_OPERATOR, ROLE\_STAFF & Analytique \\
+G8 ML & POST & \texttt{/predict/peak-hours}, \texttt{/predict/incidents} & ROLE\_ADMIN, ROLE\_OPERATOR, ROLE\_STAFF & ML service \\
+G9 & GET, POST, PUT, DELETE & \texttt{/api/incidents/**}, \texttt{/api/rapports/**} & JWT selon G9 & Incidents \\
+G10 & GET & \texttt{/actuator/health}, \texttt{/swagger-ui.html} & Public & Gateway \\
+\bottomrule
+\end{longtable}
+
+\subsection{Contrat login}
+
+\begin{lstlisting}[style=code]
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "admin.g10@sgitu.ma",
+  "password": "Password123"
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=code]
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "refresh-token-g3",
+  "tokenType": "Bearer",
+  "expiresIn": 3600
+}
+\end{lstlisting}
+
+\subsection{Contrat d'erreur standardise}
+
+\begin{lstlisting}[style=code]
+{
+  "timestamp": "2026-06-03T10:15:30",
+  "status": 403,
+  "error": "Forbidden",
+  "code": "FORBIDDEN",
+  "message": "Acces refuse pour ce role",
+  "path": "/api/v1/analytics/dashboard",
+  "correlationId": "demo-rbac-403"
+}
+\end{lstlisting}
+
+\subsection{Gestion des erreurs HTTP}
+
+\begin{longtable}{p{2cm}p{4cm}p{8.5cm}}
+\toprule
+\textbf{HTTP} & \textbf{Code applicatif} & \textbf{Signification} \\
+\midrule
+400 & \texttt{BAD\_REQUEST} & Requete invalide ou JSON incorrect au niveau du service cible. \\
+401 & \texttt{UNAUTHORIZED} & Token absent ou authentification requise. \\
+401 & \texttt{INVALID\_TOKEN} & Token expire, mal signe, blackliste ou claims invalides. \\
+403 & \texttt{FORBIDDEN} & Token valide mais role insuffisant. \\
+404 & \texttt{ROUTE\_NOT\_FOUND} & Route non reconnue par la Gateway. \\
+503 & \texttt{SERVICE\_UNAVAILABLE} & Microservice cible arrete ou inaccessible. \\
+504 & \texttt{GATEWAY\_TIMEOUT} & Le service cible ne repond pas dans le timeout configure. \\
+500 & \texttt{INTERNAL\_SERVER\_ERROR} & Erreur technique non prevue. \\
+\bottomrule
+\end{longtable}
+
+\newpage
+
+% ============================================================
+\section{Securite}
+
+\subsection{Contrat JWT}
+
+Le token JWT est transmis dans le header suivant :
+
+\begin{lstlisting}[style=code]
+Authorization: Bearer <access_token>
+\end{lstlisting}
+
+Claims attendus :
+
+\begin{longtable}{p{3cm}p{4cm}p{7cm}}
+\toprule
+\textbf{Claim} & \textbf{Exemple} & \textbf{Role} \\
+\midrule
+\texttt{sub} & \texttt{admin.g10@sgitu.ma} & Identifiant principal, generalement email. \\
+\texttt{userId} & \texttt{1} & Identifiant utilisateur propage aux services. \\
+\texttt{roles} & \texttt{["ROLE\_ADMIN"]} & Liste des roles. \\
+\texttt{role} & \texttt{ROLE\_USER} & Ancien format accepte pour compatibilite. \\
+\texttt{iat} & \texttt{1778204092} & Date d'emission. \\
+\texttt{exp} & \texttt{1778290492} & Date d'expiration. \\
+\texttt{jti} & \texttt{uuid} & Identifiant du token, utile pour blacklist. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Secret partage et perspective RS256}
+
+Dans la version actuelle, G3 et G10 utilisent un secret HS256 partage via variable d'environnement \texttt{JWT\_SECRET}. Ce choix est simple pour la demonstration locale et permet a G10 de verifier les tokens emis par G3.
+
+\begin{warningBox}
+Pour une version production, la solution recommandee est RS256 : G3 signe avec une cle privee, et G10 verifie avec une cle publique. Cela evite de partager le secret de signature entre plusieurs services.
+\end{warningBox}
+
+\subsection{Spring Security WebFlux}
+
+La configuration WebFlux desactive CSRF, declare les routes publiques et applique les roles sur les routes sensibles. Le filtre JWT est ajoute dans l'ordre \texttt{AUTHENTICATION}.
+
+\begin{lstlisting}[style=code]
+.pathMatchers("/auth/login", "/auth/refresh",
+              "/actuator/**", "/swagger-ui/**",
+              "/v3/api-docs/**").permitAll()
+.pathMatchers(HttpMethod.POST, "/api/users").permitAll()
+.pathMatchers("/api/v1/analytics/**", "/predict/**")
+    .hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR", "ROLE_STAFF")
+.pathMatchers("/api/**").authenticated()
+.addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+\end{lstlisting}
+
+\subsection{Controle d'acces par roles}
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Role} & \textbf{Acces principal} \\
+\midrule
+ROLE\_USER / ROLE\_PASSENGER & Routes utilisateur de base, tickets, abonnements personnels. \\
+ROLE\_ADMIN & Administration generale, utilisateurs, billetterie admin, notifications admin, analytics. \\
+ROLE\_OPERATOR & Analytics, prediction ML, exploitation. \\
+ROLE\_STAFF & Analytics et supervision. \\
+ROLE\_ADMIN\_G2 & Administration des plans et abonnements. \\
+ROLE\_G4\_OPERATOR & Consultation et gestion operationnelle G4. \\
+ROLE\_DISPATCHER & Missions, affectations, impacts incidents dans G4. \\
+ROLE\_ADMIN\_G7 & Administration du suivi vehicules. \\
+ROLE\_DRIVER & Publication de positions et alertes vehicule. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Headers propages}
+
+Apres validation, G10 supprime les headers utilisateur entrants puis ajoute ses propres valeurs de confiance :
+
+\begin{lstlisting}[style=code]
+X-User-Id: 1
+X-User-Email: admin.g10@sgitu.ma
+X-Roles: ROLE_ADMIN,ROLE_OPERATOR
+X-User-Role: ROLE_ADMIN
+X-Source-Group: G10
+X-Correlation-Id: 44b8b244-686c-40cb-a4db
+\end{lstlisting}
+
+Exemple d'utilisation cote service cible :
+
+\begin{lstlisting}[style=code]
+String userId = request.getHeader("X-User-Id");
+String roles = request.getHeader("X-Roles");
+String correlationId = request.getHeader("X-Correlation-Id");
+\end{lstlisting}
+
+\subsection{Blacklist token et logout}
+
+La livraison finale ajoute Redis pour prendre en charge la revocation des tokens. Lorsqu'un logout est traite, le token ou son \texttt{jti} peut etre marque comme revoque jusqu'a son expiration naturelle. G10 verifie ensuite la blacklist avant d'accepter un token.
+
+\begin{lstlisting}[style=code]
+TOKEN_BLACKLIST_ENABLED=true
+REDIS_HOST=redis
+REDIS_PORT=6379
+\end{lstlisting}
+
+\begin{infoBox}
+Cette blacklist repond a la remarque du rendu intermediaire : un token JWT stateless reste valide jusqu'a son expiration ; Redis ajoute une couche de revocation pour le logout.
+\end{infoBox}
+
+\newpage
+
+% ============================================================
+\section{Documentation API}
+
+\subsection{Swagger/OpenAPI}
+
+La documentation Swagger de G10 est accessible via :
+
+\begin{lstlisting}[style=code]
+http://localhost:8080/swagger-ui.html
+http://localhost:8080/v3/api-docs
+\end{lstlisting}
+
+Elle inclut :
+
+\begin{itemize}
+  \item la description du role G10 ;
+  \item les routes principales exposees ;
+  \item le schema Bearer JWT ;
+  \item des exemples JSON ;
+  \item les erreurs \texttt{401}, \texttt{403}, \texttt{404}, \texttt{503}.
+\end{itemize}
+
+\screenshot{screenshots/swagger_gateway.png}{0.92}{Capture Swagger de l'API Gateway}
+
+\subsection{Documentation technique}
+
+Les fichiers de documentation utiles sont :
+
+\begin{longtable}{p{6cm}p{8.5cm}}
+\toprule
+\textbf{Fichier} & \textbf{Utilite} \\
+\midrule
+\texttt{README.md} & Commandes de lancement local et Docker. \\
+\texttt{docs/ENDPOINTS.md} & Contrat de routage et securite. \\
+\texttt{docs/G10\_DOCUMENTATION\_FINALE.md} & Documentation finale en Markdown. \\
+\texttt{docs/G10\_*\_Postman\_Collection.json} & Collections Postman par integration. \\
+\texttt{docs/diagrams/*.puml} & Sources PlantUML. \\
+\texttt{docs/diagrams/*.png} & Diagrammes exportes pour le rapport. \\
+\bottomrule
+\end{longtable}
+
+\newpage
+
+% ============================================================
+\section{Validation et tests}
+
+\subsection{Tests automatises Maven}
+
+Commande :
+
+\begin{lstlisting}[style=code]
+cd api-gateway
+.\mvnw.cmd test
+\end{lstlisting}
+
+Les tests couvrent :
+
+\begin{itemize}
+  \item validation JWT absent/invalide ;
+  \item role insuffisant ;
+  \item route inconnue ;
+  \item acces analytics par roles autorises ;
+  \item compatibilite des claims \texttt{role} et \texttt{roles} ;
+  \item propagation du correlation id ;
+  \item fallback en cas de service indisponible.
+\end{itemize}
+
+\screenshot{screenshots/maven_tests_success.png}{0.88}{Preuve d'execution des tests Maven}
+
+\subsection{Collections Postman}
+
+\begin{longtable}{p{5.5cm}p{8.7cm}}
+\toprule
+\textbf{Collection} & \textbf{Objectif} \\
+\midrule
+\texttt{SGITU\_G10\_Postman\_Collection.json} & Tests de base G10 : health, JWT, RBAC, erreurs. \\
+\texttt{G10\_Gateway\_G1\_Billetterie\_Postman\_Collection.json} & Integration G10 avec G1. \\
+\texttt{G10\_Gateway\_G2\_Relation\_Postman\_Collection.json} & Integration G10 avec G2. \\
+\texttt{G10\_Gateway\_G3\_Relation\_Postman\_Collection.json} & Login, utilisateurs et roles G3 via G10. \\
+\texttt{G10\_Gateway\_G4\_Relation\_Postman\_Collection.json} & Coordination et RBAC G4. \\
+\texttt{G10\_Gateway\_G5\_Notification\_Postman\_Collection.json} & Notifications via G10. \\
+\texttt{G10\_Gateway\_G6\_Paiement\_Postman\_Collection.json} & Paiement via G10. \\
+\texttt{G10\_Gateway\_G7\_Relation\_Postman\_Collection.json} & Suivi vehicules via G10. \\
+\texttt{G10\_Gateway\_G8\_Relation\_Postman\_Collection.json} & Analytics et ML via G10. \\
+\texttt{G10\_Gateway\_G9\_Relation\_Postman\_Collection.json} & Incidents via G10. \\
+\texttt{G10\_MultiGroup\_EndToEnd\_Postman\_Collection.json} & Scenarios croises G3, G5, G8, G1, G6. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Scenarios fonctionnels obligatoires}
+
+\begin{longtable}{p{1cm}p{5cm}p{4cm}p{4.5cm}}
+\toprule
+\textbf{No} & \textbf{Scenario} & \textbf{Resultat attendu} & \textbf{Preuve} \\
+\midrule
+1 & Health Gateway & \texttt{200 UP} & Capture Postman health \\
+2 & Login G3 via G10 & \texttt{200 + accessToken} & Capture login \\
+3 & Route protegee sans JWT & \texttt{401 UNAUTHORIZED} & Capture 401 \\
+4 & JWT invalide & \texttt{401 INVALID\_TOKEN} & Capture 401 invalid token \\
+5 & ROLE\_PASSENGER sur analytics & \texttt{403 FORBIDDEN} & Capture RBAC refuse \\
+6 & ROLE\_OPERATOR sur analytics & \texttt{200 OK} & Capture RBAC autorise \\
+7 & Ingestion tickets G8 & \texttt{201/207} & Capture ingestion \\
+8 & Prediction ML G8 & \texttt{200 OK} & Capture ML \\
+9 & Notification via G10 & \texttt{202 ACCEPTED} & Capture notification \\
+10 & Service cible arrete & \texttt{503 SERVICE\_UNAVAILABLE} & Capture resilience \\
+\bottomrule
+\end{longtable}
+
+\screenshot{screenshots/postman_health_g10.png}{0.82}{Postman - Health G10}
+\screenshot{screenshots/postman_login_g3.png}{0.82}{Postman - Login G3 via G10}
+\screenshot{screenshots/postman_rbac_403.png}{0.82}{Postman - RBAC refuse}
+\screenshot{screenshots/postman_analytics_operator_200.png}{0.82}{Postman - Analytics autorise}
+\screenshot{screenshots/postman_resilience_503.png}{0.82}{Postman - Service cible arrete et 503}
+
+\subsection{Logs et tracabilite}
+
+Commandes utilisees :
+
+\begin{lstlisting}[style=code]
+docker compose logs -f api-gateway
+docker compose logs -f g8-analytics-service
+docker compose logs -f notification-service
+docker compose logs -f service-gestion-incidents
+\end{lstlisting}
+
+Exemple de log attendu :
+
+\begin{lstlisting}[style=code]
+Gateway request correlationId=demo-g10 method=POST path=/api/notifications/send
+Gateway response correlationId=demo-g10 status=202 path=/api/notifications/send
+\end{lstlisting}
+
+\screenshot{screenshots/logs_gateway_success.png}{0.9}{Logs Gateway montrant le routage reussi}
+
+\newpage
+
+% ============================================================
+\section{Conteneurisation}
+
+\subsection{Dockerfile optimise}
+
+\begin{lstlisting}[style=code]
+FROM maven:3.9.5-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+RUN addgroup -S sgitu && adduser -S g10 -G sgitu
+USER g10
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar",
+            "--spring.profiles.active=docker"]
+\end{lstlisting}
+
+\subsection{Construction et execution}
+
+\begin{lstlisting}[style=code]
+cd api-gateway
+docker compose up -d --build
+docker compose ps
+docker compose logs -f api-gateway
+\end{lstlisting}
+
+La Gateway ecoute sur le port externe \texttt{8080}. Les autres services metier sont appeles par nom Docker dans \texttt{sgitu-network}.
+
+\subsection{docker-compose G10}
+
+Le compose local de G10 contient :
+
+\begin{itemize}
+  \item \texttt{api-gateway} ;
+  \item \texttt{redis} pour la blacklist ;
+  \item \texttt{prometheus} pour collecter les metriques G10 ;
+  \item \texttt{grafana} pour afficher le dashboard G10.
+\end{itemize}
+
+\begin{lstlisting}[style=code]
+services:
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+
+  api-gateway:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_BLACKLIST_ENABLED: ${TOKEN_BLACKLIST_ENABLED:-true}
+      REDIS_HOST: redis
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+\end{lstlisting}
+
+\newpage
+
+% ============================================================
+\section{Orchestration globale}
+
+\subsection{docker-compose global}
+
+Au niveau racine du projet, un \texttt{docker-compose.yml} permet de lancer l'environnement distribue SGITU : bases de donnees, Kafka, Redis, services G1 a G10, Prometheus et Grafana.
+
+\begin{lstlisting}[style=code]
+docker compose up -d --build
+docker compose ps
+\end{lstlisting}
+
+\begin{longtable}{p{4cm}p{5cm}p{4cm}}
+\toprule
+\textbf{Groupe} & \textbf{Nom Docker} & \textbf{Port interne} \\
+\midrule
+G1 & \texttt{service-billetterie} & 8081 \\
+G2 & \texttt{service-abonnement} & 8082 \\
+G3 & \texttt{g3-user-service} / \texttt{user-service} & 8083 \\
+G4 & \texttt{g4-coordination} & 8084 \\
+G5 & \texttt{notification-service} & 8085 \\
+G6 & \texttt{g6-payment-service} & 8086 \\
+G7 & \texttt{g7-service} / \texttt{g7-suivi-vehicules} & 8087 \\
+G8 & \texttt{g8-analytics-service} & 8088 \\
+G8 ML & \texttt{ml-service} & 5000 \\
+G9 & \texttt{service-gestion-incidents} & 8089 \\
+G10 & \texttt{api-gateway} & 8080 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Ressources internes}
+
+\begin{longtable}{p{4cm}p{5cm}p{5cm}}
+\toprule
+\textbf{Ressource} & \textbf{Usage} & \textbf{Exemple} \\
+\midrule
+Redis & Blacklist tokens G10 & \texttt{redis:6379} \\
+Kafka & Evenements inter-services & G1/G2/G5/G7/G8/G9 \\
+MongoDB & Donnees G1/G8 selon groupe & \texttt{mongo} \\
+MySQL/PostgreSQL & Donnees G2/G3/G4/G6/G9 & Selon groupe \\
+Prometheus & Collecte metriques & \texttt{prometheus:9090} \\
+Grafana & Visualisation monitoring & \texttt{localhost:3000} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Securite reseau}
+
+Pour la demonstration, le client externe utilise \texttt{localhost:8080}. Dans une configuration plus stricte, les ports metier G1 a G9 ne doivent pas etre publies vers l'hote ; ils doivent rester accessibles seulement dans \texttt{sgitu-network}. Cette approche reduit le risque de contournement de la Gateway.
+
+\begin{infoBox}
+Dans Docker, un conteneur appelle un autre conteneur avec son nom de service, par exemple \texttt{http://api-gateway:8080}. Depuis Postman ou le navigateur sur la machine, on utilise \texttt{http://localhost:8080}.
+\end{infoBox}
+
+\newpage
+
+% ============================================================
+\section{Monitoring et observabilite}
+
+\subsection{Actuator et Prometheus}
+
+G10 expose les endpoints Actuator suivants :
+
+\begin{lstlisting}[style=code]
+/actuator/health
+/actuator/metrics
+/actuator/prometheus
+\end{lstlisting}
+
+Prometheus collecte les metriques de tous les groupes avec des labels \texttt{group} et \texttt{service}.
+
+\begin{lstlisting}[style=code]
+- job_name: 'g10-api-gateway'
+  static_configs:
+    - targets: ['api-gateway:8080']
+      labels:
+        group: G10
+        service: api-gateway
+  metrics_path: '/actuator/prometheus'
+\end{lstlisting}
+
+\subsection{Grafana}
+
+Deux dashboards sont fournis :
+
+\begin{itemize}
+  \item \texttt{SGITU - G10 API Gateway} : dashboard detaille de G10 ;
+  \item \texttt{SGITU - Vue Globale Tous les Groupes} : statut G1 a G10.
+\end{itemize}
+
+\screenshot{screenshots/grafana_g10_dashboard.png}{0.9}{Dashboard Grafana G10}
+\screenshot{screenshots/grafana_global_dashboard.png}{0.9}{Dashboard Grafana global G1 a G10}
+
+\subsection{Prometheus targets}
+
+\screenshot{screenshots/prometheus_targets_all_up.png}{0.9}{Targets Prometheus des groupes SGITU}
+
+Le tableau Prometheus permet de verifier si un service expose correctement ses metriques. Si un groupe est \texttt{down}, cela indique un probleme de container, de chemin Actuator, de securite ou de nom Docker.
+
+\newpage
+
+% ============================================================
+\section{Simulation Kubernetes}
+
+\subsection{Objectif du bonus Kubernetes}
+
+La livraison finale demande un produit pret pour un deploiement orchestre. Pour cela, le projet contient une simulation Kubernetes globale et des manifests G10.
+
+Les fichiers principaux sont :
+
+\begin{lstlisting}[style=code]
+k8s/global/namespace.yaml
+k8s/global/config.yaml
+k8s/global/infrastructure.yaml
+k8s/global/applications.yaml
+k8s/global/monitoring.yaml
+k8s/global/kustomization.yaml
+api-gateway/k8s/api-gateway-deployment.yaml
+api-gateway/k8s/g10-observability.yaml
+\end{lstlisting}
+
+\subsection{Commandes de deploiement}
+
+\begin{lstlisting}[style=code]
+kubectl apply -k k8s/global
+kubectl get pods -n sgitu
+kubectl get svc -n sgitu
+\end{lstlisting}
+
+Pour tester uniquement G10 :
+
+\begin{lstlisting}[style=code]
+kubectl apply -f api-gateway/k8s/api-gateway-deployment.yaml
+kubectl apply -f api-gateway/k8s/g10-observability.yaml
+\end{lstlisting}
+
+\subsection{Port-forward de demonstration}
+
+\begin{lstlisting}[style=code]
+kubectl port-forward svc/api-gateway 8080:8080 -n sgitu
+kubectl port-forward svc/grafana 3000:3000 -n sgitu
+kubectl port-forward svc/prometheus 9090:9090 -n sgitu
+\end{lstlisting}
+
+\screenshot{screenshots/kubernetes_pods.png}{0.9}{Pods Kubernetes SGITU}
+
+\newpage
+
+% ============================================================
+\section{CI/CD GitHub Actions}
+
+\subsection{Objectif}
+
+Pour completer la livraison finale, le projet contient un workflow GitHub Actions global. Son objectif est de verifier automatiquement que le projet reste compilable, que la configuration Docker/Kubernetes est valide et que les images Docker peuvent etre construites.
+
+\begin{lstlisting}[style=code]
+.github/workflows/sgitu-global-ci-cd.yml
+\end{lstlisting}
+
+\subsection{Etapes du pipeline}
+
+\begin{longtable}{p{4cm}p{10cm}}
+\toprule
+\textbf{Job} & \textbf{Role} \\
+\midrule
+\texttt{maven-package} & Compile et package tous les microservices Java G1 a G10. \\
+\texttt{g10-tests} & Execute automatiquement les tests Maven du groupe 10. \\
+\texttt{all-service-tests} & Execute les tests de tous les groupes en mode manuel. \\
+\texttt{configuration-validation} & Valide Docker Compose, Prometheus et le rendu Kubernetes. \\
+\texttt{docker-build} & Construit toutes les images Docker sans publication sur pull request. \\
+\texttt{publish-ghcr} & Publie les images sur GitHub Container Registry sur \texttt{main}/\texttt{master}. \\
+\texttt{ci-summary} & Resume l'etat du pipeline et echoue si une etape obligatoire echoue. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Declenchement}
+
+Le pipeline se lance automatiquement sur les pushes et pull requests qui modifient le code des microservices, Docker, Kubernetes ou monitoring.
+
+\begin{lstlisting}[style=code]
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
+    inputs:
+      run_all_tests: true/false
+\end{lstlisting}
+
+\subsection{Publication des images}
+
+Sur la branche principale, les images sont publiees sur GHCR avec deux tags :
+
+\begin{lstlisting}[style=code]
+ghcr.io/<owner>/<repo>/<image>:latest
+ghcr.io/<owner>/<repo>/<image>:<commit-sha>
+\end{lstlisting}
+
+Cette configuration evite de stocker des mots de passe Docker Hub dans le code. L'authentification utilise le token GitHub Actions \texttt{GITHUB\_TOKEN}.
+
+\screenshot{screenshots/github_actions_global_pipeline.png}{0.9}{Pipeline GitHub Actions global SGITU}
+
+\newpage
+
+% ============================================================
+\section{Resilience et challenge chaos}
+
+\subsection{Comportement attendu si un service tombe}
+
+Pour G10, la resilience consiste a ne pas faire tomber toute l'application lorsqu'un microservice cible est indisponible. Si G8, G5 ou G6 est arrete, la Gateway doit retourner une erreur claire :
+
+\begin{lstlisting}[style=code]
+{
+  "status": 503,
+  "code": "SERVICE_UNAVAILABLE",
+  "message": "Microservice cible indisponible",
+  "correlationId": "chaos-g8"
+}
+\end{lstlisting}
+
+\subsection{Scenario de test chaos}
+
+Exemple avec G8 :
+
+\begin{lstlisting}[style=code]
+docker compose stop g8-analytics-service
+
+# Postman
+GET http://localhost:8080/api/v1/analytics/dashboard
+Authorization: Bearer <TOKEN_OPERATOR>
+X-Correlation-Id: chaos-g8
+
+# Resultat attendu
+503 SERVICE_UNAVAILABLE
+
+docker compose start g8-analytics-service
+\end{lstlisting}
+
+Ce test prouve que la Gateway reste disponible et que la panne est isolee au service cible.
+
+\screenshot{screenshots/chaos_g8_503.png}{0.9}{Test chaos : G8 arrete et reponse 503}
+
+\newpage
+
+% ============================================================
+\section{Integration inter-groupes}
+
+\subsection{Regle de communication retenue}
+
+Pour les appels REST venant d'un client externe, la requete passe par G10. Pour les communications asynchrones Kafka, les services publient directement sur les topics convenus. Pour les appels REST internes entre microservices, deux strategies sont possibles : passage par G10 lorsque l'API est protegee ou communication directe securisee par token de service.
+
+\begin{infoBox}
+Dans notre demonstration finale, les tests Postman montrent prioritairement les appels externes via G10, car c'est le perimetre principal du groupe 10.
+\end{infoBox}
+
+\subsection{Conformite avec les groupes}
+
+\begin{longtable}{p{1.2cm}p{4cm}p{9cm}}
+\toprule
+\textbf{Grp} & \textbf{Integration} & \textbf{Etat} \\
+\midrule
+G1 & Billetterie & Routes tickets et admin configurees, tests Postman disponibles. \\
+G2 & Abonnement & Routes abonnements/plans configurees, rewrite path applique. \\
+G3 & Utilisateurs & Login, register, users et roles routes ; G3 emet les JWT. \\
+G4 & Coordination & Routes G4, lignes, arrets, missions et roles G4 configures. \\
+G5 & Notifications & Route \texttt{/api/notifications/**}, headers Gateway propages, Authorization retire si requis par G5. \\
+G6 & Paiement & Routes payments/refunds/invoices configurees avec rewrite path. \\
+G7 & Suivi vehicules & Routes vehicules, positions et alertes avec RBAC dedie. \\
+G8 & Analytique & Ingestion, analytics et ML proteges par admin/operator/staff. \\
+G9 & Incidents & Routes incidents et rapports legacy configurees. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Preuve de validation croisee}
+
+\screenshot{screenshots/postman_multigroup_success.png}{0.9}{Postman multi-groupes via G10}
+
+\newpage
+
+% ============================================================
+\section{Livrables finaux}
+
+\subsection{Archive attendue}
+
+L'archive \texttt{Groupe10\_SGITU\_Final.zip} doit contenir :
+
+\begin{itemize}
+  \item le code source \texttt{api-gateway/src} ;
+  \item le \texttt{pom.xml} ;
+  \item le \texttt{Dockerfile} ;
+  \item le \texttt{docker-compose.yml} G10 ;
+  \item les manifests \texttt{k8s} ;
+  \item les fichiers monitoring ;
+  \item le \texttt{README.md} ;
+  \item les collections Postman ;
+  \item le rapport PDF ;
+  \item la presentation PDF.
+\end{itemize}
+
+\subsection{Checklist de conformite}
+
+\begin{longtable}{p{8cm}p{3cm}p{4cm}}
+\toprule
+\textbf{Exigence} & \textbf{Etat} & \textbf{Preuve} \\
+\midrule
+Introduction et perimetre & OK & Section 1 \\
+Diagrammes UML mis a jour & OK & Section 2 \\
+Architecture technique & OK & Section 3 \\
+Documentation Swagger & OK & Section 6 \\
+Securite JWT et roles & OK & Section 5 \\
+Tests unitaires/integration & OK & Section 7 \\
+Dockerfile optimise & OK & Section 8 \\
+docker-compose avec dependances & OK & Section 9 \\
+README de lancement & OK & \texttt{README.md} \\
+Prometheus/Grafana & OK bonus & Section 10 \\
+Kubernetes & OK bonus & Section 11 \\
+CI/CD GitHub Actions & OK bonus & Section 12 \\
+Resilience/Chaos & OK & Section 13 \\
+\bottomrule
+\end{longtable}
+
+\newpage
+
+% ============================================================
+\section{Etat d'avancement final}
+
+\subsection{Fonctionnalites finalisees}
+
+\begin{itemize}
+  \item API Gateway fonctionnelle ;
+  \item routage G1 a G9 ;
+  \item validation JWT HS256 ;
+  \item RBAC detaille par groupe ;
+  \item blacklist token via Redis ;
+  \item headers utilisateur propages ;
+  \item correlation id automatique ;
+  \item erreurs JSON harmonisees ;
+  \item Swagger/OpenAPI ;
+  \item collections Postman par groupe ;
+  \item Docker Compose G10 et global ;
+  \item Prometheus/Grafana ;
+  \item Kubernetes ;
+  \item CI/CD GitHub Actions global ;
+  \item scenarios de resilience.
+\end{itemize}
+
+\subsection{Limites connues}
+
+\begin{itemize}
+  \item le secret JWT HS256 reste partage en demonstration ; RS256 est recommande en production ;
+  \item certains services metier peuvent encore publier leurs ports pour faciliter les tests individuels ;
+  \item la disponibilite des dashboards depend de l'exposition correcte de \texttt{/actuator/prometheus} par chaque groupe ;
+  \item les captures doivent etre ajoutees dans \texttt{docs/screenshots} avant compilation finale du PDF.
+\end{itemize}
+
+\subsection{Perspectives}
+
+\begin{itemize}
+  \item migration vers RS256 avec cle publique ;
+  \item rate limiting par utilisateur ou par IP ;
+  \item centralisation des logs dans ELK ou Loki ;
+  \item service discovery dynamique ;
+  \item politiques Kubernetes plus strictes.
+\end{itemize}
+
+\newpage
+
+% ============================================================
+\section{Conclusion}
+
+La livraison finale du groupe 10 fournit une API Gateway complete pour l'ecosysteme SGITU. Elle assure le routage vers les microservices, la validation des JWT emis par G3, le controle d'acces par roles, la propagation du contexte utilisateur, la gestion des erreurs, la tracabilite et l'observabilite.
+
+Le projet repond aux exigences principales du rendu final : code source propre, API documentee, securite appliquee, tests Postman, Dockerfile, docker-compose, README, monitoring et simulation Kubernetes. La Gateway permet de demontrer une integration securisee entre les groupes, tout en respectant la separation des responsabilites propre aux architectures microservices.
+
+\begin{successBox}
+G10 est pret pour la soutenance finale : le service est fonctionnel, testable via Postman, observable via Prometheus/Grafana et deployable en Docker ou Kubernetes.
+\end{successBox}
+
+\end{document}

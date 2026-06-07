@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -47,8 +48,10 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
                         .collect(Collectors.toList());
 
                 // --- Populate Spring Security context ---
+                UUID normalizedUserId = parseUserId(userId);
+
                 AuthenticatedUser authenticatedUser = new AuthenticatedUser(
-                        UUID.fromString(userId),
+                        normalizedUserId,
                         userEmail,
                         authorities
                 );
@@ -63,7 +66,7 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
                 // --- Populate ThreadLocal context ---
                 RequestContextHolder.set(
                         RequestContext.builder()
-                                .userId(UUID.fromString(userId))
+                                .userId(normalizedUserId)
                                 .userEmail(userEmail)
                                 .roles(roleList)
                                 .correlationId(correlationId)
@@ -78,6 +81,14 @@ public class GatewayHeaderAuthenticationFilter extends OncePerRequestFilter {
         } finally {
             RequestContextHolder.clear();
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    private UUID parseUserId(String userId) {
+        try {
+            return UUID.fromString(userId);
+        } catch (IllegalArgumentException ignored) {
+            return UUID.nameUUIDFromBytes(("sgitu-user-" + userId).getBytes(StandardCharsets.UTF_8));
         }
     }
 }

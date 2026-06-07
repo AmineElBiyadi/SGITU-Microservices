@@ -1,0 +1,996 @@
+﻿{
+    "info":  {
+                 "name":  "SGITU - G10 Gateway x G1 Billetterie",
+                 "description":  "Collection Postman exhaustive cote Gateway pour verifier Client -\u003e G10 -\u003e G1 Billetterie. Elle couvre JWT, RBAC, routage, headers Gateway, endpoints tickets utilisateur, endpoints admin reels et resilience 503. Les ticket-types sont documentes comme non exposes par G1 actuellement.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "event":  [
+                  {
+                      "listen":  "prerequest",
+                      "script":  {
+                                     "type":  "text/javascript",
+                                     "exec":  [
+                                                  "const secret = pm.collectionVariables.get(\u0027jwtSecret\u0027) || \u0027SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!\u0027;",
+                                                  "function b64url(input) { return CryptoJS.enc.Base64.stringify(input).replace(/=+$/,\u0027\u0027).replace(/\\+/g,\u0027-\u0027).replace(/\\//g,\u0027_\u0027); }",
+                                                  "function makeJwt(email, userId, roles, ttlSeconds) {",
+                                                  "  const now = Math.floor(Date.now() / 1000);",
+                                                  "  const header = { alg: \u0027HS256\u0027, typ: \u0027JWT\u0027 };",
+                                                  "  const payload = { sub: email, userId: String(userId), roles: roles, iat: now, exp: now + ttlSeconds, jti: \u0027g1-postman-\u0027 + Math.random().toString(36).slice(2) };",
+                                                  "  const encodedHeader = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+                                                  "  const encodedPayload = b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+                                                  "  const signature = b64url(CryptoJS.HmacSHA256(encodedHeader + \u0027.\u0027 + encodedPayload, secret));",
+                                                  "  return encodedHeader + \u0027.\u0027 + encodedPayload + \u0027.\u0027 + signature;",
+                                                  "}",
+                                                  "if (pm.collectionVariables.get(\u0027autoGenerateTokens\u0027) !== \u0027false\u0027) {",
+                                                  "  pm.collectionVariables.set(\u0027adminToken\u0027, makeJwt(\u0027admin.g1@sgitu.ma\u0027, \u00271\u0027, [\u0027ROLE_ADMIN\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027passengerToken\u0027, makeJwt(\u0027passenger.g1@sgitu.ma\u0027, \u0027101\u0027, [\u0027ROLE_PASSENGER\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027operatorToken\u0027, makeJwt(\u0027operator.g1@sgitu.ma\u0027, \u0027102\u0027, [\u0027ROLE_OPERATOR\u0027], 3600));",
+                                                  "  pm.collectionVariables.set(\u0027expiredToken\u0027, makeJwt(\u0027expired.g1@sgitu.ma\u0027, \u0027199\u0027, [\u0027ROLE_PASSENGER\u0027], -60));",
+                                                  "  pm.collectionVariables.set(\u0027invalidToken\u0027, \u0027invalid.jwt.token\u0027);",
+                                                  "}",
+                                                  "if (!pm.collectionVariables.get(\u0027runId\u0027)) { pm.collectionVariables.set(\u0027runId\u0027, Date.now().toString()); }",
+                                                  "pm.collectionVariables.set(\u0027futureExpiresAt\u0027, new Date(Date.now() + 86400000).toISOString());",
+                                                  "if (!pm.collectionVariables.get(\u0027ticketId\u0027)) { pm.collectionVariables.set(\u0027ticketId\u0027, \u0027missing-ticket-g10-g1\u0027); }",
+                                                  "if (!pm.collectionVariables.get(\u0027pendingTicketId\u0027)) { pm.collectionVariables.set(\u0027pendingTicketId\u0027, pm.collectionVariables.get(\u0027ticketId\u0027)); }"
+                                              ]
+                                 }
+                  }
+              ],
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:8080",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "jwtSecret",
+                         "value":  "SGITU_G3_JWT_SECRET_KEY_CHANGE_ME_IN_PRODUCTION_256BITS!!",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "autoGenerateTokens",
+                         "value":  "true",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "adminToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "passengerToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "operatorToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "expiredToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "invalidToken",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "runId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "futureExpiresAt",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "ticketId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "ticketTokenValue",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "holderId",
+                         "value":  "101",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "newHolderId",
+                         "value":  "102",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "pendingTicketId",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
+                         "key":  "g1DownMode",
+                         "value":  "false",
+                         "type":  "string"
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "00 - Preconditions G10 et G1",
+                     "item":  [
+                                  {
+                                      "name":  "00.1 - 200 health G10",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-health-gateway"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/actuator/health"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027G10 UP\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                "pm.test(\u0027Body contains UP\u0027, function () { pm.expect(pm.response.text()).to.include(\u0027UP\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "00.2 - 200 OpenAPI G10 contient route G1",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/v3/api-docs"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027OpenAPI accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                "pm.test(\u0027Documentation mentions tickets path\u0027, function () { pm.expect(pm.response.text()).to.include(\u0027/api/v1/tickets\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "01 - Securite JWT avant G1",
+                     "item":  [
+                                  {
+                                      "name":  "01.1 - 401 get ticket sans JWT",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-no-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Sans JWT refuse par G10\u0027, function () { pm.response.to.have.status(401); });",
+                                                                                "pm.test(\u0027Code erreur coherent\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027UNAUTHORIZED\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "01.2 - 401 get ticket JWT invalide",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{invalidToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-invalid-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027JWT invalide refuse\u0027, function () { pm.response.to.have.status(401); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "01.3 - 401 get ticket JWT expire",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{expiredToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-expired-jwt"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027JWT expire refuse\u0027, function () { pm.response.to.have.status(401); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "01.4 - 403 admin dashboard avec ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-forbidden"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/dashboard"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027ROLE_PASSENGER refuse sur admin G1\u0027, function () { pm.response.to.have.status(403); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "02 - Tickets G1 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "02.1 - 201 create ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-create-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"tripId\": \"MISSION-{{runId}}\",\n  \"holderId\": \"{{holderId}}\",\n  \"price\": 7.5,\n  \"currency\": \"MAD\",\n  \"ticketType\": \"ONE_WAY\",\n  \"ticketClass\": \"ORDINARY\",\n  \"identityMethod\": \"QR_CODE\",\n  \"rawPayload\": \"qr-g10-g1-{{runId}}\",\n  \"expiresAt\": \"{{futureExpiresAt}}\",\n  \"metadata\": { \"source\": \"POSTMAN_G10_G1\" }\n}"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Create ticket retourne 201\u0027, function () { pm.response.to.have.status(201); });",
+                                                                                "const body = pm.response.json();",
+                                                                                "pm.test(\u0027Ticket id retourne\u0027, function () { pm.expect(body.id).to.exist; });",
+                                                                                "if (body.id) { pm.collectionVariables.set(\u0027ticketId\u0027, body.id); }",
+                                                                                "if (body.tokenValue) { pm.collectionVariables.set(\u0027ticketTokenValue\u0027, body.tokenValue); }"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.2 - 200 get created ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-get-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Get ticket retourne 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                "pm.test(\u0027Correlation id present\u0027, function () { pm.expect(pm.response.headers.get(\u0027X-Correlation-Id\u0027)).to.exist; });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.3 - 200 user ticket history ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-user-history"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/user/{{holderId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027History retourne 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                "pm.test(\u0027Body is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.4 - 400 create ticket payload invalide",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-invalid-payload"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{ \"holderId\": \"101\" }"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Payload invalide refuse\u0027, function () { pm.expect([400,422]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.5 - 200/422 pay ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-pay-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/pay",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"userId\": \"{{holderId}}\",\n  \"sourceType\": \"TICKET\",\n  \"paymentMethod\": \"CARD\",\n  \"savedPaymentToken\": \"tok_test_g10_g1\"\n}"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Pay route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.6 - 200/422 validate ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-validate-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/validate",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"tokenValue\": \"{{ticketTokenValue}}\",\n  \"identityPayload\": { \"qr\": \"{{ticketTokenValue}}\" }\n}"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Validate route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.7 - 200/422 transfer ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-transfer-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/transfer",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"newHolderId\": \"{{newHolderId}}\",\n  \"reason\": \"Postman integration transfer\"\n}"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Transfer route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });",
+                                                                                "if (pm.response.code === 200) {",
+                                                                                "  const body = pm.response.json();",
+                                                                                "  if (body.newHolderTicket \u0026\u0026 body.newHolderTicket.id) { pm.collectionVariables.set(\u0027pendingTicketId\u0027, body.newHolderTicket.id); }",
+                                                                                "}"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.8 - 200/422 cancel ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-cancel-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/cancel"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Cancel ticket route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.9 - 200/422 refund ticket ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-refund-ticket"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/refund"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Refund ticket route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.10 - 200/422 accept transfer ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-transfer-accept"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{pendingTicketId}}/transfer/accept",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \\"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "acceptingUserId\\: \\"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.11 - 200/422 reject transfer ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-transfer-reject"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{pendingTicketId}}/transfer/reject",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \\"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "acceptingUserId\\: \\"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "02.12 - 200/422 cancel transfer ROLE_PASSENGER",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-transfer-cancel"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}/transfer/cancel"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Cancel transfer route G1 repond\u0027, function () { pm.expect([200,400,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "03 - Administration G1 via G10",
+                     "item":  [
+                                  {
+                                      "name":  "03.1 - 200 admin dashboard ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-dashboard"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/dashboard"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin dashboard accessible\u0027, function () { pm.response.to.have.status(200); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.2 - 200 admin list tickets ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-tickets"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin list tickets accessible\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                "pm.test(\u0027Body is array\u0027, function () { pm.expect(pm.response.json()).to.be.an(\u0027array\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.3 - 200 admin flagged tickets ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-flagged"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/flagged"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin flagged accessible\u0027, function () { pm.response.to.have.status(200); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.4 - 200/404 admin audit ticket ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-audit"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}/audit"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin audit route repond\u0027, function () { pm.expect([200,404]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.5 - 200/404 admin cancel ticket ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-cancel"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"reason\": \"Postman admin cancellation\",\n  \"cancelledBy\": \"1\"\n}"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin cancel route repond\u0027, function () { pm.expect([200,400,404,422]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.6 - 200/404 admin flagged ticket detail ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-flagged-detail"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}/flagged"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Admin flagged detail route repond\u0027, function () { pm.expect([200,404,422,503]).to.include(pm.response.code); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.7 - 200/404 admin resolve flag ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-resolve-flag"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}/flag/resolve",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \\"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "resolutionNote\\: \\Postman"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.8 - 200/404 admin confirm fraud ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-confirm-fraud"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}/flag/confirmfraud",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \\"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "fraudReason\\: \\Postman"
+                                                                            ]
+                                                               }
+                                                }
+                                  },
+                                  {
+                                      "name":  "03.9 - 200/404 admin force refund ROLE_ADMIN",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-admin-force-refund"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/admin/tickets/{{ticketId}}/forcerefund",
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \\"
+                                                               }
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "reason\\: \\Postman"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "04 - Resilience G1",
+                     "item":  [
+                                  {
+                                      "name":  "04.1 - G1 down -\u003e 503 via G10",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{passengerToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-down"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/tickets/{{ticketId}}"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Quand G1 est arrete, G10 retourne 503\u0027, function () { pm.response.to.have.status(503); });",
+                                                                                "pm.test(\u0027Code service unavailable\u0027, function () { pm.expect(pm.response.json().code).to.eql(\u0027SERVICE_UNAVAILABLE\u0027); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "05 - Verification contrat G1 reel",
+                     "item":  [
+                                  {
+                                      "name":  "05.1 - 404 ticket-types non expose par G1 actuel",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{adminToken}}"
+                                                                     },
+                                                                     {
+                                                                         "key":  "X-Correlation-Id",
+                                                                         "value":  "g10-g1-ticket-types-not-implemented"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/ticket-types"
+                                                  },
+                                      "event":  {
+                                                    "listen":  "test",
+                                                    "script":  {
+                                                                   "type":  "text/javascript",
+                                                                   "exec":  [
+                                                                                "pm.test(\u0027Ticket-types non expose actuellement par G1\u0027, function () { pm.expect([404,503]).to.include(pm.response.code); });",
+                                                                                "pm.test(\u0027Ce test documente le contrat reel G1 actuel\u0027, function () { pm.expect(pm.response.code).to.not.eql(401); pm.expect(pm.response.code).to.not.eql(403); });"
+                                                                            ]
+                                                               }
+                                                }
+                                  }
+                              ]
+                 }
+             ]
+}

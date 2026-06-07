@@ -187,7 +187,7 @@ public class SubscriptionEventPublisher {
                 .userId(user.getId().toString())
                 .email(user.getEmail())
                 .phone(user.getProfile() != null ? user.getProfile().getPhone() : null)
-                .deviceToken(null) 
+                .deviceToken(null)
                 .build();
 
         NotificationEventDTO event = NotificationEventDTO.builder()

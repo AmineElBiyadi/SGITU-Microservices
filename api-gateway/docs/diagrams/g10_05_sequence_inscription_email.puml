@@ -1,0 +1,35 @@
+@startuml
+title Sequence - Inscription et login avec G3 source de verite
+
+autonumber
+actor "Visiteur" as Visitor
+participant "G10 Gateway" as G10
+participant "G3 User/Auth Service" as G3
+database "User DB G3" as Db
+participant "G5 Notifications" as G5
+
+Visitor -> G10 : POST /api/users
+activate G10
+G10 -> G3 : route /api/users
+activate G3
+G3 -> Db : creer utilisateur
+Db --> G3 : userId
+G3 -> G5 : publier notification\nUSER_REGISTERED
+G5 --> G3 : notification acceptee
+G3 --> G10 : 200/201 inscription creee
+deactivate G3
+G10 --> Visitor : reponse G3
+deactivate G10
+
+Visitor -> G10 : POST /auth/login\nemail, password
+activate G10
+G10 -> G3 : route /auth/login
+activate G3
+G3 -> Db : verifier identifiants
+Db --> G3 : utilisateur + roles
+G3 --> G10 : 200 JWT + refreshToken
+deactivate G3
+G10 --> Visitor : 200 JWT + refreshToken
+deactivate G10
+
+@enduml

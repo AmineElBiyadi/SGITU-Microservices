@@ -19,10 +19,16 @@ services:
       start_period: 20s
 
   ml-service:
-    build: ./ml-service
+    build:
+      context: ./ml-service
+      network: host
+      extra_hosts:
+        - "pypi.org=151.101.64.223"
+        - "files.pythonhosted.org=151.101.128.223"
     container_name: g8-ml-service
     networks:
       - sgitu-internal
+      - sgitu-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -31,16 +37,19 @@ services:
       start_period: 15s
 
   g8-analytics:
-    build: .
+    build:
+      context: .
+      network: host
+      extra_hosts:
+        - "repo.maven.apache.org=104.18.18.12"
     container_name: g8-analytics-service
     ports:
       - "8088:8088"
     environment:
       MONGO_URI: mongodb://mongodb:27017/g8_analytics
       ML_SERVICE_URL: http://ml-service:5000
+      G5_NOTIFICATION_URL: http://api-gateway:8080/api/notifications/send
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-    networks:
-      - sgitu-internal
     depends_on:
       mongodb:
         condition: service_healthy
@@ -55,6 +64,9 @@ services:
       retries: 5
       start_period: 60s
     restart: on-failure
+    networks:
+      - sgitu-internal
+      - sgitu-network
 
   prometheus:
     image: prom/prometheus:v2.51.0
@@ -130,6 +142,8 @@ networks:
   sgitu-internal:
     name: sgitu-internal
     driver: bridge
+  sgitu-network:
+    external: true
 
 volumes:
   g8-mongo-data:
