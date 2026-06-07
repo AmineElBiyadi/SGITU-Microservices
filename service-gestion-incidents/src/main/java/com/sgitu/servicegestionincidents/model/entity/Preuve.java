@@ -26,8 +26,10 @@ public class Preuve {
     private TypePreuve type;
 
     private String fichier;
+    private String stockageKey;
     private String urlStockage;
     private String description;
+    private Long tailleFichier;
 
     @Column(nullable = false)
     @Builder.Default
@@ -38,7 +40,6 @@ public class Preuve {
     }
 
     public Long getTaille() {
-        // TODO: Implémenter la logique de calcul de taille
-        return 0L;
+        return this.tailleFichier != null ? this.tailleFichier : 0L;
     }
 }

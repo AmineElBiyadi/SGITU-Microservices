@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: g9-servicemonitor
+  namespace: service-gestion-incidents
+  labels:
+    app: g9-service
+spec:
+  selector:
+    matchLabels:
+      app: g9-service
+  endpoints:
+  - port: "8089"
+    path: /api/incidents/actuator/prometheus
+    interval: 15s
