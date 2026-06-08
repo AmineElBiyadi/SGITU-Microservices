@@ -16,8 +16,12 @@ public class NotificationProducer {
 
     public void envoyerNotification(NotificationEvent event) {
         try {
-            log.info("Publication notification type {} avec l'ID {}",
-                    event.getEventType(), event.getNotificationId());
+            log.info("[Publication Notification vers G5] type={} | channel={} | email={} | phone={} | id={}",
+                    event.getEventType(),
+                    event.getChannel(),
+                    event.getRecipient().getEmail(),
+                    event.getRecipient().getPhone(),
+                    event.getNotificationId());
             kafkaTemplate.send(MessagingConstants.NOTIFICATION_TOPIC, event)
                     .whenComplete((result, ex) -> {
                         if (ex != null) {
