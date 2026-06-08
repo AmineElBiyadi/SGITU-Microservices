@@ -2,15 +2,25 @@
   "info": {
     "_postman_id": "45d3592a-e9b3-4b08-9c84-705c9f9e6099",
     "name": "SGITU-Gestion-Incidents",
-    "description": "Collection pour tester les APIs du service de gestion des incidents en suivant le cycle de vie logique.",
+    "description": "Collection pour tester les APIs du service de gestion des incidents en suivant le cycle de vie logique.\n\nAuthentification : Bearer token JWT obtenu depuis G3 (POST http://localhost:8083/api/auth/login).\nDéfinir la variable de collection `token` avec le JWT obtenu.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
       "name": "1. Cycle de vie de l'Incident",
       "item": [
         {
-          "name": "1.1 Signaler un incident",
+          "name": "1.1 Signaler un incident (avec fichiers)",
           "event": [
             {
               "listen": "test",
@@ -21,9 +31,10 @@
                   "});",
                   "",
                   "var jsonData = pm.response.json();",
-                  "if (jsonData.id) {",
-                  "    pm.collectionVariables.set(\"incidentId\", jsonData.id);",
-                  "    console.log(\"ID de l'incident sauvegardé : \" + jsonData.id);",
+                  "if (jsonData.incidentId) {",
+                  "    pm.collectionVariables.set(\"incidentId\", jsonData.incidentId);",
+                  "    console.log(\"ID de l'incident sauvegardé : \" + jsonData.incidentId);",
+                  "    console.log(\"Référence : \" + jsonData.reference);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -32,39 +43,36 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "1"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_PASSENGER"
-              }
-            ],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"type\": \"ACCIDENT\",\n  \"description\": \"Accident léger entre deux bus à la station centrale.\",\n  \"dateIncident\": \"2026-05-27T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"vehiculeId\": \"BUS-123\",\n  \"preuves\": [\n    {\n      \"type\": \"PHOTO\",\n      \"fichierBase64\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\",\n      \"description\": \"Vue d'ensemble de l'accident\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "request",
+                  "value": "{\n  \"type\": \"ACCIDENT\",\n  \"description\": \"Accident léger entre deux bus à la station centrale.\",\n  \"dateIncident\": \"2026-05-27T10:30:00\",\n  \"latitude\": 33.5731,\n  \"longitude\": -7.5898,\n  \"vehiculeId\": \"BUS-123\"\n}",
+                  "contentType": "application/json",
+                  "type": "text",
+                  "description": "Données de l'incident en JSON"
+                },
+                {
+                  "key": "fichiers",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true,
+                  "description": "Pièces jointes optionnelles (photos, vidéos, documents)"
                 }
-              }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/signaler",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "signaler"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["signaler"]
             }
           },
           "response": []
         },
         {
-          "name": "1.1 Signaler un incident (2)",
+          "name": "1.1 Signaler un incident - Panne Véhicule",
           "event": [
             {
               "listen": "test",
@@ -75,46 +83,42 @@
                   "});",
                   "",
                   "var jsonData = pm.response.json();",
-                  "if (jsonData.id) {",
-                  "    pm.collectionVariables.set(\"incidentId\", jsonData.id);",
-                  "    console.log(\"ID de l'incident sauvegardé : \" + jsonData.id);",
+                  "if (jsonData.incidentId) {",
+                  "    pm.collectionVariables.set(\"incidentId\", jsonData.incidentId);",
+                  "    console.log(\"ID de l'incident sauvegardé : \" + jsonData.incidentId);",
+                  "    console.log(\"Référence : \" + jsonData.reference);",
                   "}"
                 ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
+                "type": "text/javascript"
               }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "1"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_PASSENGER"
-              }
-            ],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"type\": \"PANNE_VEHICULE\",\n  \"description\": \"Panne technique signalée sur un tramway provoquant un arrêt temporaire du service.\",\n  \"dateIncident\": \"2026-05-27T14:45:00\",\n  \"latitude\": 34.0209,\n  \"longitude\": -6.8416,\n  \"vehiculeId\": \"TRAM-204\",\n  \"preuves\": [\n    {\n      \"type\": \"PHOTO\",\n      \"fichierBase64\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAE/wJ/l7n6WQAAAABJRU5ErkJggg==\",\n      \"description\": \"Photo du tableau de bord affichant l’erreur technique\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "request",
+                  "value": "{\n  \"type\": \"PANNE_VEHICULE\",\n  \"description\": \"Panne technique signalée sur un tramway provoquant un arrêt temporaire du service.\",\n  \"dateIncident\": \"2026-05-27T14:45:00\",\n  \"latitude\": 34.0209,\n  \"longitude\": -6.8416,\n  \"vehiculeId\": \"TRAM-204\"\n}",
+                  "contentType": "application/json",
+                  "type": "text",
+                  "description": "Données de l'incident en JSON"
+                },
+                {
+                  "key": "fichiers",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true,
+                  "description": "Pièces jointes optionnelles"
                 }
-              }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/signaler",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "signaler"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["signaler"]
             }
           },
           "response": []
@@ -123,24 +127,11 @@
           "name": "1.2 Consulter l'incident créé",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "1"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_PASSENGER"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}"]
             }
           },
           "response": []
@@ -149,34 +140,16 @@
           "name": "1.3 Passer en ANALYSE",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"statut\": \"ANALYSE\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/statut",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "statut"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "statut"]
             }
           },
           "response": []
@@ -185,34 +158,16 @@
           "name": "1.4 Affecter un responsable",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"responsableId\": 104\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "raw": "{\n  \"responsableId\": 7\n}",
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/affecter",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "affecter"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "affecter"]
             }
           },
           "response": []
@@ -221,34 +176,16 @@
           "name": "1.5 Démarrer le traitement (EN_TRAITEMENT)",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"statut\": \"EN_TRAITEMENT\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/statut",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "statut"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "statut"]
             }
           },
           "response": []
@@ -257,26 +194,11 @@
           "name": "1.6 Ajouter un renfort",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/{{incidentId}}/renforts/105",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "renforts",
-                "105"
-              ]
+              "raw": "{{baseUrl}}/{{incidentId}}/renforts/6",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "renforts", "6"]
             }
           },
           "response": []
@@ -285,25 +207,11 @@
           "name": "1.7 Lister les renforts",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/renforts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "renforts"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "renforts"]
             }
           },
           "response": []
@@ -312,34 +220,16 @@
           "name": "1.8 Demander une escalade",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"Dégâts de structure trop importants sur la voie.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/demander-escalade",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "demander-escalade"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "demander-escalade"]
             }
           },
           "response": []
@@ -348,34 +238,16 @@
           "name": "1.9 Refuser une demande d'escalade",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"Le technicien sur place peut gérer avec l'aide du renfort affecté.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/refuser-escalade",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "refuser-escalade"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "refuser-escalade"]
             }
           },
           "response": []
@@ -384,34 +256,16 @@
           "name": "1.10 Réessayer la demande d'escalade",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"Confirmation du besoin urgent d'un équipement lourd spécifique.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/demander-escalade",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "demander-escalade"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "demander-escalade"]
             }
           },
           "response": []
@@ -420,34 +274,16 @@
           "name": "1.11 Confirmer/Escalader l'incident",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"Validation du besoin d'équipement lourd par le dispatcher.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/escalader",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "escalader"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "escalader"]
             }
           },
           "response": []
@@ -456,34 +292,16 @@
           "name": "1.12 Marquer comme Résolu (RESOLU)",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"statut\": \"RESOLU\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/statut",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "statut"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "statut"]
             }
           },
           "response": []
@@ -492,34 +310,16 @@
           "name": "1.13 Clôturer un incident",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"Intervention terminée, voies libérées.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/cloturer",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "cloturer"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "cloturer"]
             }
           },
           "response": []
@@ -528,34 +328,16 @@
           "name": "1.14 Annuler un incident (Fausse alerte)",
           "request": {
             "method": "PUT",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"motif\": \"C'était une fausse alerte signalée par erreur.\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+              "options": { "raw": { "language": "json" } }
             },
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/annuler",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "annuler"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "annuler"]
             }
           },
           "response": []
@@ -569,27 +351,11 @@
           "name": "2.1 Filtrer par statut NOUVEAU",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}?statut=NOUVEAU",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "query": [
-                {
-                  "key": "statut",
-                  "value": "NOUVEAU"
-                }
-              ]
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "statut", "value": "NOUVEAU" }]
             }
           },
           "response": []
@@ -598,24 +364,11 @@
           "name": "2.2 Obtenir tous les incidents (Superviseur)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "3"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_SUPERVISOR"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/tous",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "tous"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["tous"]
             }
           },
           "response": []
@@ -624,24 +377,11 @@
           "name": "2.3 Obtenir les incidents non escaladés",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/non-escalades",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "non-escalades"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["non-escalades"]
             }
           },
           "response": []
@@ -650,24 +390,11 @@
           "name": "2.4 Obtenir les incidents escaladés",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "3"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_SUPERVISOR"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/escalades",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "escalades"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["escalades"]
             }
           },
           "response": []
@@ -676,24 +403,11 @@
           "name": "2.5 Obtenir mes incidents affectés (Intervenant)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/affectes",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "affectes"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["affectes"]
             }
           },
           "response": []
@@ -702,24 +416,11 @@
           "name": "2.6 Obtenir les demandes d'escalade en attente",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "2"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_DISPATCHER"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/demandes-escalades",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "demandes-escalades"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["demandes-escalades"]
             }
           },
           "response": []
@@ -728,24 +429,11 @@
           "name": "2.7 Obtenir mes signalements",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "1"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_PASSENGER"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/mes-signalements",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "mes-signalements"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["mes-signalements"]
             }
           },
           "response": []
@@ -759,25 +447,11 @@
           "name": "3.1 Consulter le suivi (historique) d'un incident",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "X-User-Id",
-                "value": "104"
-              },
-              {
-                "key": "X-User-Role",
-                "value": "ROLE_TECHNICIAN"
-              }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/{{incidentId}}/suivi",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "{{incidentId}}",
-                "suivi"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["{{incidentId}}", "suivi"]
             }
           },
           "response": []
@@ -791,15 +465,12 @@
           "name": "4.1 Rapport — Aujourd'hui (jour)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "2" },
-              { "key": "X-User-Role", "value": "ROLE_DISPATCHER" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports?periode=jour",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports" ],
-              "query": [ { "key": "periode", "value": "jour" } ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports"],
+              "query": [{ "key": "periode", "value": "jour" }]
             }
           },
           "response": []
@@ -808,15 +479,12 @@
           "name": "4.2 Rapport — Cette semaine (semaine)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "2" },
-              { "key": "X-User-Role", "value": "ROLE_DISPATCHER" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports?periode=semaine",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports" ],
-              "query": [ { "key": "periode", "value": "semaine" } ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports"],
+              "query": [{ "key": "periode", "value": "semaine" }]
             }
           },
           "response": []
@@ -825,15 +493,12 @@
           "name": "4.3 Rapport — Ce mois (mois)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "3" },
-              { "key": "X-User-Role", "value": "ROLE_SUPERVISOR" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports?periode=mois",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports" ],
-              "query": [ { "key": "periode", "value": "mois" } ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports"],
+              "query": [{ "key": "periode", "value": "mois" }]
             }
           },
           "response": []
@@ -842,15 +507,12 @@
           "name": "4.4 Rapport — Ce trimestre (trimestre)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "3" },
-              { "key": "X-User-Role", "value": "ROLE_SUPERVISOR" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports?periode=trimestre",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports" ],
-              "query": [ { "key": "periode", "value": "trimestre" } ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports"],
+              "query": [{ "key": "periode", "value": "trimestre" }]
             }
           },
           "response": []
@@ -859,15 +521,12 @@
           "name": "4.5 Rapport — Cette année (annee)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "3" },
-              { "key": "X-User-Role", "value": "ROLE_SUPERVISOR" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports?periode=annee",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports" ],
-              "query": [ { "key": "periode", "value": "annee" } ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports"],
+              "query": [{ "key": "periode", "value": "annee" }]
             }
           },
           "response": []
@@ -876,14 +535,11 @@
           "name": "4.6 Tableau de bord en temps réel",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "3" },
-              { "key": "X-User-Role", "value": "ROLE_SUPERVISOR" }
-            ],
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/rapports/tableau-bord",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports", "tableau-bord" ]
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports", "tableau-bord"]
             }
           },
           "response": []
@@ -892,14 +548,11 @@
           "name": "4.7 Statistiques d'un intervenant (par-responsable)",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "X-User-Id",   "value": "3" },
-              { "key": "X-User-Role", "value": "ROLE_SUPERVISOR" }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/rapports/par-responsable/104",
-              "host": [ "{{baseUrl}}" ],
-              "path": [ "rapports", "par-responsable", "104" ]
+              "raw": "{{baseUrl}}/rapports/par-responsable/7",
+              "host": ["{{baseUrl}}"],
+              "path": ["rapports", "par-responsable", "7"]
             }
           },
           "response": []
@@ -915,6 +568,11 @@
     {
       "key": "incidentId",
       "value": "1"
+    },
+    {
+      "key": "token",
+      "value": "<paste your JWT here>",
+      "description": "JWT obtenu depuis POST http://localhost:8083/api/auth/login"
     }
   ]
 }
