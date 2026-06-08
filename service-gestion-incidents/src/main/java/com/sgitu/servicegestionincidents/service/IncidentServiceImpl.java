@@ -646,6 +646,9 @@ public class IncidentServiceImpl implements IncidentService {
         // Notification G5 — confirmation au déclarant
         notificationService.envoyerConfirmation(saved);
 
+        // Notification G5 — alerte aux dispatchers
+        notificationService.envoyerAlerteDispatchers(saved);
+
         // Déclencher G4 (Transport) — CONFIRME au moment du signalement
         try {
             envoyerEvenementTransport(saved, "CONFIRME");
