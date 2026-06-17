@@ -24,7 +24,9 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Force de hachage : 10 rounds (compromis sécurité/performance)
+        // Plus élevé = plus sécurisé mais plus lent
+        return new BCryptPasswordEncoder(10);
     }
 
     @Bean

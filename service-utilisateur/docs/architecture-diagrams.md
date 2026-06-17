@@ -16,6 +16,7 @@ graph TB
 
     subgraph GatewayZone ["Zone Passerelle & Sécurité"]
         G10["API Gateway (G10) <br/> (Spring Cloud Gateway)"]
+        Sec["Security Provider <br/> (JWT Validation + Claims Extraction)"]
         RedisG3[("Cache Révocation (G3-Redis) <br/> (Redis 7)")]
     end
 
@@ -40,7 +41,8 @@ graph TB
     Web -->|"HTTPS (Port 8080)"| G10
 
     %% Routage et Sécurité
-    G10 -->|"Vérifie les tokens"| G3
+    G10 -->|"Interroge la couche de sécurité"| Sec
+    Sec -->|"Validation JWT & Complétude des claims"| G3
     G3 <-->|"Lecture/Écriture"| RedisG3
     G3 -->|"Hibernate / JPA"| DB3
 
@@ -86,18 +88,27 @@ sequenceDiagram
     %% Étape 2 : Requête métier protégée
     Note over Client, G1: 2. Requête vers un Service Protégé (G1)
     Client->>G10: GET /api/v1/tickets (Header Authorization: Bearer JWT)
-    
+
     %% Étape 3 : Validation
-    Note over G10, Redis: 3. Interception & Vérification Sécurité
-    G10->>G3: GET /auth/validate (Vérification signature & expiration)
+    Note over G10, G3: 3. Vérification de la validité et de la révocation du token
+    G10->>G3: GET /auth/validate (Header Authorization: Bearer JWT)
     G3->>Redis: isTokenRevoked(token) ?
     Redis-->>G3: False (Le token n'est pas révoqué)
     G3-->>G10: Token Valide (Retourne userId, email, roles)
 
     %% Étape 4 : Routage
     Note over G10, G1: 4. Routage & Injection de contexte
-    G10->>G1: GET /v1/tickets (En-têtes X-User-Id, X-User-Roles, etc.)
+    G10->>G1: GET /v1/tickets (En-têtes X-User-Id, X-User-Roles, X-User-Email)
     Note over G1: Vérification des rôles<br/>(ex: ROLE_PASSENGER)
     G1-->>G10: Liste des tickets (200 OK)
     G10-->>Client: Liste des tickets (200 OK)
+
+    %% Étape 5 : Déconnexion sécurisée (Sign-Out)
+    Note over Client, G3: 5. Sign-Out & invalidation côté serveur
+    Client->>G10: POST /api/auth/logout (Header Authorization: Bearer JWT)
+    G10->>G3: POST /auth/logout (route interne)
+    G3->>Redis: SETEX <token> <TTL_restant> "revoked"
+    Redis-->>G3: OK
+    G3-->>G10: 204 No Content
+    G10-->>Client: Déconnexion confirmée
 ```
